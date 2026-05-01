@@ -1,64 +1,161 @@
-# @donotdev/crud
+# DoNotDev CRUD
 
-CRUD operations and form components for DoNotDev framework
+Complete CRUD operations and form components for DoNotDev framework.
 
-## Installation
+## Quick Start
 
-### One-Time Setup (Per Project/Monorepo)
+```typescript
+import { useCrud, EntityFormRenderer } from '@donotdev/crud';
 
-**Step 1: Create Personal Access Token**
+// Data operations (requires configureProviders({ crud: adapter }) at app startup)
+function UserList() {
+  const { data, loading, query } = useCrud('users', {
+    schema: UserSchema
+  });
 
-Create a GitHub Personal Access Token with `read:packages` scope (create once, reuse forever across unlimited projects):
-1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
-2. Generate new token with `read:packages` scope
-3. Copy the token (save it securely - you'll use this same token for all your projects)
+  useEffect(() => {
+    query({ limit: 10 });
+  }, []);
 
-**Step 2: Configure .npmrc**
+  return <div>{/* Render users */}</div>;
+}
 
-Create `.npmrc` in your project root (copy this file to each new project/monorepo, reuse the same PAT):
+// Form rendering
+function UserForm() {
+  const { add } = useCrud('users', { schema: UserSchema });
 
-```bash
-@donotdev:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=ghp_YourPersonalAccessToken
+  return (
+    <EntityFormRenderer
+      entity={UserEntity}
+      onSubmit={async (data) => {
+        await add(data);
+      }}
+    />
+  );
+}
 ```
 
-Replace `ghp_YourPersonalAccessToken` with your actual token. You can copy this `.npmrc` file to any new project/monorepo.
+## Architecture
 
-### Install Package
+### 4-Layer Architecture
 
-**If using `dndev init`:** Your `package.json` with the correct dependencies will be scaffolded, so you just need to run `bun install`.
-
-**If adding to an existing project:**
-
-```bash
-bun add @donotdev/crud
-# or
-npm install @donotdev/crud
+```
+useCrud (React entry point)
+    ↓
+CrudService (Complete orchestrator)
+    ↓
+Backend Adapter (FunctionsAdapter | FirestoreAdapter)
+    ↓
+Backend SDK (Firebase Functions | Firestore SDK)
 ```
 
-**Note:** Once PAT and `.npmrc` are set up, you can install any `@donotdev/*` package without repeating these steps.
+### Package Structure
 
-**Note:** This is a private package. You need to be a member of the DoNotDev community to access it.
+- **Form Components** (`@donotdev/components/form/fields`) - Pure UI components without react-hook-form
+- **Controlled Components** (`@donotdev/core/crud`) - React Hook Form wrappers
+- **Form Renderers** (`@donotdev/crud`) - High-level form components (EntityFormRenderer, FormFieldRenderer)
+- **Data Layer** (`@donotdev/crud`) - useCrud hook, CrudService, CrudStore
 
-## Documentation
+## Usage
 
-Visit [donotdev.com](https://donotdev.com) for full showcase.
-Visit [docs.donotdev.com](https://docs.donotdev.com) for full documentation.
+### useCrud Hook
 
-## Issues & Feedback
+```typescript
+const {
+  data,
+  loading,
+  error,
+  get,
+  set,
+  update,
+  delete: deleteDoc,
+  add,
+  query,
+} = useCrud('users', {
+  schema: UserSchema,
+});
 
-This repository is for **issues and feedback only**. 
+// Get single document
+const user = await get('user123');
 
-- [Report a bug](https://github.com/donotdev/crud/issues/new?template=bug_report.md)
-- [Request a feature](https://github.com/donotdev/crud/issues/new?template=feature_request.md)
+// Create document
+await add({ name: 'John', email: 'john@example.com' });
 
-**Source code is private.** All development happens in the private monorepo. Issues reported here will be addressed by the maintainers.
+// Update document
+await update('user123', { name: 'Jane' });
 
-## License
+// Delete document
+await deleteDoc('user123');
 
-Commercial © DoNotDev
+// Query collection
+const users = await query({ limit: 10, orderBy: 'createdAt' });
+```
 
----
+### EntityFormRenderer
 
-**This is an issue-only repository.** Source code is maintained in a private monorepo.
+```typescript
+const UserEntity = {
+  name: {
+    name: 'name',
+    type: 'text',
+    label: 'Name',
+    required: true
+  },
+  email: {
+    name: 'email',
+    type: 'email',
+    label: 'Email',
+    required: true
+  }
+};
 
+<EntityFormRenderer
+  entity={UserEntity}
+  onSubmit={async (data) => {
+    await add(data);
+  }}
+/>
+```
+
+## Dependencies
+
+- `@donotdev/core` - Core utilities and types
+- `@donotdev/components` - UI components
+- `@donotdev/firebase` - Firebase provider
+- `react-hook-form` - Form state management
+
+## Backend Adapters
+
+### FirestoreAdapter (`@donotdev/firebase`)
+
+Direct Firestore SDK operations with real-time subscriptions.
+
+```typescript
+import { FirestoreAdapter } from '@donotdev/firebase';
+configureProviders({ crud: new FirestoreAdapter() });
+```
+
+**When to use:** User preferences, settings, prototyping without functions.
+**When NOT to use:** Production data requiring server-side security — use `FunctionsAdapter` instead.
+
+### FunctionsAdapter (`@donotdev/crud`)
+
+Callable functions adapter (Firebase Cloud Functions or Supabase Edge Functions).
+
+```typescript
+import { FunctionsAdapter } from '@donotdev/crud';
+configureProviders({ crud: new FunctionsAdapter() });
+```
+
+Server generates technical fields and enforces security rules. Use for production data requiring validation, auth checks, and audit logs.
+
+### SupabaseCrudAdapter (`@donotdev/supabase`)
+
+Direct PostgREST access with RLS-based security.
+
+```typescript
+import { SupabaseCrudAdapter } from '@donotdev/supabase';
+configureProviders({ crud: new SupabaseCrudAdapter(supabaseClient) });
+```
+
+DB-level security via Row Level Security and column grants. Field name mapping (camelCase ↔ snake_case) handled at adapter boundary.

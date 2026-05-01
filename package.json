@@ -1,0 +1,104 @@
+{
+  "name": "@donotdev/crud",
+  "version": "0.1.42",
+  "private": false,
+  "type": "module",
+  "license": "MIT",
+  "description": "CRUD operations and form components for DoNotDev framework",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "sideEffects": [
+    "./src/builtinFieldTypes.tsx",
+    "./src/registerBuiltinFieldTypes.tsx",
+    "./src/fieldTypeRegistry.ts"
+  ],
+  "files": [
+    "dist",
+    "guidelines",
+    "package.json",
+    "README.md",
+    "LICENSE.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/donotdev/crud.git"
+  },
+  "keywords": [
+    "donotdev",
+    "dndev",
+    "crud",
+    "forms",
+    "react-hook-form",
+    "firebase",
+    "valibot",
+    "react",
+    "typescript"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "tsc --noEmit --watch --listFiles false --listEmittedFiles false",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "lint": "eslint src/",
+    "type-check": "bunx tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@donotdev/components": "workspace:*",
+    "@donotdev/core": "workspace:*",
+    "dompurify": "^3.3.2",
+    "react-easy-crop": "^5.5.6"
+  },
+  "peerDependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@tiptap/extension-placeholder": "^3.19.0",
+    "@tiptap/pm": "^3.19.0",
+    "@tiptap/react": "^3.19.0",
+    "@tiptap/starter-kit": "^3.19.0",
+    "lucide-react": "^0.575.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-hook-form": "^7.71.2",
+    "valibot": "^1.2.0"
+  },
+  "devDependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@testing-library/react": "^16.1.0",
+    "@tiptap/extension-placeholder": "^3.19.0",
+    "@tiptap/pm": "^3.19.0",
+    "@tiptap/react": "^3.19.0",
+    "@tiptap/starter-kit": "^3.19.0",
+    "lucide-react": "^0.575.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-hook-form": "^7.71.2",
+    "valibot": "^1.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@tiptap/extension-placeholder": {
+      "optional": true
+    },
+    "@tiptap/pm": {
+      "optional": true
+    },
+    "@tiptap/react": {
+      "optional": true
+    },
+    "@tiptap/starter-kit": {
+      "optional": true
+    }
+  }
+}
