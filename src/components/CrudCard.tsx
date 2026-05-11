@@ -228,13 +228,15 @@ export function CrudCard({
 
   const deleteItem = useCrud(entity).delete;
 
-  const overlay =
+  const actionsNode =
     renderActions || showDelete ? (
       <div
         style={{
           display: 'flex',
           alignItems: 'flex-start',
           gap: 'var(--gap-xs)',
+          // Override inherited pointer-events:none from .dndev-card-overlay
+          pointerEvents: 'auto',
         }}
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
@@ -274,25 +276,10 @@ export function CrudCard({
       elevated
       onClick={onClick ? () => onClick(item.id) : undefined}
       className={className}
-      overlay={overlay ?? undefined}
+      overlay={actionsNode ?? undefined}
       overlayPosition="top-right"
-    >
-      {renderOverlay && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'none',
-            zIndex: 5,
-          }}
-        >
-          {renderOverlay}
-        </div>
-      )}
-    </Card>
+      fullOverlay={renderOverlay ?? undefined}
+    />
   );
 }
 
