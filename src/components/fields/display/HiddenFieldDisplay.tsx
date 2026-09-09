@@ -9,9 +9,9 @@
  * @author AMBROISE PARK Consulting
  */
 
-import type { EntityField } from '@donotdev/core';
-
 import type { ComponentType } from 'react';
+
+import type { EntityField } from '@donotdev/core';
 
 export interface HiddenFieldDisplayProps {
   /** Field configuration */

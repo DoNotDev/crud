@@ -42,8 +42,9 @@ vi.mock('@donotdev/core', async () => {
 // Subject under test — imported after mocks are registered.
 // -----------------------------------------------------------------------------
 
-import { FunctionsAdapter } from '../adapters/FunctionsAdapter';
 import { BulkCollisionError } from '@donotdev/core';
+
+import { FunctionsAdapter } from '../adapters/FunctionsAdapter';
 
 // -----------------------------------------------------------------------------
 // Helpers

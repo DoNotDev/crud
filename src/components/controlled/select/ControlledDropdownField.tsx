@@ -2,14 +2,13 @@
 // packages/features/crud/src/components/controlled/select/ControlledDropdownField.tsx
 
 import { useMemo } from 'react';
+import type { ReactElement } from 'react';
 import { Controller, useWatch, useFormContext } from 'react-hook-form';
+import type { FieldValues, Path } from 'react-hook-form';
 
 import { translateLabel } from '../../../forms/utils';
 import { DropdownComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
-
-import type { ReactElement } from 'react';
-import type { FieldValues, Path } from 'react-hook-form';
 
 /**
  * ControlledDropdownField - Explicit controlled component for select/dropdown inputs

@@ -9,9 +9,9 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { Checkbox } from '@donotdev/components';
-
 import type { ChangeEvent, ComponentType, ReactNode } from 'react';
+
+import { Checkbox } from '@donotdev/components';
 
 export interface CheckboxFieldComponentProps {
   /** The label for the checkbox - can be a string or ReactNode (e.g., with links) */

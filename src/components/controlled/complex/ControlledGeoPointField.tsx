@@ -1,13 +1,12 @@
 'use client';
 // packages/features/crud/src/components/controlled/complex/ControlledGeoPointField.tsx
 
+import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
+import type { FieldValues, Path } from 'react-hook-form';
 
 import { GeoPointFieldComponent, type GeoPoint } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
-
-import type { ReactElement } from 'react';
-import type { FieldValues, Path } from 'react-hook-form';
 
 /**
 

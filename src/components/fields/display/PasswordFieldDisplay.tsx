@@ -11,11 +11,10 @@
 
 import { Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
+import type { ComponentType } from 'react';
 
 import { Skeleton, Button, CopyToClipboard, Stack } from '@donotdev/components';
 import type { EntityField } from '@donotdev/core';
-
-import type { ComponentType } from 'react';
 
 export interface PasswordFieldDisplayProps {
   /** Field configuration */

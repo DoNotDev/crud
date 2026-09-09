@@ -9,9 +9,9 @@
  * @author AMBROISE PARK Consulting
  */
 
-import DateFieldComponent from './DateFieldComponent';
-
 import type { ChangeEvent, ComponentType } from 'react';
+
+import DateFieldComponent from './DateFieldComponent';
 
 export interface TimestampFieldComponentProps {
   /** Field label */

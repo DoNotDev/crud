@@ -9,10 +9,10 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ChangeEvent, ComponentType } from 'react';
+
 import { RadioGroup, Label, Stack } from '@donotdev/components';
 import type { RadioOption } from '@donotdev/components';
-
-import type { ChangeEvent, ComponentType } from 'react';
 
 export interface RadioFieldComponentProps {
   /** Field label */

@@ -11,11 +11,10 @@
  */
 
 import { useState } from 'react';
+import type { ChangeEvent, ComponentType, MouseEvent } from 'react';
 
 import { Checkbox, Label, Sheet, Stack, Text } from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
-
-import type { ChangeEvent, ComponentType, MouseEvent } from 'react';
 
 export interface GdprConsentFieldComponentProps {
   /** Whether the checkbox is checked */

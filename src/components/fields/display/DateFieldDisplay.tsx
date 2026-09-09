@@ -9,11 +9,11 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ComponentType } from 'react';
+
 import { Text, Spinner } from '@donotdev/components';
 import { getI18nInstance } from '@donotdev/core';
 import type { EntityField } from '@donotdev/core';
-
-import type { ComponentType } from 'react';
 
 export interface DateFieldDisplayProps {
   /** Field configuration */

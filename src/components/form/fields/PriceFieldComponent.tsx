@@ -13,6 +13,7 @@
 
 import { CirclePlus, CircleMinus } from 'lucide-react';
 import { useId, useState } from 'react';
+import type { ChangeEvent, ComponentType } from 'react';
 
 import {
   Input,
@@ -24,8 +25,6 @@ import {
   CollapsibleContent,
 } from '@donotdev/components';
 import { useTranslation, getCurrencySymbol } from '@donotdev/core';
-
-import type { ChangeEvent, ComponentType } from 'react';
 
 export interface PriceValue {
   amount: number | null;

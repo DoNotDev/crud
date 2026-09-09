@@ -11,13 +11,12 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
+import type { FieldValues, Path } from 'react-hook-form';
 
 import { RatingFieldComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
-
-import type { ReactElement } from 'react';
-import type { FieldValues, Path } from 'react-hook-form';
 
 /**
  * ControlledRatingField - Controlled component for star rating inputs

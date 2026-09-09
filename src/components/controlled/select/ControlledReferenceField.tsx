@@ -2,14 +2,13 @@
 // packages/features/crud/src/components/controlled/select/ControlledReferenceField.tsx
 
 import { useMemo } from 'react';
+import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
+import type { FieldValues, Path } from 'react-hook-form';
 
 import { useCrudList } from '../../../useCrudList';
 import ReferenceFieldComponent from '../../form/fields/ReferenceFieldComponent';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
-
-import type { ReactElement } from 'react';
-import type { FieldValues, Path } from 'react-hook-form';
 
 /** Auto-detect fields to use as label from an item's keys */
 const AUTO_DETECT_FIELDS = ['name', 'title', 'label', 'displayName'];

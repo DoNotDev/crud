@@ -20,6 +20,11 @@
 import { valibotResolver } from '@hookform/resolvers/valibot';
 import { useMemo, useEffect, useRef, createElement } from 'react';
 import { useForm } from 'react-hook-form';
+import type {
+  FieldValues,
+  ResolverOptions,
+  DefaultValues,
+} from 'react-hook-form';
 
 import { toast, ToastAction } from '@donotdev/components';
 import { BACKEND_GENERATED_FIELD_NAMES, createSchemas } from '@donotdev/core';
@@ -28,22 +33,16 @@ import type { AnyEntity } from '@donotdev/core';
 import { useFormStore, useFormStatus, useUploadProgress } from '../../stores';
 import { useUploadStore } from '../../stores/UploadStore';
 import { checkForBlobUrls, isStorageUrl } from '../../utils/uploadValidation';
-import { getFieldsForOperation } from '../utils';
-import {
-  buildInitialFromRecord,
-  buildSchemaDefaults,
-} from '../utils/buildInitialValues';
-
 import type {
   UseEntityFormOptions,
   EntityFormReturn,
   InferEntityData,
 } from '../types';
-import type {
-  FieldValues,
-  ResolverOptions,
-  DefaultValues,
-} from 'react-hook-form';
+import { getFieldsForOperation } from '../utils';
+import {
+  buildInitialFromRecord,
+  buildSchemaDefaults,
+} from '../utils/buildInitialValues';
 
 /** Default translation function (module-level for stable reference) */
 const defaultT = (key: string): string => key;
@@ -493,7 +492,10 @@ export function useEntityForm<E extends AnyEntity>(
     const result = { ...data } as Record<string, unknown>;
     for (const [fieldName, fieldConfig] of Object.entries(e.fields)) {
       if (fieldConfig.type === 'price' && fieldName in result) {
-        const val = result[fieldName] as { amount?: number | null } | null | undefined;
+        const val = result[fieldName] as
+          | { amount?: number | null }
+          | null
+          | undefined;
         if (val == null || val.amount == null) {
           result[fieldName] = null;
         }
@@ -725,7 +727,6 @@ export function useEntityForm<E extends AnyEntity>(
     }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => cleanup, []);
 
   // ============================================================================

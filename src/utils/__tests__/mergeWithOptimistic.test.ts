@@ -11,9 +11,8 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { mergeWithOptimistic } from '../mergeWithOptimistic';
-
 import type { OptimisticMeta } from '../../types';
+import { mergeWithOptimistic } from '../mergeWithOptimistic';
 
 /** Item must satisfy WithId (id + index signature) for mergeWithOptimistic generic */
 interface Item {

@@ -13,7 +13,6 @@
 import { useCallback } from 'react';
 
 import { useCrudStore } from '../CrudStore';
-
 import type { FilterState } from '../types';
 
 /** Options for the {@link useCrudFilters} hook. */

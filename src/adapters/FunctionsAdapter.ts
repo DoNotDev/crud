@@ -104,7 +104,11 @@ export class FunctionsAdapter implements ICrudAdapter {
       const data = result.data as T;
       // Validate response if schema provided
       if (schema) {
-        const validated = validateWithSchema(schema, data, 'FunctionsAdapter.get') as Record<string, unknown>;
+        const validated = validateWithSchema(
+          schema,
+          data,
+          'FunctionsAdapter.get'
+        ) as Record<string, unknown>;
         return { ...validated, id } as T;
       }
       // Include document ID in result (mirrors FirestoreAdapter contract)

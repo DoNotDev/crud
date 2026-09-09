@@ -11,10 +11,9 @@
  */
 
 import { useId } from 'react';
+import type { ChangeEvent, ComponentProps } from 'react';
 
 import { Input, Label, Spinner, cn, Stack } from '@donotdev/components';
-
-import type { ChangeEvent, ComponentProps } from 'react';
 
 export interface TextFieldComponentProps extends Omit<
   ComponentProps<typeof Input>,

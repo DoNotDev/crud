@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import Cropper from 'react-easy-crop';
+import type { Area, Point } from 'react-easy-crop';
 
 import {
   Button,
@@ -40,9 +41,7 @@ import { useTranslation } from '@donotdev/core';
 
 import { processImage } from '../../../utils/imageProcessing';
 import { createPreviewURL, revokePreviewURL } from '../../../utils/imageUtils';
-
 import type { ImageMetadata } from '../../../utils/imageUtils';
-import type { Area, Point } from 'react-easy-crop';
 
 export interface ImageViewerDialogProps {
   /** Array of images */

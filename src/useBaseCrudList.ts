@@ -23,12 +23,11 @@ import type {
 
 import { useCrudStore } from './CrudStore';
 import { CRUD_OPERATION } from './types';
+import type { OptimisticMeta, CacheOptions } from './types';
 import { useCrud, getCrudServiceInstance, EMPTY_OPTIMISTIC } from './useCrud';
+import type { UseCrudOptions } from './useCrud';
 import { mergeWithOptimistic } from './utils/mergeWithOptimistic';
 import { injectScopeFilter, getCurrentScopeValue } from './utils/scopeUtils';
-
-import type { OptimisticMeta, CacheOptions } from './types';
-import type { UseCrudOptions } from './useCrud';
 
 /** Cursor cache for server-side pagination */
 type CursorCache = Map<number, string | null>;

@@ -9,10 +9,10 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ChangeEvent, ComponentType } from 'react';
+
 import { Select, Stack } from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
-
-import type { ChangeEvent, ComponentType } from 'react';
 
 export interface DropdownComponentProps {
   /** Field label */

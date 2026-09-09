@@ -19,6 +19,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
 import {
   SortableContext,
   useSortable,
@@ -34,20 +35,18 @@ import {
   useRef,
   useState,
 } from 'react';
+import type { ChangeEvent, DragEvent } from 'react';
 
 import { Text, Stack, Progress, handleImageError } from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
 import type { Picture } from '@donotdev/core';
 
 import { useFileUpload } from '../../../hooks/useFileUpload';
+import type { FileEntry } from '../../../stores/UploadStore';
 import { processImage } from '../../../utils/imageProcessing';
 import { uploadImage } from '../../../utils/imageStorage';
-import { ImageViewerDialog } from '../internal/ImageViewerDialog';
-
-import type { FileEntry } from '../../../stores/UploadStore';
 import type { ImageMetadata } from '../../../utils/imageUtils';
-import type { DragEndEvent } from '@dnd-kit/core';
-import type { ChangeEvent, DragEvent } from 'react';
+import { ImageViewerDialog } from '../internal/ImageViewerDialog';
 
 // Stable reference for accept types
 const IMAGE_ACCEPT_TYPES = ['image/*'];

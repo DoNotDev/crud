@@ -11,12 +11,12 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ReactNode } from 'react';
+
 import { ActionButton } from '@donotdev/components';
 import type { ActionButtonProps } from '@donotdev/components';
 
 import { useCrudStore } from '../CrudStore';
-
-import type { ReactNode } from 'react';
 
 /** Props for {@link CrudButton}, an ActionButton variant that auto-checks CRUD availability. */
 export interface CrudButtonProps<T = unknown> extends Omit<

@@ -8,13 +8,12 @@
  * valibotResolver, proving that partial data passes update but fails create.
  */
 
-import { describe, it, expect } from 'vitest';
-import * as v from 'valibot';
 import { valibotResolver } from '@hookform/resolvers/valibot';
+import type { FieldValues, ResolverOptions } from 'react-hook-form';
+import type * as v from 'valibot';
+import { describe, it, expect } from 'vitest';
 
 import { createSchemas, defineEntity, EDITABLE } from '@donotdev/core';
-
-import type { FieldValues, ResolverOptions } from 'react-hook-form';
 
 // ---------------------------------------------------------------------------
 // Test Entity: mimics apartment with required fields + computed field

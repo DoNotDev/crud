@@ -279,11 +279,9 @@ export async function bulkAcrossImpl(
       const patchRecord = patch as Record<string, unknown>;
       return {
         id,
-        patch: (
-          updatePiiFields.length > 0 && self.security
-            ? self.security.encryptPii(patchRecord, updatePiiFields)
-            : patchRecord
-        ) as Record<string, unknown>,
+        patch: (updatePiiFields.length > 0 && self.security
+          ? self.security.encryptPii(patchRecord, updatePiiFields)
+          : patchRecord) as Record<string, unknown>,
       };
     });
 
@@ -296,9 +294,15 @@ export async function bulkAcrossImpl(
   const cacheLogsMap = new Map<string, BatchCacheLog>();
 
   try {
-    for (const { batch, encryptedInserts, encryptedUpdates } of preparedBatches) {
+    for (const {
+      batch,
+      encryptedInserts,
+      encryptedUpdates,
+    } of preparedBatches) {
       const { collection, deletes = [] } = batch;
-      const insertTempIds = encryptedInserts.map(() => `temp_${generateUUID()}`);
+      const insertTempIds = encryptedInserts.map(
+        () => `temp_${generateUUID()}`
+      );
       const touchedIds = [
         ...(batch.updates ?? []).map((u) => u.id),
         ...deletes,
@@ -322,7 +326,13 @@ export async function bulkAcrossImpl(
         if (self.store) {
           self.store.getState().addOptimistic(collection, tempId, tempItem);
         }
-        updateListCaches(self, collection, tempId, tempItem, CRUD_OPERATION.ADD);
+        updateListCaches(
+          self,
+          collection,
+          tempId,
+          tempItem,
+          CRUD_OPERATION.ADD
+        );
         log.inserts.push({
           tempId,
           originalRow: row as Record<string, unknown>,
@@ -365,8 +375,11 @@ export async function bulkAcrossImpl(
     const results: Record<string, import('@donotdev/core').BulkResult> = {};
 
     for (const wave of waves) {
-      const waveEntries = wave.map((waveBatch) =>
-        preparedBatches.find((p) => p.batch.collection === waveBatch.collection)!
+      const waveEntries = wave.map(
+        (waveBatch) =>
+          preparedBatches.find(
+            (p) => p.batch.collection === waveBatch.collection
+          )!
       );
 
       const waveResults = await Promise.all(
@@ -515,8 +528,7 @@ export async function bulkAcrossImpl(
     throw wrappedError;
   } finally {
     for (const { batch } of preparedBatches) {
-      if (self.store)
-        self.store.getState().setLoading(batch.collection, false);
+      if (self.store) self.store.getState().setLoading(batch.collection, false);
     }
   }
 }

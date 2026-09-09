@@ -9,9 +9,9 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { Label, Input, cn, Stack } from '@donotdev/components';
-
 import type { ChangeEvent, ComponentType } from 'react';
+
+import { Label, Input, cn, Stack } from '@donotdev/components';
 
 export interface GeoPoint {
   lat: number;

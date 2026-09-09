@@ -11,6 +11,7 @@
  */
 
 import { useState, useMemo, useEffect, useId } from 'react';
+import type { ChangeEvent, ComponentType } from 'react';
 
 import {
   Input,
@@ -24,8 +25,6 @@ import {
 import type { DropdownMenuItemData } from '@donotdev/components';
 import { Flag, COUNTRIES } from '@donotdev/core';
 import type { CountryData } from '@donotdev/core';
-
-import type { ChangeEvent, ComponentType } from 'react';
 
 export interface PhoneNumberComponentProps {
   /** Field label */

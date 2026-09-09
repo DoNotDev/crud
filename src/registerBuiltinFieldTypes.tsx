@@ -18,6 +18,8 @@
 // in @donotdev/core/schemas/getSchemaType.ts on module load.
 // This registry only handles UI components + filter/display metadata.
 
+import type { ChangeEvent, ReactElement } from 'react';
+
 import {
   Text,
   Stack,
@@ -74,16 +76,14 @@ import {
   RichTextComponent,
   TextFieldComponent,
 } from './components/form/fields';
-import { translateLabel } from './forms/utils';
-import { sanitizeHtml } from './utils/sanitizeHtml';
-
 import type { UncontrolledFieldProps } from './FieldRegistry';
 import type {
   FieldTypeMetadata,
   DisplayFormatter,
   DisplayFormatterOptions,
 } from './fieldTypeRegistry.types';
-import type { ChangeEvent, ReactElement } from 'react';
+import { translateLabel } from './forms/utils';
+import { sanitizeHtml } from './utils/sanitizeHtml';
 
 // ============================================================================
 // Display Formatters
@@ -954,7 +954,10 @@ export function registerAllBuiltinFieldTypes(
         components.uncontrolled
       );
     }
-    metadataRegistry.set(type, metadata);
+    // Built-ins read their error from fieldState, so they omit the form-wide
+    // `errors` prop by default — a call site sets omitFormErrors: false when it
+    // genuinely needs it (field-array, for nested item errors).
+    metadataRegistry.set(type, { omitFormErrors: true, ...metadata });
   };
 
   // Text-based
@@ -1501,6 +1504,8 @@ export function registerAllBuiltinFieldTypes(
     components: {
       controlled: ControlledFieldArrayField,
     },
+    // Forwards `errors` to the nested item renderers — needs the form-wide object
+    omitFormErrors: false,
   });
 
   // Selection

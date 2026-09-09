@@ -10,11 +10,10 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import type { ChangeEvent, ComponentType } from 'react';
 
 import { Input, Label, cn, Stack } from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
-
-import type { ChangeEvent, ComponentType } from 'react';
 
 export interface NumberFieldComponentProps {
   /** Label for the field */

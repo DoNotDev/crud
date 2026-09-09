@@ -22,7 +22,6 @@
 import { createDoNotDevStore, isClient } from '@donotdev/core';
 
 import { OPTIMISTIC_STATUSES, CRUD_OPERATION } from './types';
-
 import type {
   OptimisticMeta,
   CrudState,

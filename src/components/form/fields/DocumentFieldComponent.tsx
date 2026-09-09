@@ -21,6 +21,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import type { ChangeEvent, DragEvent } from 'react';
 
 import {
   Button,
@@ -36,6 +37,7 @@ import {
 import { handleError, useTranslation } from '@donotdev/core';
 
 import { useFileUpload } from '../../../hooks/useFileUpload';
+import type { FileEntry, UploadResult } from '../../../stores/UploadStore';
 import {
   uploadFile,
   deleteFile,
@@ -43,10 +45,7 @@ import {
   formatFileSize,
   getDocumentAcceptString,
 } from '../../../utils/fileStorage';
-
-import type { FileEntry, UploadResult } from '../../../stores/UploadStore';
 import type { FileAsset } from '../../../utils/fileStorage';
-import type { ChangeEvent, DragEvent } from 'react';
 
 export interface DocumentFieldComponentProps {
   /** Field name (for upload registration) */

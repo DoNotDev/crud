@@ -9,10 +9,10 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ComponentType } from 'react';
+
 import { Avatar, Text } from '@donotdev/components';
 import type { EntityField } from '@donotdev/core';
-
-import type { ComponentType } from 'react';
 
 export interface ImageFieldDisplayProps {
   /** Field configuration */

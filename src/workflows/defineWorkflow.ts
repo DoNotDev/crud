@@ -25,10 +25,10 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ReactNode } from 'react';
+
 import type { AnyEntity } from '@donotdev/core';
 import type { ConditionInput, ConditionalBehavior } from '@donotdev/core';
-
-import type { ReactNode } from 'react';
 
 /** Configuration for a single workflow step */
 export interface WorkflowStep {

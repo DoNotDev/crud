@@ -84,7 +84,10 @@ export function auditCrud(
  * anonymous client can exhaust the limit for all others. Call `setCurrentUser()`
  * after auth state changes to enable per-user isolation.
  */
-export function rateLimitKey(self: CrudServiceInternal, collection: string): string {
+export function rateLimitKey(
+  self: CrudServiceInternal,
+  collection: string
+): string {
   return self.currentUserId
     ? `${self.currentUserId}:${collection}`
     : collection;

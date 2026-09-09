@@ -10,7 +10,6 @@
  */
 
 import { CRUD_OPERATION } from '../types';
-
 import type { OptimisticMeta } from '../types';
 
 interface WithId {

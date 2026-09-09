@@ -11,6 +11,7 @@
  */
 
 import { useState, useId, useRef, useEffect } from 'react';
+import type { ChangeEvent, ComponentProps, ComponentType } from 'react';
 
 import {
   Textarea,
@@ -19,8 +20,6 @@ import {
   cn,
   Stack,
 } from '@donotdev/components';
-
-import type { ChangeEvent, ComponentProps, ComponentType } from 'react';
 
 export interface TextAreaComponentProps extends Omit<
   ComponentProps<typeof Textarea>,

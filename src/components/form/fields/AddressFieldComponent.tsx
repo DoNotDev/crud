@@ -57,7 +57,10 @@ const MAX_CACHE_SIZE = 100;
 
 function loadCache(): Map<string, AddressOption[]> {
   try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(CACHE_KEY) : null;
+    const raw =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem(CACHE_KEY)
+        : null;
     if (raw) return new Map(JSON.parse(raw));
   } catch {
     /* corrupted — start fresh */
@@ -105,13 +108,15 @@ function installBootstrapLoader(key: string) {
   const e = new URLSearchParams();
 
   const u = () =>
-    // eslint-disable-next-line no-async-promise-executor
     d._p ||
     (d._p = new Promise<void>(async (resolve, reject) => {
       const a = m.createElement('script');
       e.set('libraries', [...r].join(','));
       for (const k of Object.keys(g)) {
-        e.set(k.replace(/[A-Z]/g, (t: string) => '_' + t[0]!.toLowerCase()), g[k]!);
+        e.set(
+          k.replace(/[A-Z]/g, (t: string) => '_' + t[0]!.toLowerCase()),
+          g[k]!
+        );
       }
       e.set('callback', c + '.maps.' + q);
       a.src = `https://maps.googleapis.com/maps/api/js?` + e;
@@ -156,7 +161,9 @@ const AddressFieldComponent = ({
 }: AddressFieldComponentProps) => {
   const { t } = useTranslation('crud');
 
-  const [inputValue, setInputValue] = useState<string>(value?.formatted_address || '');
+  const [inputValue, setInputValue] = useState<string>(
+    value?.formatted_address || ''
+  );
   const [options, setOptions] = useState<AddressOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState(false);
@@ -193,11 +200,15 @@ const AddressFieldComponent = ({
         }
         await (window as any).google.maps.importLibrary('places');
         if (cancelled) return;
-        sessionTokenRef.current = new (window as any).google.maps.places.AutocompleteSessionToken();
+        sessionTokenRef.current = new (
+          window as any
+        ).google.maps.places.AutocompleteSessionToken();
         setMapsLoaded(true);
       } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('[AddressFieldComponent] Google Maps loading failed:', err);
+        console.error(
+          '[AddressFieldComponent] Google Maps loading failed:',
+          err
+        );
         if (!cancelled) setApiError(true);
       }
     })();
@@ -226,16 +237,19 @@ const AddressFieldComponent = ({
       setLoading(true);
       try {
         const places = (window as any).google.maps.places;
-        const { suggestions } = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-          input: inputValue,
-          sessionToken: sessionTokenRef.current,
-        });
+        const { suggestions } =
+          await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+            input: inputValue,
+            sessionToken: sessionTokenRef.current,
+          });
 
         const newOptions: AddressOption[] = suggestions
           .filter((s: any) => s.placePrediction)
           .map((s: any) => {
             const pred = s.placePrediction;
-            const label = [pred.mainText?.text, pred.secondaryText?.text].filter(Boolean).join(', ');
+            const label = [pred.mainText?.text, pred.secondaryText?.text]
+              .filter(Boolean)
+              .join(', ');
             globalPredictions.set(label, pred);
             evictOldest(globalPredictions);
             return { value: label, label };
@@ -246,8 +260,10 @@ const AddressFieldComponent = ({
         evictOldest(globalSuggestionCache);
         persistCache(globalSuggestionCache);
       } catch (err) {
-        // eslint-disable-next-line no-console
-        console.warn('[AddressFieldComponent] AutocompleteSuggestion failed:', err);
+        console.warn(
+          '[AddressFieldComponent] AutocompleteSuggestion failed:',
+          err
+        );
         setApiError(true);
         setOptions([]);
       } finally {
@@ -262,7 +278,9 @@ const AddressFieldComponent = ({
 
   const handleSelect = useCallback(
     async (selected: string | string[]) => {
-      const selectedLabel = Array.isArray(selected) ? selected[0] || '' : selected;
+      const selectedLabel = Array.isArray(selected)
+        ? selected[0] || ''
+        : selected;
       if (!selectedLabel) return;
 
       // Manual mode: emit raw text
@@ -280,12 +298,16 @@ const AddressFieldComponent = ({
         // Cache miss (e.g. localStorage rehydrate) — re-fetch to recover the SDK object
         setLoading(true);
         try {
-          const { suggestions } = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-            input: selectedLabel,
-            sessionToken: sessionTokenRef.current,
-          });
+          const { suggestions } =
+            await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+              input: selectedLabel,
+              sessionToken: sessionTokenRef.current,
+            });
           const match = suggestions.find((s: any) => {
-            const label = [s.placePrediction?.mainText?.text, s.placePrediction?.secondaryText?.text]
+            const label = [
+              s.placePrediction?.mainText?.text,
+              s.placePrediction?.secondaryText?.text,
+            ]
               .filter(Boolean)
               .join(', ');
             return label === selectedLabel;
@@ -295,8 +317,10 @@ const AddressFieldComponent = ({
             globalPredictions.set(selectedLabel, prediction);
           }
         } catch (err) {
-          // eslint-disable-next-line no-console
-          console.warn('[AddressFieldComponent] Re-fetch for selection failed:', err);
+          console.warn(
+            '[AddressFieldComponent] Re-fetch for selection failed:',
+            err
+          );
         }
         if (!prediction) {
           setLoading(false);
@@ -314,24 +338,31 @@ const AddressFieldComponent = ({
           fields: ['formattedAddress', 'location', 'addressComponents'],
         });
 
-        const formattedAddress: string = place.formattedAddress || selectedLabel;
+        const formattedAddress: string =
+          place.formattedAddress || selectedLabel;
         let lat = place.location?.lat() ?? 0;
         let lng = place.location?.lng() ?? 0;
 
         // Coord fallback: geocode the address if Places returned none
         if (lat === 0 && lng === 0 && formattedAddress) {
           try {
-            const geocodingLib: any = await (window as any).google.maps.importLibrary('geocoding');
+            const geocodingLib: any = await (
+              window as any
+            ).google.maps.importLibrary('geocoding');
             const geocoder = new geocodingLib.Geocoder();
-            const geocodeResult = await geocoder.geocode({ address: formattedAddress });
+            const geocodeResult = await geocoder.geocode({
+              address: formattedAddress,
+            });
             const loc = geocodeResult.results?.[0]?.geometry?.location;
             if (loc) {
               lat = loc.lat();
               lng = loc.lng();
             }
           } catch (geoErr) {
-            // eslint-disable-next-line no-console
-            console.error('[AddressFieldComponent] Geocoder fallback failed:', geoErr);
+            console.error(
+              '[AddressFieldComponent] Geocoder fallback failed:',
+              geoErr
+            );
           }
         }
 
@@ -344,10 +375,14 @@ const AddressFieldComponent = ({
         if (extractDistrictCode) {
           const components: any[] = place.addressComponents || [];
           const postal =
-            components.find((c) => (c.types || []).includes('postal_code'))?.longText ||
-            components.find((c) => (c.types || []).includes('postal_code'))?.long_name ||
+            components.find((c) => (c.types || []).includes('postal_code'))
+              ?.longText ||
+            components.find((c) => (c.types || []).includes('postal_code'))
+              ?.long_name ||
             '';
-          const districtCode = postal.startsWith('92') ? 92 : parseInt(postal.slice(-2), 10) || null;
+          const districtCode = postal.startsWith('92')
+            ? 92
+            : parseInt(postal.slice(-2), 10) || null;
           newValue.district_code = districtCode;
         }
 
@@ -358,7 +393,6 @@ const AddressFieldComponent = ({
         // New session token after a successful selection (per Google docs)
         sessionTokenRef.current = new places.AutocompleteSessionToken();
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error('[AddressFieldComponent] Place fetchFields failed:', err);
         // Don't drop the user's input on error
         setInputValue(selectedLabel);
@@ -394,7 +428,9 @@ const AddressFieldComponent = ({
           <p
             style={{
               fontSize: 'var(--font-size-xs)',
-              color: error ? 'var(--destructive-foreground)' : 'var(--muted-foreground)',
+              color: error
+                ? 'var(--destructive-foreground)'
+                : 'var(--muted-foreground)',
             }}
           >
             {helperText}
@@ -432,14 +468,19 @@ const AddressFieldComponent = ({
             color: 'var(--muted-foreground)',
           }}
         >
-          {t('address.apiUnavailable', 'Google Places unavailable — type address manually')}
+          {t(
+            'address.apiUnavailable',
+            'Google Places unavailable — type address manually'
+          )}
         </p>
       )}
       {helperText && (
         <p
           style={{
             fontSize: 'var(--font-size-xs)',
-            color: error ? 'var(--destructive-foreground)' : 'var(--muted-foreground)',
+            color: error
+              ? 'var(--destructive-foreground)'
+              : 'var(--muted-foreground)',
           }}
         >
           {helperText}

@@ -9,9 +9,9 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { Label, Slider, cn, Stack } from '@donotdev/components';
-
 import type { ChangeEvent, ComponentType } from 'react';
+
+import { Label, Slider, cn, Stack } from '@donotdev/components';
 
 export interface RangeFieldComponentProps {
   /** Label for the field */

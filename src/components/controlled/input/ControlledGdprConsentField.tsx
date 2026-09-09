@@ -1,13 +1,12 @@
 'use client';
 // packages/features/crud/src/components/controlled/input/ControlledGdprConsentField.tsx
 
+import type { ChangeEvent, ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
+import type { FieldValues, Path } from 'react-hook-form';
 
 import { GdprConsentFieldComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
-
-import type { ChangeEvent, ReactElement } from 'react';
-import type { FieldValues, Path } from 'react-hook-form';
 
 /**
  * ControlledGdprConsentField - GDPR-compliant consent checkbox with automatic label generation

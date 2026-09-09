@@ -9,10 +9,10 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ComponentType } from 'react';
+
 import { Badge, BADGE_VARIANT, Text, Stack } from '@donotdev/components';
 import type { EntityField } from '@donotdev/core';
-
-import type { ComponentType } from 'react';
 
 export interface MultiDropdownDisplayProps {
   /** Field configuration */

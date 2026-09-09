@@ -125,9 +125,9 @@ vi.mock('../CrudService.cache.js', () => ({
 // Subject under test — imported after mocks register.
 // -----------------------------------------------------------------------------
 
+import type { CrudService } from '../CrudService';
 import { bulkImpl } from '../CrudService.bulk';
 import { updateListCaches } from '../CrudService.cache';
-import type { CrudService } from '../CrudService';
 
 // -----------------------------------------------------------------------------
 // Helpers

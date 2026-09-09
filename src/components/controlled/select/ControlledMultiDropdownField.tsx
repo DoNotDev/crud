@@ -2,14 +2,13 @@
 // packages/features/crud/src/components/controlled/select/ControlledMultiDropdownField.tsx
 
 import { useMemo } from 'react';
+import type { ReactElement } from 'react';
 import { Controller, useWatch } from 'react-hook-form';
+import type { FieldValues, Path } from 'react-hook-form';
 
 import { translateLabel } from '../../../forms/utils';
 import { MultiDropdownComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
-
-import type { ReactElement } from 'react';
-import type { FieldValues, Path } from 'react-hook-form';
 
 /**
  * ControlledMultiDropdownField - Explicit controlled component for multiselect inputs

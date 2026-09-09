@@ -12,13 +12,13 @@
  * in controlledProps when the entity field has `validation.required: true`.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
-
-import { FormFieldRenderer } from '../FormFieldRenderer';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import type { EntityField } from '@donotdev/core';
+
 import type { ControlledFieldProps } from '../controlled/types';
+import { FormFieldRenderer } from '../FormFieldRenderer';
 
 // Track what props the controlled component receives
 let capturedProps: ControlledFieldProps | null = null;

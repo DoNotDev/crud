@@ -1,14 +1,13 @@
 'use client';
 // packages/features/crud/src/components/controlled/input/ControlledPriceField.tsx
 
+import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
+import type { FieldValues, Path } from 'react-hook-form';
 
 import { PriceFieldComponent } from '../../form/fields';
-import { convertValidationRules, type ControlledFieldProps } from '../types';
-
 import type { PriceValue } from '../../form/fields';
-import type { ReactElement } from 'react';
-import type { FieldValues, Path } from 'react-hook-form';
+import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
  * ControlledPriceField - Controlled component for structured price (amount, currency, VAT, discount %).

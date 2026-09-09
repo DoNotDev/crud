@@ -11,15 +11,15 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ReactElement } from 'react';
+
 import { Text, Stack } from '@donotdev/components';
 import { handleError, getI18nInstance } from '@donotdev/core';
 import type { FieldType, EntityField } from '@donotdev/core';
 
 import { getDisplayFormatter } from '../fieldTypeRegistry';
-import { translateFieldLabel } from '../forms/utils';
-
 import type { DisplayFormatterOptions } from '../fieldTypeRegistry';
-import type { ReactElement } from 'react';
+import { translateFieldLabel } from '../forms/utils';
 
 /** Props for {@link DisplayFieldRenderer}, renders a field value as read-only text. */
 export interface DisplayFieldRendererProps<T extends FieldType = FieldType> {

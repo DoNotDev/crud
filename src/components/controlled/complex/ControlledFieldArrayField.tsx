@@ -11,17 +11,16 @@
  */
 
 import { Plus, Trash2 } from 'lucide-react';
+import type { ReactElement } from 'react';
 import { useFieldArray, Controller } from 'react-hook-form';
+import type { FieldValues, Path } from 'react-hook-form';
 
 import { Button } from '@donotdev/components';
 import type { EntityField, FieldType } from '@donotdev/core';
 
 import { getFieldRegistry } from '../../../FieldRegistry';
 import { convertValidationRules } from '../types';
-
 import type { ControlledFieldProps } from '../types';
-import type { ReactElement } from 'react';
-import type { FieldValues, Path } from 'react-hook-form';
 
 /** Sub-field definition inside fieldSpecific.fields */
 export interface SubFieldDef {

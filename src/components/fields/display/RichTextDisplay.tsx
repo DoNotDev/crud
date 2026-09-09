@@ -12,12 +12,12 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ComponentType } from 'react';
+
 import { Text } from '@donotdev/components';
 import type { EntityField } from '@donotdev/core';
 
 import { sanitizeHtml } from '../../../utils/sanitizeHtml';
-
-import type { ComponentType } from 'react';
 
 export interface RichTextDisplayProps {
   /** Field configuration */

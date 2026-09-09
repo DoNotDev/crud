@@ -11,9 +11,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { matchesFilter } from '../matchesFilter';
-
 import type { FilterType } from '../../fieldTypeRegistry.types';
+import { matchesFilter } from '../matchesFilter';
 
 // Mock the registry - we control what getFilterType returns per test
 vi.mock('../../fieldTypeRegistry.store', () => ({

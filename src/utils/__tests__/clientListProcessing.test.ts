@@ -11,15 +11,15 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+import type { Entity } from '@donotdev/core';
+
+import type { FilterState } from '../../types';
 import {
   applyFilters,
   applySearch,
   applySort,
   getSearchableFields,
 } from '../clientListProcessing';
-
-import type { Entity } from '@donotdev/core';
-import type { FilterState } from '../../types';
 
 // Mock fieldTypeRegistry.store — controls getFilterType for matchesFilter and getValueType/isFilterable for clientListProcessing
 vi.mock('../../fieldTypeRegistry.store', () => ({

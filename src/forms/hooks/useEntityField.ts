@@ -16,13 +16,12 @@ import type { AnyEntity, EntityField } from '@donotdev/core';
 
 import { useController } from './useController';
 import { formatValue } from '../../components/DisplayFieldRenderer';
-import { isFieldEditable } from '../utils';
-
 import type {
   EntityFormReturn,
   InferEntityData,
   EntityFieldReturn,
 } from '../types';
+import { isFieldEditable } from '../utils';
 
 /**
  * Granular hook for single field control within an entity form.

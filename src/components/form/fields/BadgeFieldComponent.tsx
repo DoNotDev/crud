@@ -9,10 +9,10 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ComponentProps, ComponentType } from 'react';
+
 import { Badge, Input, cn, Stack } from '@donotdev/components';
 import type { EntityField } from '@donotdev/core';
-
-import type { ComponentProps, ComponentType } from 'react';
 
 export interface BadgeFieldComponentProps extends Omit<
   ComponentProps<typeof Input>,

@@ -9,10 +9,10 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ComponentType } from 'react';
+
 import { Button } from '@donotdev/components';
 import type { ButtonVariant } from '@donotdev/components';
-
-import type { ComponentType } from 'react';
 
 export interface ButtonFieldComponentProps {
   /** The button label */

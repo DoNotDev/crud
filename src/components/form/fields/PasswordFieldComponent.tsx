@@ -11,10 +11,9 @@
  */
 
 import { useId } from 'react';
+import type { ChangeEvent, ComponentProps, ComponentType } from 'react';
 
 import { PasswordInput, Label, cn, Stack } from '@donotdev/components';
-
-import type { ChangeEvent, ComponentProps, ComponentType } from 'react';
 
 export interface PasswordFieldComponentProps extends Omit<
   ComponentProps<typeof PasswordInput>,

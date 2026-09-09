@@ -10,6 +10,7 @@
  */
 
 import { useId } from 'react';
+import type { ChangeEvent, ComponentType } from 'react';
 
 import {
   DatePicker,
@@ -18,8 +19,6 @@ import {
   cn,
   Stack,
 } from '@donotdev/components';
-
-import type { ChangeEvent, ComponentType } from 'react';
 
 export interface DateFieldComponentProps {
   /** Field label */

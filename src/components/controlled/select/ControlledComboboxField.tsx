@@ -2,14 +2,13 @@
 // packages/features/crud/src/components/controlled/select/ControlledComboboxField.tsx
 
 import { useMemo, useEffect, useRef } from 'react';
+import type { ReactElement } from 'react';
 import { Controller, useWatch, useFormContext } from 'react-hook-form';
+import type { FieldValues, Path } from 'react-hook-form';
 
 import { translateLabel } from '../../../forms/utils';
 import { ComboboxComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
-
-import type { ReactElement } from 'react';
-import type { FieldValues, Path } from 'react-hook-form';
 
 /**
 
@@ -72,7 +71,7 @@ export function ControlledComboboxField(
     if (!validValues.includes(currentValue as string) && resetField) {
       resetField(name as Path<FieldValues>);
     }
-  }, [parentValue]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [parentValue]);
 
   // Translate option labels
 

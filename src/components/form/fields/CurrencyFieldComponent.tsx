@@ -10,10 +10,9 @@
  */
 
 import { useState, useEffect, useId } from 'react';
+import type { ChangeEvent, ComponentType } from 'react';
 
 import { Input, FloatingLabel, Stack } from '@donotdev/components';
-
-import type { ChangeEvent, ComponentType } from 'react';
 
 export interface CurrencyFieldComponentProps {
   /** Field label */

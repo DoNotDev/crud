@@ -11,6 +11,7 @@
 
 import { Copy, Mail, Calendar, Clock } from 'lucide-react';
 import { useState } from 'react';
+import type { ComponentType } from 'react';
 
 import {
   Skeleton,
@@ -24,8 +25,6 @@ import {
 } from '@donotdev/components';
 import type { EntityField } from '@donotdev/core';
 import { getWeekFromISOString, getI18nInstance } from '@donotdev/core';
-
-import type { ComponentType } from 'react';
 
 export interface TextFieldDisplayProps {
   /** Field configuration */

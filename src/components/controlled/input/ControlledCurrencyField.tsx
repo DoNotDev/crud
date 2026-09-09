@@ -1,13 +1,12 @@
 'use client';
 // packages/features/crud/src/components/controlled/input/ControlledCurrencyField.tsx
 
+import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
+import type { FieldValues, Path } from 'react-hook-form';
 
 import { CurrencyFieldComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
-
-import type { ReactElement } from 'react';
-import type { FieldValues, Path } from 'react-hook-form';
 
 /**
  * ControlledCurrencyField - Explicit controlled component for currency inputs

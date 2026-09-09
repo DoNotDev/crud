@@ -19,14 +19,17 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useWatch } from 'react-hook-form';
+import type { Control, FieldValues } from 'react-hook-form';
 
 import { evaluateFieldConditions } from '@donotdev/core';
 import type { ConditionResult } from '@donotdev/core';
 
 import type { RenderableField } from '../forms/utils/getFieldsForOperation';
-import type { Control, FieldValues } from 'react-hook-form';
+
+/** Stable identity — forms without conditional fields must never re-render on it. */
+const EMPTY_CONDITIONS: Record<string, ConditionResult> = {};
 
 /**
  * Evaluate field conditions against live form values.
@@ -56,27 +59,36 @@ export function useFieldConditions<
   fields: readonly RenderableField[],
   control: Control<TFieldValues>
 ): Record<string, ConditionResult> {
-  // Watch all form values — useWatch returns the entire form state
-  const formValues = useWatch({ control }) as Record<string, unknown>;
-
-  // Check if any field has conditions (avoid unnecessary computation)
-  const hasConditions = useMemo(
-    () => fields.some((f) => f.config.conditions),
+  // Only the fields that actually declare conditions — the rest never affect the result
+  const conditionFields = useMemo(
+    () => fields.filter((f) => f.config.conditions),
     [fields]
   );
 
-  return useMemo(() => {
-    if (!hasConditions) return {};
+  /**
+   * Derive the condition results from the form values.
+   *
+   * Passed to useWatch as `compute`, so the subscription re-renders the caller
+   * only when a condition *outcome* changes — not on every keystroke. Forms with
+   * no conditional fields return the same empty object and never re-render at all.
+   * Evaluating a handful of comparisons per change is far cheaper than re-rendering
+   * every field in the form.
+   */
+  const compute = useCallback(
+    (values: TFieldValues): Record<string, ConditionResult> => {
+      if (conditionFields.length === 0) return EMPTY_CONDITIONS;
 
-    const results: Record<string, ConditionResult> = {};
-    for (const field of fields) {
-      if (field.config.conditions) {
+      const results: Record<string, ConditionResult> = {};
+      for (const field of conditionFields) {
         results[field.name] = evaluateFieldConditions(
-          field.config.conditions,
-          formValues
+          field.config.conditions!,
+          values as Record<string, unknown>
         );
       }
-    }
-    return results;
-  }, [fields, formValues, hasConditions]);
+      return results;
+    },
+    [conditionFields]
+  );
+
+  return useWatch({ control, compute }) as Record<string, ConditionResult>;
 }

@@ -14,7 +14,6 @@ import type { AnyEntity } from '@donotdev/core';
 
 import { matchesFilter } from './matchesFilter';
 import { getValueType, isFilterable } from '../fieldTypeRegistry.store';
-
 import type { FilterState } from '../types';
 
 /**

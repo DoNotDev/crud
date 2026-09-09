@@ -54,18 +54,21 @@ import {
 } from '@donotdev/components';
 import type { GridCols } from '@donotdev/components';
 import type { AnyEntity } from '@donotdev/core';
-import { useTranslation, handleError, formatDate, isFieldVisible } from '@donotdev/core';
+import {
+  useTranslation,
+  handleError,
+  formatDate,
+  isFieldVisible,
+} from '@donotdev/core';
 
 import { DateFilter, type DateFilterValue } from './DateFilter';
 import { YearFilter } from './YearFilter';
-
 import { getFilterType, isFilterable } from '../fieldTypeRegistry';
 import { translateFieldLabel, translateLabel } from '../forms/utils';
 import { useCrudFilters } from '../hooks/useCrudFilters';
+import type { FilterState } from '../types';
 import { useCrudCardList } from '../useCrudCardList';
 import { matchesFilter } from '../utils/matchesFilter';
-
-import type { FilterState } from '../types';
 
 // Re-export for backward compatibility
 export { matchesFilter } from '../utils/matchesFilter';
@@ -151,18 +154,32 @@ export function EntityFilters<
   });
 
   // Draft state for range text inputs — decoupled from store for debounced writes
-  const [draftRanges, setDraftRanges] = useState<Record<string, { min: string; max: string }>>({});
+  const [draftRanges, setDraftRanges] = useState<
+    Record<string, { min: string; max: string }>
+  >({});
   // Local slider positions for smooth drag — committed to store on pointer-up
-  const [sliderDrafts, setSliderDrafts] = useState<Record<string, [number, number]>>({});
+  const [sliderDrafts, setSliderDrafts] = useState<
+    Record<string, [number, number]>
+  >({});
   const rangeTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Cleanup timers on unmount
-  useEffect(() => () => { Object.values(rangeTimers.current).forEach(clearTimeout); }, []);
+  useEffect(
+    () => () => {
+      Object.values(rangeTimers.current).forEach(clearTimeout);
+    },
+    []
+  );
 
   // Debounced handler for RangeInput typing (250ms per field)
-  const handleRangeInputChange = (fieldName: string, min: string, max: string) => {
+  const handleRangeInputChange = (
+    fieldName: string,
+    min: string,
+    max: string
+  ) => {
     setDraftRanges((prev) => ({ ...prev, [fieldName]: { min, max } }));
-    if (rangeTimers.current[fieldName]) clearTimeout(rangeTimers.current[fieldName]);
+    if (rangeTimers.current[fieldName])
+      clearTimeout(rangeTimers.current[fieldName]);
     rangeTimers.current[fieldName] = setTimeout(() => {
       handleFilterChange(fieldName, { min, max });
     }, 250);
@@ -190,7 +207,8 @@ export function EntityFilters<
       const fieldType = fieldConfig?.type || 'text';
 
       if (!isFilterable(fieldType)) return false;
-      if (!isFieldVisible(fieldConfig?.visibility ?? 'guest', viewerRole)) return false;
+      if (!isFieldVisible(fieldConfig?.visibility ?? 'guest', viewerRole))
+        return false;
       return true;
     });
   }, [fieldsToFilter, entity.listFields, entity.fields, viewerRole]);
@@ -526,10 +544,20 @@ export function EntityFilters<
               maxValue={draftRanges[fieldName]?.max ?? rangeFilter.max ?? ''}
               actualMin={sliderMin}
               actualMax={sliderMax}
-              onChange={(min, max) => handleRangeInputChange(fieldName, min, max)}
+              onChange={(min, max) =>
+                handleRangeInputChange(fieldName, min, max)
+              }
               onClear={() => {
-                setDraftRanges((prev) => { const n = { ...prev }; delete n[fieldName]; return n; });
-                setSliderDrafts((prev) => { const n = { ...prev }; delete n[fieldName]; return n; });
+                setDraftRanges((prev) => {
+                  const n = { ...prev };
+                  delete n[fieldName];
+                  return n;
+                });
+                setSliderDrafts((prev) => {
+                  const n = { ...prev };
+                  delete n[fieldName];
+                  return n;
+                });
                 handleFilterChange(fieldName, undefined);
               }}
             />
@@ -543,11 +571,23 @@ export function EntityFilters<
               max={sliderMax}
               step={1}
               onValueChange={(values) =>
-                setSliderDrafts((prev) => ({ ...prev, [fieldName]: values as [number, number] }))
+                setSliderDrafts((prev) => ({
+                  ...prev,
+                  [fieldName]: values as [number, number],
+                }))
               }
               onValueCommit={(values) => {
-                setDraftRanges((prev) => ({ ...prev, [fieldName]: { min: String(values[0]), max: String(values[1]) } }));
-                handleFilterChange(fieldName, { min: String(values[0]), max: String(values[1]) });
+                setDraftRanges((prev) => ({
+                  ...prev,
+                  [fieldName]: {
+                    min: String(values[0]),
+                    max: String(values[1]),
+                  },
+                }));
+                handleFilterChange(fieldName, {
+                  min: String(values[0]),
+                  max: String(values[1]),
+                });
               }}
             />
           </Stack>
@@ -566,8 +606,14 @@ export function EntityFilters<
               value={isRangeFilter ? rangeFilter : undefined}
               onChange={(newValue) => handleFilterChange(fieldName, newValue)}
               tCrud={tCrud}
-              minYear={yearMinMax?.min ?? (fieldConfig.validation?.min as number | undefined)}
-              maxYear={yearMinMax?.max ?? (fieldConfig.validation?.max as number | undefined)}
+              minYear={
+                yearMinMax?.min ??
+                (fieldConfig.validation?.min as number | undefined)
+              }
+              maxYear={
+                yearMinMax?.max ??
+                (fieldConfig.validation?.max as number | undefined)
+              }
             />
           </div>
         );

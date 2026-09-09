@@ -29,13 +29,12 @@ import {
   useBaseCrudList,
   type UseBaseCrudListOptions,
 } from './useBaseCrudList';
+import type { UseCrudOptions } from './useCrud';
 import {
   applyFilters,
   applySearch,
   applySort,
 } from './utils/clientListProcessing';
-
-import type { UseCrudOptions } from './useCrud';
 import type {
   ClientSort,
   ClientSortConfig,

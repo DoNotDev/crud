@@ -10,9 +10,9 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { Switch, Text, Stack } from '@donotdev/components';
-
 import type { ChangeEvent, ComponentType } from 'react';
+
+import { Switch, Text, Stack } from '@donotdev/components';
 
 export interface SwitchFieldComponentProps {
   /** Field label */

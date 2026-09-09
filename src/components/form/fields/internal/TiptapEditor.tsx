@@ -17,11 +17,11 @@
  */
 
 import { useEffect, useState } from 'react';
+import type { ChangeEvent, ComponentType } from 'react';
 
 import { Stack } from '@donotdev/components';
 
 import type { RichTextComponentProps } from '../types';
-import type { ChangeEvent, ComponentType } from 'react';
 
 // Optional peer dependency - graceful degradation if not installed
 // Use 'any' to avoid type conflicts when Tiptap is dynamically imported

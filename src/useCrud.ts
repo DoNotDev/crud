@@ -41,13 +41,12 @@ import type {
 
 import { getCrudService } from './CrudService';
 import { useCrudStore } from './CrudStore';
-import { injectScope, injectScopeFilter } from './utils/scopeUtils';
-
 import type {
   CrudServiceInterface,
   CacheOptions,
   MutationOptions,
 } from './types';
+import { injectScope, injectScopeFilter } from './utils/scopeUtils';
 
 // =============================================================================
 // Module-level singletons (shared across all CRUD hooks)

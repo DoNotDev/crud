@@ -12,13 +12,12 @@
  */
 
 import { lazy, Suspense, useState, useEffect } from 'react';
+import type { ComponentType } from 'react';
 
 import { Stack } from '@donotdev/components';
 
 import TextAreaComponent from './TextAreaComponent';
-
 import type { RichTextComponentProps } from './types';
-import type { ComponentType } from 'react';
 
 // Lazy load Tiptap editor (CSR-only)
 const TiptapEditor = lazy(() =>

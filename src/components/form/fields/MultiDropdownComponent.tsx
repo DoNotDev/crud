@@ -11,11 +11,10 @@
  */
 
 import { useMemo, useId } from 'react';
+import type { ChangeEvent, ComponentType } from 'react';
 
 import { Combobox, Tag, Stack } from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
-
-import type { ChangeEvent, ComponentType } from 'react';
 
 /** Show all chips up to this count; above it, collapse */
 const MAX_VISIBLE = 4;

@@ -11,11 +11,10 @@
  */
 
 import { useState } from 'react';
+import type { ChangeEvent, ComponentType } from 'react';
 
 import { Input, Button, Stack } from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
-
-import type { ChangeEvent, ComponentType } from 'react';
 
 export interface MultiInputTextFieldComponentProps {
   /** Label for the input field */

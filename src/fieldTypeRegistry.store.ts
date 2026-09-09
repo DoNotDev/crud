@@ -13,7 +13,6 @@
 import { getGlobalSingleton } from '@donotdev/core';
 
 import { getFieldRegistry } from './FieldRegistry';
-
 import type { FieldTypeMetadata } from './fieldTypeRegistry.types';
 import type { DisplayFormatter } from './fieldTypeRegistry.types';
 import type { FilterType } from './fieldTypeRegistry.types';

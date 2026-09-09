@@ -12,10 +12,9 @@
 
 import { Clock } from 'lucide-react';
 import { useState, useMemo } from 'react';
+import type { ComponentType } from 'react';
 
 import { Label, Stack, Button, Slider } from '@donotdev/components';
-
-import type { ComponentType } from 'react';
 
 /** Preset durations in minutes */
 export const DURATION_PRESETS = [15, 30, 45, 60, 90, 120, 150, 180] as const;

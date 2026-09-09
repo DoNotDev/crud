@@ -10,16 +10,19 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { ReactElement } from 'react';
+import type { Control, FieldValues } from 'react-hook-form';
+
 import { handleError } from '@donotdev/core';
 import type { EntityField, FieldType, ValueTypeForField } from '@donotdev/core';
 
 import { getFieldRegistry } from '../FieldRegistry';
-import { getMetadataRegistry } from '../fieldTypeRegistry.store';
+import {
+  getFieldTypeMetadata,
+  getMetadataRegistry,
+} from '../fieldTypeRegistry.store';
 import { ControlledTextField, type ControlledFieldProps } from './controlled';
 import { TextFieldComponent } from './form/fields';
-
-import type { ReactElement } from 'react';
-import type { Control, FieldValues } from 'react-hook-form';
 
 // Base props shared between controlled and uncontrolled modes
 interface FormFieldRendererBaseProps<T extends FieldType = FieldType> {
@@ -101,12 +104,19 @@ export function FormFieldRenderer<
       | undefined;
     const placeholder = fieldSpecific?.placeholder as string | undefined;
 
+    // Field types that read their error from fieldState opt out of the form-wide
+    // `errors` object, so this component's props stay referentially stable and the
+    // memo below holds across validation passes.
+    const omitFormErrors =
+      registry.omitsFormErrors(config.type) ||
+      getFieldTypeMetadata(config.type)?.omitFormErrors === true;
+
     // Registry dispatch boundary: widen Control<TFieldValues> → Control<FieldValues>
     // Control<T> is invariant in react-hook-form — this is the standard pattern
     // for dynamic dispatch where the registry can't know the specific entity type
     const controlledProps: ControlledFieldProps = {
       control: control as Control<FieldValues>,
-      errors,
+      ...(omitFormErrors ? {} : { errors }),
       fieldConfig: { ...config, label: config.label || name },
       t,
       placeholder,

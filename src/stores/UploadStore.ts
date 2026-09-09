@@ -12,7 +12,6 @@
  */
 
 import { createDoNotDevStore } from '@donotdev/core';
-
 import type { FileAsset, Picture } from '@donotdev/core';
 
 /**

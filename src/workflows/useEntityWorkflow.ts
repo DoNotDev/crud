@@ -24,13 +24,12 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 
 import { evaluateCondition } from '@donotdev/core';
 
+import type { WorkflowConfig, WorkflowStep } from './defineWorkflow';
 import {
   saveWorkflowState,
   loadWorkflowState,
   clearWorkflowState,
 } from './WorkflowPersistence';
-
-import type { WorkflowConfig, WorkflowStep } from './defineWorkflow';
 
 /** Options for useEntityWorkflow */
 export interface UseEntityWorkflowOptions {

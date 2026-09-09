@@ -17,13 +17,12 @@
  */
 
 import { getFieldRegistry } from './FieldRegistry';
-import { registerAllBuiltinFieldTypes } from './registerBuiltinFieldTypes';
 import {
   setRegistrationInit,
   getMetadataRegistry,
 } from './fieldTypeRegistry.store';
-
 import type { FieldTypeMetadata } from './fieldTypeRegistry.types';
+import { registerAllBuiltinFieldTypes } from './registerBuiltinFieldTypes';
 
 // Wire lazy init — runs once on first registry read.
 setRegistrationInit((registry) => {

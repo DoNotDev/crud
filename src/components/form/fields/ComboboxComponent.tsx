@@ -12,11 +12,10 @@
  */
 
 import { useMemo, useId } from 'react';
+import type { ChangeEvent, ComponentType } from 'react';
 
 import { Combobox, Stack, cn } from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
-
-import type { ChangeEvent, ComponentType } from 'react';
 
 export interface ComboboxComponentProps {
   /** Field label */

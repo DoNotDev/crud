@@ -10,9 +10,9 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { Label, Rating, Stack } from '@donotdev/components';
-
 import type { ComponentType } from 'react';
+
+import { Label, Rating, Stack } from '@donotdev/components';
 
 export interface RatingFieldComponentProps {
   /** Label for the field */

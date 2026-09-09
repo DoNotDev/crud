@@ -29,7 +29,6 @@
  */
 
 import { createContext, useContext } from 'react';
-
 import type { ReactNode } from 'react';
 
 // Simple string context - no object wrapper, no state needed

@@ -15,7 +15,6 @@
 import { useEffect, useRef } from 'react';
 
 import { handleError } from '@donotdev/core';
-
 import type { Picture } from '@donotdev/core';
 
 import { useUploadContext } from '../contexts/UploadContext';
@@ -24,7 +23,6 @@ import {
   useFieldFiles,
   generateStandaloneFormId,
 } from '../stores/UploadStore';
-
 import type { FileEntry, UploadResult } from '../stores/UploadStore';
 
 /** Backwards-compatible alias */
