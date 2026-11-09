@@ -9,6 +9,8 @@
  * @author AMBROISE PARK Consulting
  */
 
+import * as v from 'valibot';
+
 export interface ProcessedImage {
   fullBlob: Blob;
   thumbBlob: Blob;
@@ -25,12 +27,76 @@ export interface ProcessImageOptions {
   thumbWidth?: number;
   /** Thumbnail height (default: 225) */
   thumbHeight?: number;
-  /** Target aspect ratio (default: 4/3) */
-  aspectRatio?: number;
-  /** WebP quality (0-1, default: 0.85 for full, 0.65 for thumb) */
+  /**
+   * Target aspect ratio, center-cropped (default: 4/3). `'original'` keeps the
+   * source ratio: full and thumbnail are scaled to fit inside their max boxes,
+   * never cropped (editorial / product photography).
+   */
+  aspectRatio?: number | 'original';
+  /** WebP quality of the full-size image (0-1, default: 0.85) */
   quality?: number;
+  /** WebP quality of the thumbnail (0-1, default: 0.65) */
+  thumbQuality?: number;
+  /**
+   * Canvas fill behind the image (default: '#FFFFFF'). `'transparent'` keeps the
+   * alpha channel of cut-out PNGs (packshots shown on a tinted surface).
+   */
+  background?: string;
   /** Crop region from react-easy-crop (overrides automatic center crop) */
   crop?: { x: number; y: number; width: number; height: number };
+}
+
+const unitInterval = v.pipe(v.number(), v.minValue(0.1), v.maxValue(1));
+const pixels = v.pipe(
+  v.number(),
+  v.integer(),
+  v.minValue(16),
+  v.maxValue(8192)
+);
+
+/**
+ * Shape of `options.fieldSpecific.image` on `image` / `images` entity fields:
+ * upload processing settings (crop excluded — that is a per-upload UI action).
+ *
+ * @example
+ * ```ts
+ * images: {
+ *   name: 'images', type: 'images', label: 'fields.images',
+ *   options: { fieldSpecific: { storagePath: 'products', image: {
+ *     maxWidth: 2400, maxHeight: 2400, thumbWidth: 960, thumbHeight: 960,
+ *     aspectRatio: 'original', quality: 0.9, thumbQuality: 0.85, background: 'transparent',
+ *   } } },
+ * }
+ * ```
+ */
+export const imageProcessingOptionsSchema = v.strictObject({
+  maxWidth: v.optional(pixels),
+  maxHeight: v.optional(pixels),
+  thumbWidth: v.optional(pixels),
+  thumbHeight: v.optional(pixels),
+  aspectRatio: v.optional(
+    v.union([
+      v.literal('original'),
+      v.pipe(v.number(), v.minValue(0.1), v.maxValue(10)),
+    ])
+  ),
+  quality: v.optional(unitInterval),
+  thumbQuality: v.optional(unitInterval),
+  background: v.optional(v.pipe(v.string(), v.minLength(1))),
+});
+
+/**
+ * Reads `fieldSpecific.image` from an entity field. Returns undefined when absent
+ * (framework defaults apply); throws on an invalid config so a typo fails loud.
+ */
+export function readImageProcessingOptions(
+  fieldSpecific: unknown
+): Omit<ProcessImageOptions, 'crop'> | undefined {
+  if (typeof fieldSpecific !== 'object' || fieldSpecific === null)
+    return undefined;
+  const raw = (fieldSpecific as { image?: unknown }).image;
+  if (raw === undefined) return undefined;
+  return v.parse(imageProcessingOptionsSchema, raw);
 }
 
 /** Cache processed images to avoid re-encoding on upload retries (File -> options hash -> ProcessedImage) */
@@ -44,6 +110,8 @@ function optionsHash(options: ProcessImageOptions): string {
     thumbHeight: options.thumbHeight,
     aspectRatio: options.aspectRatio,
     quality: options.quality,
+    thumbQuality: options.thumbQuality,
+    background: options.background,
     crop: options.crop,
   });
 }
@@ -64,8 +132,10 @@ export async function processImage(
     maxHeight = 1440,
     thumbWidth = 300,
     thumbHeight = 225,
-    aspectRatio = 4 / 3,
+    aspectRatio: aspectOption = 4 / 3,
     quality = 0.85,
+    thumbQuality = 0.65,
+    background = '#FFFFFF',
     crop,
   } = options;
 
@@ -81,10 +151,18 @@ export async function processImage(
 
     img.onload = async () => {
       try {
+        const sourceWidth = crop ? crop.width : img.width;
+        const sourceHeight = crop ? crop.height : img.height;
+        // 'original': keep the source ratio (no crop); otherwise center-crop to the target.
+        const keepRatio = aspectOption === 'original';
+        const aspectRatio = keepRatio
+          ? sourceWidth / sourceHeight
+          : aspectOption;
+
         // Calculate dimensions maintaining aspect ratio
         const { width: fullWidth, height: fullHeight } = calculateDimensions(
-          crop ? crop.width : img.width,
-          crop ? crop.height : img.height,
+          sourceWidth,
+          sourceHeight,
           maxWidth,
           maxHeight,
           aspectRatio
@@ -97,16 +175,27 @@ export async function processImage(
           fullHeight,
           aspectRatio,
           quality,
+          background,
           crop
         );
 
-        // Generate thumbnail (lower quality fine for small sizes)
+        // Thumbnail: fixed box by default; with 'original', scaled to fit inside the box.
+        const thumbSize = keepRatio
+          ? calculateDimensions(
+              sourceWidth,
+              sourceHeight,
+              thumbWidth,
+              thumbHeight,
+              aspectRatio
+            )
+          : { width: thumbWidth, height: thumbHeight };
         const thumbBlob = await resizeToWebP(
           img,
-          thumbWidth,
-          thumbHeight,
+          thumbSize.width,
+          thumbSize.height,
           aspectRatio,
-          0.65,
+          thumbQuality,
+          background,
           crop
         );
 
@@ -186,6 +275,7 @@ async function resizeToWebP(
   targetHeight: number,
   aspectRatio: number,
   quality: number,
+  background: string,
   crop?: { x: number; y: number; width: number; height: number }
 ): Promise<Blob> {
   const canvas = document.createElement('canvas');
@@ -198,9 +288,11 @@ async function resizeToWebP(
   canvas.width = targetWidth;
   canvas.height = targetHeight;
 
-  // White background (WebP supports transparency but most use cases want white)
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, targetWidth, targetHeight);
+  // Opaque fill by default (white); 'transparent' keeps the source alpha channel.
+  if (background !== 'transparent') {
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, targetWidth, targetHeight);
+  }
 
   let sx: number, sy: number, sWidth: number, sHeight: number;
 

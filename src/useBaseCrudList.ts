@@ -12,7 +12,13 @@
 
 import { useMemo, useCallback, useRef, useState, useEffect } from 'react';
 
-import { useQuery } from '@donotdev/core';
+import {
+  hasProvider,
+  isClient,
+  useAuthSessionSnapshot,
+  useQuery,
+  useQueryClient,
+} from '@donotdev/core';
 import type {
   AnyEntity,
   FeatureStatus,
@@ -221,6 +227,41 @@ export function useBaseCrudList<T extends { id: string } = { id: string }>(
     enabled: enabled && !!queryOptions,
   });
 
+  // 7a. Server render: fetch before rendering, so the HTML carries the data and the
+  // streamed hydration (NextJsAppProviders) seeds the browser cache under the same key:
+  // the first paint is final (no loading → content swap, image in the initial HTML).
+  // Signed-out visitors read with the public role; signed-in visitors with their own
+  // access token (adapter.forAccessToken; the database verifies it), i.e. exactly what
+  // their browser would read. Without a usable token (or an adapter that cannot read
+  // as a token holder) the browser loads it. Scoped (tenant) entities never prefetch.
+  const queryClient = useQueryClient();
+  const sessionSnapshot = useAuthSessionSnapshot();
+  const onServer = !isClient();
+  const signedOut = !hasProvider('auth') || sessionSnapshot?.user === null;
+  const serverFetch =
+    onServer &&
+    enabled &&
+    !!queryOptions &&
+    !scope &&
+    (signedOut ||
+      (!!sessionSnapshot?.user &&
+        !!sessionSnapshot.accessToken &&
+        !!getCrudServiceInstance()?.bindRequestAccessToken(
+          queryClient,
+          sessionSnapshot.accessToken
+        )));
+  if (serverFetch && queryData === undefined && !queryError) {
+    // Thrown, not `use()`d: the hooks of one component suspend one after another, and
+    // React's `use()` replays an earlier hook's settled promise in the same slot,
+    // rendering this hook without its data (TanStack's suspense throws too). A failed
+    // read settles to undefined: the retry sees the error, renders loading, and the
+    // browser (which receives no data for it) fetches it again — same first paint.
+    throw queryClient.fetchQuery(queryOptions).then(
+      () => undefined,
+      () => undefined
+    );
+  }
+
   // 7b. Auto-switch: if auto mode and total exceeds what we fetched, flip to server
   useEffect(() => {
     if (
@@ -341,13 +382,15 @@ export function useBaseCrudList<T extends { id: string } = { id: string }>(
 
   const items = processedData?.items ?? [];
 
+  // Server render: no data = loading (the browser's first pass, which fetches on mount,
+  // reports loading too), and errors stay with the browser, which retries the read.
   return {
     status,
     data: processedData,
     items,
-    loading: isLoading,
-    fetching: isFetching,
-    error: queryError ?? crudError,
+    loading: onServer ? enabled && queryData === undefined : isLoading,
+    fetching: onServer ? false : isFetching,
+    error: onServer ? null : (queryError ?? crudError),
     mutate: refreshList,
     refresh: refreshList,
     isAvailable: true,

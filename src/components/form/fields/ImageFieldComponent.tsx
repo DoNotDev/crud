@@ -44,6 +44,7 @@ import type { Picture } from '@donotdev/core';
 import { useFileUpload } from '../../../hooks/useFileUpload';
 import type { FileEntry } from '../../../stores/UploadStore';
 import { processImage } from '../../../utils/imageProcessing';
+import type { ProcessImageOptions } from '../../../utils/imageProcessing';
 import { uploadImage } from '../../../utils/imageStorage';
 import type { ImageMetadata } from '../../../utils/imageUtils';
 import { ImageViewerDialog } from '../internal/ImageViewerDialog';
@@ -76,6 +77,13 @@ export interface ImageFieldComponentProps {
   required?: boolean;
   /** Camera capture mode: 'environment' (back), 'user' (front), or undefined (browser decides) */
   capture?: 'environment' | 'user';
+  /**
+   * WebP processing applied before upload (sizes, ratio, quality, background).
+   * Omit for the defaults: 1920x1440 full + 300x225 thumb, 4:3 center crop,
+   * quality 0.85 / 0.65, white background. Entity fields set it through
+   * `options.fieldSpecific.image`.
+   */
+  processing?: Omit<ProcessImageOptions, 'crop'>;
 }
 
 export interface ImageFieldComponentRef {
@@ -293,6 +301,7 @@ const ImageFieldComponent = forwardRef<
       storagePath,
       required,
       capture,
+      processing,
     },
     ref
   ) => {
@@ -324,13 +333,13 @@ const ImageFieldComponent = forwardRef<
         file: File,
         onProgress: (progress: number) => void
       ): Promise<Picture> => {
-        const { fullBlob, thumbBlob } = await processImage(file);
+        const { fullBlob, thumbBlob } = await processImage(file, processing);
         return uploadImage(fullBlob, thumbBlob, file.name, {
           storagePath,
           onProgress: (p) => onProgress(p.progress),
         });
       },
-      [storagePath]
+      [storagePath, processing]
     );
 
     const { files, addFiles, removeFile, reorderFiles } = useFileUpload({

@@ -81,7 +81,7 @@ describe('EntityFilters', () => {
   });
 
   it('renders filters for entity fields', () => {
-    render(<EntityFilters entity={mockEntity} />);
+    render(<EntityFilters entity={mockEntity} viewerRole="user" />);
 
     // Component should render clear buttons (per-filter + global)
     const clearButtons = screen.getAllByRole('button', { name: /clear/i });
@@ -94,14 +94,14 @@ describe('EntityFilters', () => {
       { id: '2', title: 'Product 2', status: 'inactive' },
     ];
 
-    render(<EntityFilters entity={mockEntity} data={mockData} />);
+    render(<EntityFilters entity={mockEntity} viewerRole="user" data={mockData} />);
 
     const clearButtons = screen.getAllByRole('button', { name: /clear/i });
     expect(clearButtons.length).toBeGreaterThan(0);
   });
 
   it('renders with sidebar variant', () => {
-    render(<EntityFilters entity={mockEntity} variant="sidebar" />);
+    render(<EntityFilters entity={mockEntity} viewerRole="user" variant="sidebar" />);
 
     const clearButtons = screen.getAllByRole('button', { name: /clear/i });
     expect(clearButtons.length).toBeGreaterThan(0);
@@ -109,7 +109,7 @@ describe('EntityFilters', () => {
 
   it('uses responsive cols for inline variant', () => {
     const { container } = render(
-      <EntityFilters entity={mockEntity} variant="inline" />
+      <EntityFilters entity={mockEntity} viewerRole="user" variant="inline" />
     );
     const grid = container.querySelector('[data-cols]');
     expect(grid).toBeTruthy();
@@ -118,7 +118,7 @@ describe('EntityFilters', () => {
 
   it('uses 1 col for sidebar variant', () => {
     const { container } = render(
-      <EntityFilters entity={mockEntity} variant="sidebar" />
+      <EntityFilters entity={mockEntity} viewerRole="user" variant="sidebar" />
     );
     const grid = container.querySelector('[data-cols]');
     expect(grid).toBeTruthy();

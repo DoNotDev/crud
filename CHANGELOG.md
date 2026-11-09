@@ -1,5 +1,12 @@
 # @donotdev/crud
 
+## 0.1.46
+
+### Patch Changes
+
+- Image fields: `options.fieldSpecific.image` configures upload processing (maxWidth/maxHeight, thumbWidth/thumbHeight, aspectRatio number | 'original', quality, thumbQuality, background incl. 'transparent'). Validated with valibot; invalid config throws. Omitted = previous defaults (1920x1440 + 300x225, 4:3, 0.85 / 0.65, white).
+- `processImage`: `aspectRatio: 'original'` keeps the source ratio (no crop, thumbnail fits its box), `thumbQuality`, `background`. `ImageFieldComponent` gains a `processing` prop.
+
 ## 0.1.44
 
 ### Patch Changes

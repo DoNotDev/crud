@@ -72,7 +72,26 @@ function getCrudState(): CrudSingletonState {
  * Get the current CrudService instance (for use in callbacks)
  */
 export function getCrudServiceInstance(): CrudServiceInterface | null {
-  return getCrudState().service;
+  return readyCrudService();
+}
+
+/**
+ * The CRUD service, usable during render as soon as the app has configured its CRUD
+ * provider (`configureProviders` runs at module load, on the server and in the browser).
+ * The server render and the hydration pass then build the same queries and render the
+ * same data; waiting for an effect left both on "initializing" (empty first paint).
+ * The store is not touched here (render-safe); the init effect publishes the service.
+ */
+function readyCrudService(): CrudServiceInterface | null {
+  const crudState = getCrudState();
+  const service =
+    crudState.service ?? (getCrudService() as CrudServiceInterface);
+  if (!service.attachProvider()) return null;
+  if (!crudState.service) {
+    service.setStore(useCrudStore);
+    crudState.service = service;
+  }
+  return service;
 }
 
 // =============================================================================
@@ -206,7 +225,7 @@ export function useCrud<
   // Status calculation (Global)
   // This depends only on consent + global store state, NOT on specific entity
   const storeCrudService = useCrudStore((state) => state.crudService);
-  const isInitializing = canProceed && !storeCrudService;
+  const isInitializing = canProceed && !storeCrudService && !readyCrudService();
   const status: FeatureStatus = !canProceed
     ? FEATURE_STATUS.DEGRADED
     : isInitializing
@@ -300,6 +319,14 @@ export function useCrud<
     if (!schemas) return;
 
     const { crudService: existingService } = useCrudStore.getState();
+
+    // Provider configured: the service is already usable (readyCrudService); publish
+    // it to the store for subscribers.
+    const ready = readyCrudService();
+    if (ready) {
+      if (!existingService) useCrudStore.getState().setCrudService(ready);
+      return;
+    }
 
     // Already initialized — covers the React Strict Mode double-invocation where
     // initPromise is null again after the first mount's finally{} block

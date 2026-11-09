@@ -34,6 +34,7 @@ vi.mock('../../FieldRegistry', () => {
     getFieldRegistry: () => ({
       getControlledComponent: () => CaptureComponent,
       getUncontrolledComponent: () => undefined,
+      omitsFormErrors: () => false,
     }),
   };
 });

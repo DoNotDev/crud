@@ -32,6 +32,7 @@ const { bulkSpy, fakeService, setHasService, getCrudServiceInstanceMock } =
     const fakeService = {
       bulk: bulkSpy,
       initialize: vi.fn(async () => {}),
+      attachProvider: vi.fn(() => true),
       setStore: vi.fn(),
     };
     let hasService = true;

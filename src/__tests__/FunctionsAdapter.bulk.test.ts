@@ -168,9 +168,9 @@ describe('FunctionsAdapter.bulk()', () => {
         deletes: ['e1'],
       })
     ).rejects.toMatchObject({
-      // wrapCrudError produces a DoNotDevError whose message references the
+      // wrapCrudError produces a DoNotDevError whose details.context references the
       // adapter signature `FunctionsAdapter.bulk(events)`.
-      message: expect.stringContaining('FunctionsAdapter.bulk(events)'),
+      details: expect.objectContaining({ context: expect.stringContaining('FunctionsAdapter.bulk(events)') }),
     });
 
     expect(callableCall).toHaveBeenCalledTimes(1);

@@ -241,6 +241,10 @@ export interface MutationOptions {
 export interface CrudServiceInterface {
   /** Initialize the CRUD adapter from the provider registry. Call configureProviders() first. */
   initialize(): Promise<void>;
+  /** Attach the configured CRUD provider synchronously (safe during render). */
+  attachProvider(): boolean;
+  /** Server render: list queries run with `client` read as the holder of `accessToken`. */
+  bindRequestAccessToken(client: object, accessToken: string): boolean;
   setStore(store: CrudStoreApi): void;
 
   // Query options for reactive hooks (useQuery)
@@ -253,7 +257,8 @@ export interface CrudServiceInterface {
     schemaType?: ListSchemaType
   ): {
     queryKey: readonly string[];
-    queryFn: () => Promise<PaginatedQueryResult<T>>;
+    /** `client`: the QueryClient running it (selects a request-scoped adapter). */
+    queryFn: (context: { client: object }) => Promise<PaginatedQueryResult<T>>;
     staleTime: number;
   };
   /** Schema accepts unknown since OperationSchemas stores dndevSchema<unknown>. T is for return type. */

@@ -75,7 +75,7 @@ import { bulkImpl } from './CrudService.bulk';
 import type { BulkSchemas } from './CrudService.bulk';
 import { bulkAcrossImpl } from './CrudService.bulkAcross';
 import { invalidateCollectionImpl } from './CrudService.cache';
-import { initializeImpl } from './CrudService.internal';
+import { attachProviderImpl, initializeImpl } from './CrudService.internal';
 import {
   addImpl,
   deleteImpl,
@@ -88,6 +88,7 @@ import {
   updateOptimisticImpl,
 } from './CrudService.optimistic';
 import {
+  bindRequestAccessToken as bindRequestAccessTokenImpl,
   getDocQueryOptionsImpl,
   getImpl,
   getListQueryOptionsImpl,
@@ -189,6 +190,24 @@ export class CrudService implements CrudServiceInternal {
    */
   initialize(): Promise<void> {
     return initializeImpl(this);
+  }
+
+  /**
+   * Attach the configured CRUD provider synchronously (no store update, safe during
+   * render). Lets the server render and the hydration pass query on the first render.
+   *
+   * @returns Whether an adapter is attached
+   */
+  attachProvider(): boolean {
+    return attachProviderImpl(this);
+  }
+
+  /**
+   * Server render: list queries run with `client` (this request's QueryClient) read as
+   * the holder of `accessToken`. False when the adapter cannot (no forAccessToken).
+   */
+  bindRequestAccessToken(client: object, accessToken: string): boolean {
+    return bindRequestAccessTokenImpl(this, client, accessToken);
   }
 
   // ===================================================================

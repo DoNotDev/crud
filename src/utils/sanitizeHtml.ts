@@ -1,21 +1,17 @@
 // packages/features/crud/src/utils/sanitizeHtml.ts
 
 /**
- * @fileoverview HTML sanitizer using DOMPurify
- * @description XSS-safe HTML sanitization for rich text content rendered with dangerouslySetInnerHTML.
+ * @fileoverview Rich-text sanitizer for CRUD fields
+ * @description Tiptap-tag allowlist over the shared `sanitizeHtml` from
+ * `@donotdev/components` (DOMPurify in the browser, DOMPurify + jsdom on the server).
  *
  * @version 0.1.0
  * @since 0.0.1
  * @author AMBROISE PARK Consulting
  */
 
-import DOMPurify from 'dompurify';
+import { sanitizeHtml as sanitize } from '@donotdev/components';
 
-/**
- * Sanitize HTML using DOMPurify — handles all known XSS vectors including
- * malformed tags, event handlers, javascript: URIs, data: URIs, SVG payloads,
- * CSS injection, and HTML entity encoding bypasses.
- */
 /**
  * Allowlisted tags for CRUD rich text fields.
  * Rich text editors (Tiptap/ProseMirror) produce only these tags.
@@ -69,11 +65,6 @@ const ALLOWED_TAGS = [
 ];
 
 /**
- * Void elements that DOMPurify may not strip in non-browser DOM implementations
- * (happy-dom parses void elements before DOMPurify can intercept them).
- * Belt-and-suspenders: regex strip after DOMPurify for these specific tags.
- */
-/**
  * Allowlisted attributes — only these survive sanitization.
  * DOMPurify defaults would be safe, but explicit is defense-in-depth.
  */
@@ -90,14 +81,10 @@ const ALLOWED_ATTR = [
   'rowspan', // tables
 ];
 
-/**
- * Void elements that DOMPurify may not strip in non-browser DOM implementations
- * (happy-dom parses void elements before DOMPurify can intercept them).
- * Belt-and-suspenders: regex strip after DOMPurify for these specific tags.
- */
-const VOID_STRIP_RE = /<\/?(?:embed|source|track|area|wbr)[^>]*>/gi;
-
+/** Sanitize CRUD rich text: shared sanitizer restricted to the rich-text allowlist. */
 export function sanitizeHtml(html: string): string {
-  const sanitized = DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR });
-  return sanitized.replace(VOID_STRIP_RE, '');
+  return sanitize(html, {
+    allowedTags: ALLOWED_TAGS,
+    allowedAttributes: ALLOWED_ATTR,
+  });
 }

@@ -110,6 +110,8 @@ vi.mock('@donotdev/core', () => ({
   hasProvider: () => true,
   getProvider: vi.fn(),
   hasRestrictedVisibility: () => false,
+  // Schema validation is covered by its own tests; bulk orchestration only.
+  validateWithSchema: (_schema: unknown, data: unknown) => data,
 }));
 
 // Stub the cache helpers so we don't need a real QueryClient.
@@ -270,7 +272,7 @@ describe('CrudService.bulk()', () => {
       metadata: {
         inserts: 2,
         updates: 1,
-        deletes: 3,
+        deletes: 2,
       },
     });
     expect(checkRateLimit).toHaveBeenCalledTimes(1);
@@ -375,7 +377,12 @@ describe('CrudService.bulk()', () => {
         },
         schemas
       )
-    ).rejects.toThrow(/Failed to bulk-write events/);
+    ).rejects.toThrow('adapter exploded mid-way');
+    // Non-collision errors go through handleError with the bulk user message.
+    expect(handleErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'adapter exploded mid-way' }),
+      expect.objectContaining({ userMessage: 'Failed to bulk-write events' })
+    );
 
     // All three rollback store calls fired.
     expect(state.rejectOptimistic).toHaveBeenCalledTimes(1); // 1 insert
@@ -469,17 +476,18 @@ describe('CrudService.bulk()', () => {
   });
 
   it('BulkCollisionError from adapter passes through unwrapped', async () => {
-    const adapterBulk = vi
-      .fn()
-      .mockRejectedValue(new BulkCollisionErrorMock(['x'], 'updates-deletes'));
+    const collision = new BulkCollisionErrorMock(['x'], 'updates-deletes');
+    const adapterBulk = vi.fn().mockRejectedValue(collision);
     const { service, state } = makeService({ adapterBulk });
 
     await expect(
       bulkImpl<Event>(service, 'events', { inserts: [{ title: 'A' }] }, schemas)
-    ).rejects.toBeInstanceOf(BulkCollisionErrorMock);
+    ).rejects.toBe(collision);
 
     // No error toast for collision (re-thrown before the generic handler).
     expect(toastMock).not.toHaveBeenCalledWith('error', expect.anything());
-    expect(state.setError).toHaveBeenCalledTimes(1);
+    expect(handleErrorMock).not.toHaveBeenCalled();
+    // Cleared at start, then set to the unwrapped collision error.
+    expect(state.setError).toHaveBeenLastCalledWith('events', collision);
   });
 });

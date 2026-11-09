@@ -176,7 +176,10 @@ export function assertCanAccess(
  * @throws If no CRUD provider is configured
  */
 export async function initializeImpl(self: CrudServiceInternal): Promise<void> {
-  if (self.adapter) return;
+  if (attachProviderImpl(self)) {
+    if (self.store) self.store.getState().setCrudService(self);
+    return;
+  }
 
   if (!hasProvider('crud')) {
     throw new Error(
@@ -191,12 +194,20 @@ export async function initializeImpl(self: CrudServiceInternal): Promise<void> {
         '  configureProviders({ crud: new SupabaseCrudAdapter(sb) })  // Supabase direct (RLS)'
     );
   }
+}
 
+/**
+ * Attach the configured CRUD provider synchronously, without touching the store, so it
+ * is safe during render (server render and the hydration pass). `configureProviders`
+ * runs at module load on both sides, so the provider is there before the first render.
+ *
+ * @returns Whether an adapter is attached
+ */
+export function attachProviderImpl(self: CrudServiceInternal): boolean {
+  if (self.adapter) return true;
+  if (!hasProvider('crud')) return false;
   self.adapter = getProvider('crud');
-
-  if (self.store) {
-    self.store.getState().setCrudService(self);
-  }
+  return true;
 }
 
 /**

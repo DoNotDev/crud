@@ -14,6 +14,7 @@
 import type {
   CrudDocQuery,
   CrudListQuery,
+  ICrudAdapter,
   dndevSchema,
   QueryOptions,
   PaginatedQueryResult,
@@ -31,6 +32,29 @@ import type { CacheOptions, CrudServiceInternal } from './types';
 
 /** Default stale time - data never becomes stale. Mutations handle cache updates. */
 const DEFAULT_STALE_TIME = Infinity;
+
+/**
+ * Request-scoped adapters for the server render, keyed by that request's QueryClient
+ * (one per request on the server). A query run with this client reads as the visitor
+ * (ICrudAdapter.forAccessToken); no entry = the shared adapter (public role).
+ */
+const requestAdapters = new WeakMap<object, ICrudAdapter>();
+
+/**
+ * Bind the visitor's access token to this request's QueryClient (server render).
+ * Returns false when the configured adapter cannot read as a token holder.
+ */
+export function bindRequestAccessToken(
+  self: CrudServiceInternal,
+  client: object,
+  accessToken: string
+): boolean {
+  if (requestAdapters.has(client)) return true;
+  const adapter = self.adapter?.forAccessToken?.(accessToken);
+  if (!adapter) return false;
+  requestAdapters.set(client, adapter);
+  return true;
+}
 
 /**
  * Get query options for list queries. Use with useQuery() in hooks.
@@ -56,10 +80,10 @@ export function getListQueryOptionsImpl<T>(
       'query',
       JSON.stringify(queryOptions),
     ] as const,
-    queryFn: async (): Promise<PaginatedQueryResult<T>> => {
+    queryFn: async ({ client }): Promise<PaginatedQueryResult<T>> => {
       if (!adapter) await initFn();
       if (!self.adapter) throw new Error('Adapter not initialized');
-      const resolvedAdapter = self.adapter;
+      const resolvedAdapter = requestAdapters.get(client) ?? self.adapter;
       return withResilience(() =>
         resolvedAdapter.query<T>(collection, queryOptions, schema, schemaType)
       );
