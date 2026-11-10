@@ -19,7 +19,7 @@ import type { ControlledFieldProps } from '../types';
 export function ControlledSwitchField(
   props: ControlledFieldProps
 ): ReactElement {
-  const { control, errors, fieldConfig, t, onChange } = props;
+  const { control, fieldConfig, t, onChange } = props;
 
   const { name, label, options = {} } = fieldConfig;
 

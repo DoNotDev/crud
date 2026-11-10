@@ -44,8 +44,23 @@ export function updateGetCache<T>(
   const queryKey = ['crud', collection, 'get', id];
 
   if (operation === CRUD_OPERATION.DELETE) {
-    // Remove from cache
-    queryClient.removeQueries({ queryKey });
+    const query = queryClient.getQueryCache().find({ queryKey, exact: true });
+    if (!query) return;
+    // Nobody shows it (temp-id cleanup, closed detail page): drop the entry, so the
+    // next read asks the backend and a recreated id is not negative-cached.
+    if (query.getObserversCount() === 0) {
+      queryClient.removeQueries({ queryKey, exact: true });
+      return;
+    }
+    // Displayed: null = "does not exist" (what a read returns). removeQueries would
+    // not notify the mounted observers, so the document would stay on screen.
+    // Marked stale, not refetched: the next read asks the backend again.
+    queryClient.setQueryData(queryKey, null);
+    void queryClient.invalidateQueries({
+      queryKey,
+      exact: true,
+      refetchType: 'none',
+    });
   } else if (operation === CRUD_OPERATION.SET && data) {
     // Full replacement — do not merge with stale old data
     queryClient.setQueryData(queryKey, data);

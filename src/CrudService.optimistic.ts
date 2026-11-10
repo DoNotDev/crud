@@ -308,11 +308,9 @@ export async function deleteOptimisticImpl(
       );
     }
   } catch (error) {
-    // Rollback: restore item to cache
-    if (previousData) {
-      updateListCaches(self, collection, id, previousData, CRUD_OPERATION.ADD);
-    }
-    // Then remove optimistic flag
+    // No cache rollback: caches are written only after the server confirms the
+    // delete, so on failure they still hold the row. Dropping the optimistic flag
+    // restores it (re-adding it would duplicate the row in every cached list).
     if (self.store) {
       self.store.getState().rejectDelete(collection, id);
     }

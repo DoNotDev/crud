@@ -205,9 +205,9 @@ export async function bulkImpl<T extends Record<string, unknown>>(
   //    (updates); either surfaces the same restriction metadata.
   // -------------------------------------------------------------------------
   if (schemas.create) {
-    assertCanAccess(self, collection, schemas.create);
+    assertCanAccess(self.adapter, collection, schemas.create);
   } else if (schemas.update) {
-    assertCanAccess(self, collection, schemas.update);
+    assertCanAccess(self.adapter, collection, schemas.update);
   }
 
   // -------------------------------------------------------------------------

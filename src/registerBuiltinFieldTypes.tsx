@@ -954,10 +954,7 @@ export function registerAllBuiltinFieldTypes(
         components.uncontrolled
       );
     }
-    // Built-ins read their error from fieldState, so they omit the form-wide
-    // `errors` prop by default — a call site sets omitFormErrors: false when it
-    // genuinely needs it (field-array, for nested item errors).
-    metadataRegistry.set(type, { omitFormErrors: true, ...metadata });
+    metadataRegistry.set(type, metadata);
   };
 
   // Text-based
@@ -1504,8 +1501,6 @@ export function registerAllBuiltinFieldTypes(
     components: {
       controlled: ControlledFieldArrayField,
     },
-    // Forwards `errors` to the nested item renderers — needs the form-wide object
-    omitFormErrors: false,
   });
 
   // Selection

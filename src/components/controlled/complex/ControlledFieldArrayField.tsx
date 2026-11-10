@@ -56,7 +56,7 @@ function getEmptyValue(type: FieldType): unknown {
 export function ControlledFieldArrayField(
   props: ControlledFieldProps
 ): ReactElement {
-  const { control, errors, fieldConfig, required, t } = props;
+  const { control, fieldConfig, required, t } = props;
   const { name, label, validation } = fieldConfig;
 
   const fieldSpecific = (fieldConfig.options?.fieldSpecific ??
@@ -166,7 +166,6 @@ export function ControlledFieldArrayField(
                 >
                   <SubFieldComponent
                     control={control}
-                    errors={errors}
                     fieldConfig={subFieldConfig}
                     t={t}
                   />

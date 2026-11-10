@@ -34,7 +34,6 @@ function Wrapper({ defaultValue }: { defaultValue: string }) {
     <FormProvider {...methods}>
       <ControlledTextField
         control={methods.control}
-        errors={{}}
         fieldConfig={{
           name: 'reference',
           label: 'fields.reference',

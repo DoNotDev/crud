@@ -87,6 +87,11 @@ describe('Expo API Safety Net — @donotdev/crud', () => {
     expect(typeof mod.useCrudList).toBe('function');
   });
 
+  it('exports useCrudDoc hook', () => {
+    expect(mod.useCrudDoc).toBeDefined();
+    expect(typeof mod.useCrudDoc).toBe('function');
+  });
+
   it('exports useCrudCardList hook', () => {
     expect(mod.useCrudCardList).toBeDefined();
     expect(typeof mod.useCrudCardList).toBe('function');
@@ -165,11 +170,6 @@ describe('Expo API Safety Net — @donotdev/crud', () => {
   it('exports getFieldRegistry', () => {
     expect(mod.getFieldRegistry).toBeDefined();
     expect(typeof mod.getFieldRegistry).toBe('function');
-  });
-
-  it('exports registerBuiltinFieldTypes', () => {
-    expect(mod.registerBuiltinFieldTypes).toBeDefined();
-    expect(typeof mod.registerBuiltinFieldTypes).toBe('function');
   });
 
   it('exports useEntityFavorites', () => {

@@ -63,3 +63,30 @@ export function mergeWithOptimistic<T extends WithId>(
 
   return result;
 }
+
+/**
+ * Apply a pending optimistic operation to one cached document.
+ * Single-document counterpart of {@link mergeWithOptimistic}:
+ * - delete → null
+ * - update → the optimistic value merged over the cached document (the optimistic
+ *   value can be partial: cold cache, or a snapshot taken from a list row)
+ * - add → the cached document when the server already returned it, else the optimistic value
+ *
+ * @param doc - Document from the TanStack Query cache (null = not found)
+ * @param op - Optimistic operation pending for this document id, if any
+ * @returns The document to display
+ */
+export function applyOptimisticToDoc<T>(
+  doc: T | null,
+  op: OptimisticMeta | undefined
+): T | null {
+  if (!op) return doc;
+  if (op.operation === CRUD_OPERATION.DELETE) return null;
+  if (op.operation === CRUD_OPERATION.UPDATE && op.optimisticData) {
+    return (doc ? { ...doc, ...op.optimisticData } : op.optimisticData) as T;
+  }
+  if (op.operation === CRUD_OPERATION.ADD && !doc && op.optimisticData) {
+    return op.optimisticData as T;
+  }
+  return doc;
+}

@@ -16,7 +16,7 @@
  * @author AMBROISE PARK Consulting
  */
 
-import type { dndevSchema } from '@donotdev/core';
+import type { dndevSchema, ICrudAdapter } from '@donotdev/core';
 import {
   getI18nInstance,
   hasProvider,
@@ -52,6 +52,30 @@ export function getPiiFields(schema?: dndevSchema<unknown>): string[] {
   const meta = (schema as { security?: { piiFields?: string[] } } | undefined)
     ?.security;
   return meta?.piiFields ?? [];
+}
+
+/**
+ * Decrypt the PII fields of one row read from the adapter (mirrors encryptPii on write).
+ * Every read that reaches the TanStack cache goes through here (get, query, the
+ * reactive query descriptors, subscriptions), so cached rows are always plaintext.
+ *
+ * @param self - CrudService (its security context; none = no decryption)
+ * @param schema - Schema carrying `security.piiFields`
+ * @param row - Row as returned by the adapter
+ * @returns The row with PII fields decrypted
+ */
+export function decryptPiiRow<T>(
+  self: CrudServiceInternal,
+  schema: dndevSchema<unknown> | undefined,
+  row: T
+): T {
+  if (!self.security) return row;
+  const piiFields = getPiiFields(schema);
+  if (piiFields.length === 0) return row;
+  return self.security.decryptPii(
+    row as unknown as Record<string, unknown>,
+    piiFields
+  ) as unknown as T;
 }
 
 /**
@@ -143,23 +167,24 @@ export async function ensureAdapter(self: CrudServiceInternal): Promise<void> {
 }
 
 /**
- * Throws if the active adapter is direct (not server-side) and the entity schema
- * has any field with restricted visibility. Call before any adapter read or write.
+ * Throws if `adapter` is direct (not server-side) and the entity schema has any
+ * field with restricted visibility. Call before any adapter read or write, with
+ * the adapter that performs it (the shared one, or a request-scoped one on the server).
  */
 export function assertCanAccess(
-  self: CrudServiceInternal,
+  adapter: ICrudAdapter | null,
   collection: string,
   schema?: dndevSchema<unknown>
 ): void {
   // Null adapter means not yet initialized — skip this check; the caller will throw
   // "Adapter not initialized" before any data access. Without this guard, null?.serverSideOnly
   // evaluates to undefined (falsy), causing an access-restriction error instead of the correct one.
-  if (!self.adapter) return;
+  if (!adapter) return;
   if (
     schema &&
     hasRestrictedVisibility(schema) &&
-    !self.adapter.serverSideOnly &&
-    !self.adapter.dbLevelSecurity
+    !adapter.serverSideOnly &&
+    !adapter.dbLevelSecurity
   ) {
     throw new Error(
       `[dndev] Direct adapter cannot access "${collection}": entity has restricted field visibility. ` +

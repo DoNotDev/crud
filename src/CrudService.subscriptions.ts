@@ -20,7 +20,11 @@ import type {
 } from '@donotdev/core';
 import { handleError } from '@donotdev/core';
 
-import { assertCanAccess, ensureAdapter } from './CrudService.internal';
+import {
+  assertCanAccess,
+  decryptPiiRow,
+  ensureAdapter,
+} from './CrudService.internal';
 import type { CrudServiceInternal } from './types';
 
 export function subscribeImpl<T>(
@@ -72,12 +76,15 @@ function subscribeSync<T>(
     if (!adapter.subscribe) {
       return () => {};
     }
-    assertCanAccess(self, collection, schema);
+    assertCanAccess(self.adapter, collection, schema);
     return adapter.subscribe<T>(
       collection,
       id,
-      (data, error) => {
-        // Sync to TanStack Query cache (single source of truth)
+      (raw, error) => {
+        // Same plaintext rows as get() / getDocQueryOptions (cache holds one shape)
+        const data = raw ? decryptPiiRow(self, schema, raw) : raw;
+        // Sync to TanStack Query cache (single source of truth).
+        // A null snapshot (remote delete) is not written: single-editor use cases.
         if (data) {
           self
             .getQueryClient()
@@ -146,11 +153,13 @@ function subscribeToCollectionSync<T>(
     if (!adapter.subscribeToCollection) {
       return () => {};
     }
-    assertCanAccess(self, collection, schema);
+    assertCanAccess(self.adapter, collection, schema);
     return adapter.subscribeToCollection<T>(
       collection,
       options,
-      (data, error) => {
+      (raw, error) => {
+        // Same plaintext rows as query() / getListQueryOptions (cache holds one shape)
+        const data = raw?.map((item) => decryptPiiRow(self, schema, item));
         // Sync to TanStack Query cache (single source of truth).
         // One key for list + listCard — same as getListQueryOptions / query().
         if (data) {

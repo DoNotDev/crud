@@ -86,14 +86,4 @@ export interface FieldTypeMetadata {
   valueType?: ValueType;
   /** UI components */
   components?: ComponentRegistration;
-  /**
-   * Omit the form-wide `errors` prop for this field type.
-   *
-   * Absent (the default) passes `errors` exactly as before. Set `true` when the
-   * component reads its error from `fieldState` instead — the RHF-native
-   * per-field subscription. `errors` changes identity on every formState
-   * update, so withholding it is what lets FormFieldRenderer's memo hold and
-   * stops sibling fields re-rendering on every validation pass.
-   */
-  omitFormErrors?: boolean;
 }

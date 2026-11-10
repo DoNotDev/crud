@@ -80,13 +80,6 @@ export interface FieldTypeRegistration<FT extends FieldType = FieldType> {
   filterable?: boolean;
   /** Filter UI type for EntityFilters (e.g. 'text', 'range', 'select') */
   filterType?: CustomFilterType;
-  /**
-   * Omit the form-wide `errors` prop for this field type.
-   * Absent (the default) passes `errors` unchanged — existing components keep
-   * working. Set `true` when the component reads its error from `fieldState`;
-   * that lets FormFieldRenderer's memo hold for this field type.
-   */
-  omitFormErrors?: boolean;
 }
 
 /**
@@ -103,8 +96,6 @@ class FieldRegistry {
     string,
     { filterable: boolean; filterType?: CustomFilterType }
   >();
-  /** Field types that asked not to receive the form-wide `errors` prop. */
-  private readonly formErrorsOmitted = new Set<string>();
 
   /**
    * Register UI components for a field type (built-in types)
@@ -132,15 +123,7 @@ class FieldRegistry {
       displayFormatter,
       filterable,
       filterType,
-      omitFormErrors,
     } = registration;
-
-    // Only an explicit opt-out is recorded — absent means "pass errors", as before
-    if (omitFormErrors) {
-      this.formErrorsOmitted.add(type);
-    } else {
-      this.formErrorsOmitted.delete(type);
-    }
 
     // Register UI components (internal cast safe — registry dispatches by type string)
     if (controlledComponent || uncontrolledComponent) {
@@ -201,11 +184,6 @@ class FieldRegistry {
    */
   isFilterable(type: string): boolean {
     return this.filterMetadata.get(type)?.filterable ?? false;
-  }
-
-  /** Whether a custom registration asked to omit the form-wide `errors` prop. */
-  omitsFormErrors(type: string): boolean {
-    return this.formErrorsOmitted.has(type);
   }
 
   /**

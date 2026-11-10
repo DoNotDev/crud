@@ -17,7 +17,7 @@ import { convertValidationRules, type ControlledFieldProps } from '../types';
  * `<Input value={value}>` — default values are overwritten on re-render.
  */
 export function ControlledTextField(props: ControlledFieldProps): ReactElement {
-  const { control, errors, fieldConfig, t, placeholder, required } = props;
+  const { control, fieldConfig, t, placeholder, required } = props;
 
   const { name, label, validation, options = {} } = fieldConfig;
 

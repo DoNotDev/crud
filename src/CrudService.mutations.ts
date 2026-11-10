@@ -66,7 +66,7 @@ export async function setImpl<T>(
     if (!self.adapter) {
       throw new Error('Adapter not initialized');
     }
-    assertCanAccess(self, collection, schema);
+    assertCanAccess(self.adapter, collection, schema);
 
     // SOC2: rate limit write, encrypt PII before storage
     if (self.security) {
@@ -191,7 +191,7 @@ export async function updateImpl<T>(
       throw new Error('Adapter not initialized');
     }
     if (schema) {
-      assertCanAccess(self, collection, schema);
+      assertCanAccess(self.adapter, collection, schema);
       // No full-schema validation here — update payloads are partial by definition.
       // The adapter validates field-level constraints on the fields it receives.
     }
@@ -352,11 +352,9 @@ export async function deleteImpl(
       );
     }
   } catch (error) {
-    // Rollback: restore item to cache
-    if (previousData) {
-      updateListCaches(self, collection, id, previousData, CRUD_OPERATION.ADD);
-    }
-    // Then remove optimistic flag
+    // No cache rollback: caches are written only after the server confirms the
+    // delete, so on failure they still hold the row. Dropping the optimistic flag
+    // restores it (re-adding it would duplicate the row in every cached list).
     if (self.store) {
       self.store.getState().rejectDelete(collection, id);
     }
@@ -422,7 +420,7 @@ export async function addImpl<T extends Record<string, unknown>>(
     if (!self.adapter) {
       throw new Error('Adapter not initialized');
     }
-    assertCanAccess(self, collection, schema);
+    assertCanAccess(self.adapter, collection, schema);
 
     // SOC2: rate limit write, encrypt PII before storage
     if (self.security) {

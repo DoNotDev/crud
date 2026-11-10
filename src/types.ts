@@ -20,6 +20,8 @@ import type {
   BulkOperations,
   BulkResult,
   CrudCreateInput,
+  CrudDocQuery,
+  CrudListQuery,
   dndevSchema,
   ICrudAdapter,
   QueryClient,
@@ -255,23 +257,14 @@ export interface CrudServiceInterface {
     schema: dndevSchema<unknown>,
     cacheOptions?: CacheOptions,
     schemaType?: ListSchemaType
-  ): {
-    queryKey: readonly string[];
-    /** `client`: the QueryClient running it (selects a request-scoped adapter). */
-    queryFn: (context: { client: object }) => Promise<PaginatedQueryResult<T>>;
-    staleTime: number;
-  };
+  ): CrudListQuery<T>;
   /** Schema accepts unknown since OperationSchemas stores dndevSchema<unknown>. T is for return type. */
   getDocQueryOptions<T>(
     collection: string,
     id: string,
     schema: dndevSchema<unknown>,
     cacheOptions?: CacheOptions
-  ): {
-    queryKey: readonly string[];
-    queryFn: () => Promise<T | null>;
-    staleTime: number;
-  };
+  ): CrudDocQuery<T>;
 
   // Read operations (with caching)
   get<T>(

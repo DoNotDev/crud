@@ -12,13 +12,7 @@
 
 import { useMemo, useCallback, useRef, useState, useEffect } from 'react';
 
-import {
-  hasProvider,
-  isClient,
-  useAuthSessionSnapshot,
-  useQuery,
-  useQueryClient,
-} from '@donotdev/core';
+import { isClient, useQuery } from '@donotdev/core';
 import type {
   AnyEntity,
   FeatureStatus,
@@ -32,6 +26,7 @@ import { CRUD_OPERATION } from './types';
 import type { OptimisticMeta, CacheOptions } from './types';
 import { useCrud, getCrudServiceInstance, EMPTY_OPTIMISTIC } from './useCrud';
 import type { UseCrudOptions } from './useCrud';
+import { useServerPrefetch } from './useServerPrefetch';
 import { mergeWithOptimistic } from './utils/mergeWithOptimistic';
 import { injectScopeFilter, getCurrentScopeValue } from './utils/scopeUtils';
 
@@ -227,40 +222,9 @@ export function useBaseCrudList<T extends { id: string } = { id: string }>(
     enabled: enabled && !!queryOptions,
   });
 
-  // 7a. Server render: fetch before rendering, so the HTML carries the data and the
-  // streamed hydration (NextJsAppProviders) seeds the browser cache under the same key:
-  // the first paint is final (no loading → content swap, image in the initial HTML).
-  // Signed-out visitors read with the public role; signed-in visitors with their own
-  // access token (adapter.forAccessToken; the database verifies it), i.e. exactly what
-  // their browser would read. Without a usable token (or an adapter that cannot read
-  // as a token holder) the browser loads it. Scoped (tenant) entities never prefetch.
-  const queryClient = useQueryClient();
-  const sessionSnapshot = useAuthSessionSnapshot();
+  // 7a. Server render: fetch before rendering (see useServerPrefetch)
+  useServerPrefetch(queryOptions, enabled, scope);
   const onServer = !isClient();
-  const signedOut = !hasProvider('auth') || sessionSnapshot?.user === null;
-  const serverFetch =
-    onServer &&
-    enabled &&
-    !!queryOptions &&
-    !scope &&
-    (signedOut ||
-      (!!sessionSnapshot?.user &&
-        !!sessionSnapshot.accessToken &&
-        !!getCrudServiceInstance()?.bindRequestAccessToken(
-          queryClient,
-          sessionSnapshot.accessToken
-        )));
-  if (serverFetch && queryData === undefined && !queryError) {
-    // Thrown, not `use()`d: the hooks of one component suspend one after another, and
-    // React's `use()` replays an earlier hook's settled promise in the same slot,
-    // rendering this hook without its data (TanStack's suspense throws too). A failed
-    // read settles to undefined: the retry sees the error, renders loading, and the
-    // browser (which receives no data for it) fetches it again — same first paint.
-    throw queryClient.fetchQuery(queryOptions).then(
-      () => undefined,
-      () => undefined
-    );
-  }
 
   // 7b. Auto-switch: if auto mode and total exceeds what we fetched, flip to server
   useEffect(() => {

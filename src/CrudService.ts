@@ -203,7 +203,7 @@ export class CrudService implements CrudServiceInternal {
   }
 
   /**
-   * Server render: list queries run with `client` (this request's QueryClient) read as
+   * Server render: list and document queries run with `client` (this request's QueryClient) read as
    * the holder of `accessToken`. False when the adapter cannot (no forAccessToken).
    */
   bindRequestAccessToken(client: object, accessToken: string): boolean {

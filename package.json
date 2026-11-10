@@ -1,6 +1,6 @@
 {
   "name": "@donotdev/crud",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "private": false,
   "type": "module",
   "license": "MIT",
@@ -15,7 +15,6 @@
     }
   },
   "sideEffects": [
-    "./src/builtinFieldTypes.tsx",
     "./src/registerBuiltinFieldTypes.tsx",
     "./src/fieldTypeRegistry.ts"
   ],

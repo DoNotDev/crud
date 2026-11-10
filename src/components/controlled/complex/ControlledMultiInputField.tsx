@@ -19,7 +19,7 @@ import { convertValidationRules, type ControlledFieldProps } from '../types';
 export function ControlledMultiInputField(
   props: ControlledFieldProps
 ): ReactElement {
-  const { control, errors, fieldConfig, required, t } = props;
+  const { control, fieldConfig, required, t } = props;
 
   const { name, label, validation, options = {} } = fieldConfig;
 

@@ -7,12 +7,19 @@
 ## Hooks
 
 ### useCrud
-Single document CRUD actions (add, update, delete, get, subscribe).
+CRUD actions (add, update, delete, get, subscribe). Holds no document: read with `useCrudDoc` or `get()`.
 
 ```tsx
-const { add, update, delete: remove, get, data, loading, error } = useCrud(carEntity);
+const { add, update, delete: remove, get, loading, error } = useCrud(carEntity);
 await add({ name: 'Tesla', year: 2024 });
 await remove('doc-id');
+```
+
+### useCrudDoc
+One document, reactive: re-renders on every edit or delete of it, anywhere in the app (shared cache). For detail/view pages.
+
+```tsx
+const { data: car, loading, notFound, error } = useCrudDoc(carEntity, carId);
 ```
 
 ### useCrudList

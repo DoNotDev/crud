@@ -4,7 +4,6 @@
 import type {
   Control,
   ControllerRenderProps,
-  FieldErrors,
   FieldValues,
   Path,
   RegisterOptions,
@@ -24,16 +23,6 @@ export interface ControlledFieldProps<
 > {
   /** Control object from react-hook-form - use with framework's useController hook */
   control: Control<T>;
-  /**
-   * Form-wide errors. Withheld when the field type registers `omitFormErrors`.
-   *
-   * @deprecated Read the error from `fieldState` (useController/Controller), or
-   * `useFormState({ control, name })` for nested paths. This object changes
-   * identity on every formState update, so receiving it re-renders the field on
-   * every validation pass. Removed in the next major — see
-   * docs/plans/form-perf-migration.html
-   */
-  errors?: FieldErrors<T>;
   fieldConfig: EntityField<FT>;
   t: (key: string, options?: Record<string, unknown>) => string;
   onChange?: (value: ValueTypeForField<FT>) => void;

@@ -16,7 +16,7 @@ import { convertValidationRules, type ControlledFieldProps } from '../types';
  * Stores value as number, displays as string in combobox
  */
 export function ControlledYearField(props: ControlledFieldProps): ReactElement {
-  const { control, errors, fieldConfig, t, placeholder, required } = props;
+  const { control, fieldConfig, t, placeholder, required } = props;
   const { name, label, validation, options: fieldOptions = {} } = fieldConfig;
 
   // Generate year options from min/max validation or use defaults

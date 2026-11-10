@@ -24,8 +24,8 @@ import { LIST_SCHEMA_TYPE, handleError } from '@donotdev/core';
 
 import {
   assertCanAccess,
+  decryptPiiRow,
   ensureAdapter,
-  getPiiFields,
   withResilience,
 } from './CrudService.internal';
 import type { CacheOptions, CrudServiceInternal } from './types';
@@ -69,9 +69,6 @@ export function getListQueryOptionsImpl<T>(
   cacheOptions?: CacheOptions,
   schemaType: ListSchemaType = LIST_SCHEMA_TYPE.LIST
 ): CrudListQuery<T> {
-  const adapter = self.adapter;
-  const initFn = () => ensureAdapter(self);
-
   // Single cache key for list + listCard — one network read shared by both
   return {
     queryKey: [
@@ -81,14 +78,61 @@ export function getListQueryOptionsImpl<T>(
       JSON.stringify(queryOptions),
     ] as const,
     queryFn: async ({ client }): Promise<PaginatedQueryResult<T>> => {
-      if (!adapter) await initFn();
+      await ensureAdapter(self);
       if (!self.adapter) throw new Error('Adapter not initialized');
-      const resolvedAdapter = requestAdapters.get(client) ?? self.adapter;
-      return withResilience(() =>
-        resolvedAdapter.query<T>(collection, queryOptions, schema, schemaType)
+      const adapter = requestAdapters.get(client) ?? self.adapter;
+      return readQuery<T>(
+        self,
+        adapter,
+        collection,
+        queryOptions,
+        schema,
+        schemaType
       );
     },
     staleTime: cacheOptions?.staleTime ?? DEFAULT_STALE_TIME,
+  };
+}
+
+/**
+ * Read one document: access check, adapter read, PII decryption.
+ * The one read path behind `get()` and `getDocQueryOptions()`: both fill the cache
+ * key `['crud', collection, 'get', id]`, so both must produce the same value.
+ */
+async function readDocument<T>(
+  self: CrudServiceInternal,
+  adapter: ICrudAdapter,
+  collection: string,
+  id: string,
+  schema: dndevSchema<unknown>
+): Promise<T | null> {
+  assertCanAccess(adapter, collection, schema);
+  const data = await withResilience(() =>
+    adapter.get<T>(collection, id, schema)
+  );
+  return data ? decryptPiiRow(self, schema, data) : null;
+}
+
+/**
+ * Run one list query: access check, adapter query, PII decryption per row.
+ * The one read path behind `query()` and `getListQueryOptions()`: both fill the cache
+ * key `['crud', collection, 'query', JSON(options)]`, so both must produce the same value.
+ */
+async function readQuery<T>(
+  self: CrudServiceInternal,
+  adapter: ICrudAdapter,
+  collection: string,
+  options: QueryOptions,
+  schema: dndevSchema<unknown>,
+  schemaType: ListSchemaType
+): Promise<PaginatedQueryResult<T>> {
+  assertCanAccess(adapter, collection, schema);
+  const result = await withResilience(() =>
+    adapter.query<T>(collection, options, schema, schemaType)
+  );
+  return {
+    ...result,
+    items: result.items.map((item) => decryptPiiRow(self, schema, item)),
   };
 }
 
@@ -104,18 +148,13 @@ export function getDocQueryOptionsImpl<T>(
   schema: dndevSchema<unknown>,
   cacheOptions?: CacheOptions
 ): CrudDocQuery<T> {
-  const adapter = self.adapter;
-  const initFn = () => ensureAdapter(self);
-
   return {
     queryKey: ['crud', collection, 'get', id] as const,
-    queryFn: async (): Promise<T | null> => {
-      if (!adapter) await initFn();
+    queryFn: async ({ client }): Promise<T | null> => {
+      await ensureAdapter(self);
       if (!self.adapter) throw new Error('Adapter not initialized');
-      const resolvedAdapter = self.adapter;
-      return withResilience(() =>
-        resolvedAdapter.get<T>(collection, id, schema)
-      );
+      const adapter = requestAdapters.get(client) ?? self.adapter;
+      return readDocument<T>(self, adapter, collection, id, schema);
     },
     staleTime: cacheOptions?.staleTime ?? DEFAULT_STALE_TIME,
   };
@@ -186,24 +225,7 @@ async function getFromAdapter<T>(
     if (!self.adapter) {
       throw new Error('Adapter not initialized');
     }
-    assertCanAccess(self, collection, schema);
-    const adapter = self.adapter;
-    const data = await withResilience(() =>
-      adapter.get<T>(collection, id, schema)
-    );
-
-    // SOC2: decrypt PII fields after read (mirrors encryptPii on write)
-    if (data && self.security) {
-      const piiFields = getPiiFields(schema);
-      if (piiFields.length > 0) {
-        return self.security.decryptPii(
-          data as unknown as Record<string, unknown>,
-          piiFields
-        ) as unknown as T;
-      }
-    }
-
-    return data;
+    return await readDocument<T>(self, self.adapter, collection, id, schema);
   } catch (error) {
     const wrappedError = handleError(error, {
       userMessage: `Failed to fetch ${collection}`,
@@ -299,27 +321,14 @@ async function queryFromAdapter<T>(
     if (!self.adapter) {
       throw new Error('Adapter not initialized');
     }
-    assertCanAccess(self, collection, schema);
-    const adapter = self.adapter;
-    const result = await withResilience(() =>
-      adapter.query<T>(collection, options, schema, schemaType)
+    return await readQuery<T>(
+      self,
+      self.adapter,
+      collection,
+      options,
+      schema,
+      schemaType
     );
-
-    // SOC2: decrypt PII fields after read (mirrors encryptPii on write)
-    if (self.security && result.items.length > 0) {
-      const piiFields = getPiiFields(schema);
-      if (piiFields.length > 0) {
-        result.items = result.items.map(
-          (item) =>
-            self.security!.decryptPii(
-              item as unknown as Record<string, unknown>,
-              piiFields
-            ) as unknown as T
-        );
-      }
-    }
-
-    return result;
   } catch (error) {
     const wrappedError = handleError(error, {
       userMessage: `Failed to query ${collection}`,

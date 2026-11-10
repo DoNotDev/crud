@@ -18,7 +18,6 @@ import type { EntityField, FieldType, ValueTypeForField } from '@donotdev/core';
 
 import { getFieldRegistry } from '../FieldRegistry';
 import {
-  getFieldTypeMetadata,
   getMetadataRegistry,
 } from '../fieldTypeRegistry.store';
 import { ControlledTextField, type ControlledFieldProps } from './controlled';
@@ -38,7 +37,6 @@ interface UncontrolledProps<
   onChange: (value: ValueTypeForField<T>) => void;
   error?: string;
   control?: never;
-  errors?: never;
 }
 
 interface ControlledProps<
@@ -46,7 +44,6 @@ interface ControlledProps<
   TFieldValues extends FieldValues = FieldValues,
 > extends FormFieldRendererBaseProps<T> {
   control: Control<TFieldValues>;
-  errors: Record<string, any>;
   value?: never;
   onChange?: never;
   error?: never;
@@ -96,7 +93,7 @@ export function FormFieldRenderer<
 
   // Controlled mode (react-hook-form) - but skip for action buttons
   if (isControlled && !isActionButton) {
-    const { control, errors } = props;
+    const { control } = props;
 
     // Extract placeholder from fieldSpecific if present
     const fieldSpecific = config.options?.fieldSpecific as
@@ -104,19 +101,11 @@ export function FormFieldRenderer<
       | undefined;
     const placeholder = fieldSpecific?.placeholder as string | undefined;
 
-    // Field types that read their error from fieldState opt out of the form-wide
-    // `errors` object, so this component's props stay referentially stable and the
-    // memo below holds across validation passes.
-    const omitFormErrors =
-      registry.omitsFormErrors(config.type) ||
-      getFieldTypeMetadata(config.type)?.omitFormErrors === true;
-
     // Registry dispatch boundary: widen Control<TFieldValues> → Control<FieldValues>
     // Control<T> is invariant in react-hook-form — this is the standard pattern
     // for dynamic dispatch where the registry can't know the specific entity type
     const controlledProps: ControlledFieldProps = {
       control: control as Control<FieldValues>,
-      ...(omitFormErrors ? {} : { errors }),
       fieldConfig: { ...config, label: config.label || name },
       t,
       placeholder,

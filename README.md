@@ -5,19 +5,23 @@ Complete CRUD operations and form components for DoNotDev framework.
 ## Quick Start
 
 ```typescript
-import { useCrud, EntityFormRenderer } from '@donotdev/crud';
+import {
+  useCrud,
+  useCrudDoc,
+  useCrudList,
+  EntityFormRenderer,
+} from '@donotdev/crud';
 
 // Data operations (requires configureProviders({ crud: adapter }) at app startup)
 function UserList() {
-  const { data, loading, query } = useCrud('users', {
-    schema: UserSchema
-  });
-
-  useEffect(() => {
-    query({ limit: 10 });
-  }, []);
-
+  const { items, loading } = useCrudList(UserEntity);
   return <div>{/* Render users */}</div>;
+}
+
+// One document, reactive to every edit/delete
+function UserDetail({ id }: { id: string }) {
+  const { data: user, loading, notFound } = useCrudDoc(UserEntity, id);
+  return <div>{/* Render user */}</div>;
 }
 
 // Form rendering

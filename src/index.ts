@@ -12,6 +12,7 @@
 // Core CRUD hooks
 export * from './useCrud';
 export * from './useCrudList';
+export * from './useCrudDoc';
 export * from './useCrudCardList';
 
 // Components
@@ -80,13 +81,6 @@ export {
   type DisplayFormatter,
   type ComponentRegistration,
 } from './fieldTypeRegistry';
-
-/**
- * @deprecated No-op shim. Built-in field types are now auto-registered via
- * `fieldTypeRegistry.ts` → `registerBuiltinFieldTypes.tsx` side-effect chain.
- * Exported for backward compatibility with consumers that call it at startup.
- */
-export { registerBuiltinFieldTypes } from './builtinFieldTypes';
 
 // Form building blocks - for custom forms
 export {

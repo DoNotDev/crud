@@ -19,7 +19,7 @@ import { convertValidationRules, type ControlledFieldProps } from '../types';
 export function ControlledRichTextField(
   props: ControlledFieldProps
 ): ReactElement {
-  const { control, errors, fieldConfig, placeholder, required, t } = props;
+  const { control, fieldConfig, placeholder, required, t } = props;
 
   const { name, label, validation, options = {} } = fieldConfig;
 

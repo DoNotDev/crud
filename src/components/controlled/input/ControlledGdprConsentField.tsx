@@ -15,7 +15,7 @@ import { convertValidationRules, type ControlledFieldProps } from '../types';
 export function ControlledGdprConsentField(
   props: ControlledFieldProps
 ): ReactElement {
-  const { control, errors, fieldConfig, required } = props;
+  const { control, fieldConfig, required } = props;
 
   const { name, validation, options = {} } = fieldConfig;
 

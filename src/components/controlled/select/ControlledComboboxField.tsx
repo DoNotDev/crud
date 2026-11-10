@@ -23,7 +23,7 @@ import { convertValidationRules, type ControlledFieldProps } from '../types';
 export function ControlledComboboxField(
   props: ControlledFieldProps
 ): ReactElement {
-  const { control, errors, fieldConfig, t, placeholder, required } = props;
+  const { control, fieldConfig, t, placeholder, required } = props;
 
   const { name, label, validation, options: fieldOptions = {} } = fieldConfig;
 

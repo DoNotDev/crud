@@ -307,6 +307,7 @@ See `lookup_symbol("BulkOperations")`, `lookup_symbol("BulkResult")`, `lookup_sy
 | Hook | One-liner |
 |------|-----------|
 | `useCrud` | CRUD actions: `add`, `update`, `delete`, `get`, `set`, `query`, `bulk` |
+| `useCrudDoc` | One document, reactive to every edit/delete (detail pages) |
 | `useCrudList` | Real-time list with search, filters, sort applied |
 | `useCrudCardList` | Same as `useCrudList`, optimized for public card views |
 | `useCrudFilters` | Filter state per collection, auto-consumed by list hooks |

@@ -20,7 +20,7 @@ import { convertValidationRules, type ControlledFieldProps } from '../types';
 export function ControlledRadioField(
   props: ControlledFieldProps
 ): ReactElement {
-  const { control, errors, fieldConfig, t, required } = props;
+  const { control, fieldConfig, t, required } = props;
 
   const { name, label, validation } = fieldConfig;
 

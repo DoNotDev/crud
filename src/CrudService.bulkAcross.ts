@@ -220,7 +220,7 @@ export async function bulkAcrossImpl(
   // -------------------------------------------------------------------------
   for (const batch of nonEmpty) {
     assertCanAccess(
-      self,
+      self.adapter,
       batch.collection,
       batch.schemas.create ?? batch.schemas.update
     );

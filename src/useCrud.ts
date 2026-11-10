@@ -307,8 +307,6 @@ export function useCrud<
     (state) => state.collections[collection]?.error || null
   );
 
-  /** @deprecated Always null. Use get() for single documents. Kept for CrudAPI<T> contract. */
-  const data = null as T | null;
 
   // ==========================================================================
   // Service initialization
@@ -613,7 +611,6 @@ export function useCrud<
   // ==========================================================================
   return {
     status: FEATURE_STATUS.READY,
-    data,
     loading,
     error,
     get,

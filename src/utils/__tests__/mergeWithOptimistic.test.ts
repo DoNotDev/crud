@@ -12,7 +12,10 @@
 import { describe, it, expect } from 'vitest';
 
 import type { OptimisticMeta } from '../../types';
-import { mergeWithOptimistic } from '../mergeWithOptimistic';
+import {
+  applyOptimisticToDoc,
+  mergeWithOptimistic,
+} from '../mergeWithOptimistic';
 
 /** Item must satisfy WithId (id + index signature) for mergeWithOptimistic generic */
 interface Item {
@@ -95,5 +98,53 @@ describe('mergeWithOptimistic', () => {
     const result = mergeWithOptimistic(queryData, optimistic);
     expect(result).toHaveLength(3);
     expect(result[1]).toEqual({ id: '2', name: 'Bob' });
+  });
+});
+
+describe('applyOptimisticToDoc', () => {
+  const doc: Item = { id: '1', name: 'Cached' };
+
+  it('returns the cached document when nothing is pending', () => {
+    expect(applyOptimisticToDoc(doc, undefined)).toBe(doc);
+    expect(applyOptimisticToDoc(null, undefined)).toBeNull();
+  });
+
+  it('returns null for a pending delete', () => {
+    expect(applyOptimisticToDoc(doc, meta('delete', null, '1'))).toBeNull();
+  });
+
+  it('merges a pending update over the cached document', () => {
+    const full = { id: '1', name: 'Cached', price: 10 };
+    expect(
+      applyOptimisticToDoc(
+        full,
+        meta('update', { id: '1', name: 'Updated' }, '1')
+      )
+    ).toEqual({ id: '1', name: 'Updated', price: 10 });
+  });
+
+  it('keeps fields the partial optimistic value lacks (cold-cache update)', () => {
+    const full = { id: '1', name: 'Cached', price: 10 };
+    expect(
+      applyOptimisticToDoc(full, meta('update', { id: '1', read: true }, '1'))
+    ).toEqual({ id: '1', name: 'Cached', price: 10, read: true });
+  });
+
+  it('returns the optimistic value for an update with nothing cached', () => {
+    const updated = { id: '1', name: 'Updated' };
+    expect(applyOptimisticToDoc(null, meta('update', updated, '1'))).toBe(
+      updated
+    );
+  });
+
+  it('returns the optimistic value for a pending add not yet cached', () => {
+    const added = { id: 'temp-1', name: 'New' };
+    expect(applyOptimisticToDoc(null, meta('add', added))).toBe(added);
+  });
+
+  it('keeps the cached document once the server returned the add', () => {
+    expect(
+      applyOptimisticToDoc(doc, meta('add', { id: '1', name: 'Stale' }, '1'))
+    ).toBe(doc);
   });
 });

@@ -20,7 +20,7 @@ import { convertValidationRules, type ControlledFieldProps } from '../types';
 export function ControlledDropdownField(
   props: ControlledFieldProps
 ): ReactElement {
-  const { control, errors, fieldConfig, t, onChange, required } = props;
+  const { control, fieldConfig, t, onChange, required } = props;
 
   const { name, label, validation, options: fieldOptions = {} } = fieldConfig;
 

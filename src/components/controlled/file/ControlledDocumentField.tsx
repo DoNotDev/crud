@@ -19,7 +19,7 @@ import { convertValidationRules, type ControlledFieldProps } from '../types';
 export function ControlledDocumentField(
   props: ControlledFieldProps
 ): ReactElement {
-  const { control, errors, fieldConfig, required, t } = props;
+  const { control, fieldConfig, required, t } = props;
 
   const { name, label, validation } = fieldConfig;
 

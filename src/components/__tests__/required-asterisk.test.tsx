@@ -34,7 +34,6 @@ vi.mock('../../FieldRegistry', () => {
     getFieldRegistry: () => ({
       getControlledComponent: () => CaptureComponent,
       getUncontrolledComponent: () => undefined,
-      omitsFormErrors: () => false,
     }),
   };
 });
@@ -82,7 +81,6 @@ describe('required asterisk - FormFieldRenderer → ControlledFieldProps', () =>
         name="rent"
         config={config}
         control={{} as any}
-        errors={{}}
         t={mockT}
       />
     );
@@ -105,7 +103,6 @@ describe('required asterisk - FormFieldRenderer → ControlledFieldProps', () =>
         name="notes"
         config={config}
         control={{} as any}
-        errors={{}}
         t={mockT}
       />
     );
@@ -127,7 +124,6 @@ describe('required asterisk - FormFieldRenderer → ControlledFieldProps', () =>
         name="lift"
         config={config}
         control={{} as any}
-        errors={{}}
         t={mockT}
       />
     );

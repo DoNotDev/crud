@@ -56,7 +56,6 @@ describe('FormFieldRenderer', () => {
         config={mockConfig}
         t={mockT}
         control={{} as any}
-        errors={{}}
       />
     );
 
@@ -77,7 +76,6 @@ describe('FormFieldRenderer', () => {
         config={textareaConfig}
         t={mockT}
         control={{} as any}
-        errors={{}}
       />
     );
 
