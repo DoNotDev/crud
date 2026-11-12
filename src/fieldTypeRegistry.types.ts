@@ -53,8 +53,10 @@ export type DisplayFormatterOptions = {
 };
 
 export type DisplayFormatter = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: exported signature; narrowing it is a breaking change for importers (deferred to a major, any-audit 2026-11-11)
   value: any,
   config: EntityField,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: t prop signature shared by field components; narrowing it is a breaking change for callers
   t: (key: string, options?: Record<string, any>) => string,
   options?: DisplayFormatterOptions
 ) => string | ReactElement;
@@ -63,6 +65,7 @@ export type DisplayFormatter = (
  * Component registration for a field type
  */
 export interface ComponentRegistration {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: exported signature; narrowing it is a breaking change for importers (deferred to a major, any-audit 2026-11-11)
   controlled: ComponentType<ControlledFieldProps<any, any>>;
   uncontrolled?: ComponentType<UncontrolledFieldProps>;
 }

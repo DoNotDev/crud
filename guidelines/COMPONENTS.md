@@ -65,6 +65,12 @@ Data table for entity collection.
 <EntityList entity={userEntity} onRowClick={(user) => edit(user.id)} />
 ```
 
+`editable` edits the list in place (text, number, select, radio, reference fields the viewer may edit; references as dropdowns). Check rows to set one field on all of them; paste blocks from Excel. Save = one `bulk({ updates })`.
+
+```tsx
+<EntityList entity={productEntity} editable />
+```
+
 ### EntityCardList
 Card grid for entity collection.
 

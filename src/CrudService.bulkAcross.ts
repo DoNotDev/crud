@@ -2,10 +2,11 @@
 
 /**
  * @fileoverview CrudService cross-collection bulk (bulkAcross) orchestration
- * @description Service-layer implementation of `bulkAcross()` — an atomic
+ * @description Service-layer implementation of `bulkAcross()` — a
  * multi-collection write that applies one optimistic pass across all collections,
  * executes adapter writes in topological order (parallel within each wave), and
- * either confirms all or rolls back all. Emits a single audit entry, a single
+ * confirms all, or stops at the first wave with rows not written (adapters
+ * report per-row failures; rows already written stay written, caches refetch). Emits a single audit entry, a single
  * rate-limit check, and at most one success toast.
  *
  * Mirrors the structure of {@link bulkImpl} but fans out across multiple
@@ -152,10 +153,12 @@ function topologicalSort(batches: AnyBatch[]): AnyBatch[][] {
 }
 
 /**
- * Cross-collection atomic bulk write.
+ * Cross-collection bulk write.
  *
  * One optimistic pass across all collections, adapter writes in topological
- * order, one toast. Any wave failure rolls back ALL collections' optimistic ops.
+ * order, one toast. A wave that throws or reports rows not written stops the
+ * chain: optimistic ops are rolled back and the collections refetched (rows
+ * already written by earlier waves stay written).
  *
  * @param self - CrudService instance.
  * @param batches - Per-collection operations. Each carries its own schemas.
@@ -281,7 +284,7 @@ export async function bulkAcrossImpl(
         id,
         patch: (updatePiiFields.length > 0 && self.security
           ? self.security.encryptPii(patchRecord, updatePiiFields)
-          : patchRecord) as Record<string, unknown>,
+          : patchRecord),
       };
     });
 
@@ -397,6 +400,17 @@ export async function bulkAcrossImpl(
       for (const { collection, result } of waveResults) {
         results[collection] = result;
       }
+
+      // Later waves depend on this one: rows that were not written stop the chain.
+      // Rows already written stay written (the catch refetches server truth).
+      const partial = waveResults.filter(({ result }) => result.failed.length > 0);
+      if (partial.length > 0) {
+        throw new Error(
+          `bulkAcross: rows not written in ${partial
+            .map(({ collection, result }) => `${collection} (${result.failed.length})`)
+            .join(', ')}`
+        );
+      }
     }
 
     // -----------------------------------------------------------------------
@@ -476,10 +490,12 @@ export async function bulkAcrossImpl(
     return { results };
   } catch (error) {
     // -----------------------------------------------------------------------
-    // 13. Rollback — undo ALL optimistic ops atomically. Reverse order per
-    //     collection: deletes → updates → inserts.
+    // 13. Rollback — undo ALL optimistic ops. Reverse order per collection:
+    //     deletes → updates → inserts. Waves that ran may have written rows,
+    //     so each collection is also invalidated to refetch server truth.
     // -----------------------------------------------------------------------
     for (const [collection, log] of cacheLogsMap) {
+      void self.invalidateCollection(collection);
       for (const { id, prev } of log.deletes) {
         if (prev)
           updateListCaches(self, collection, id, prev, CRUD_OPERATION.ADD);
@@ -507,7 +523,7 @@ export async function bulkAcrossImpl(
     ) {
       for (const { batch } of preparedBatches) {
         if (self.store)
-          self.store.getState().setError(batch.collection, error as Error);
+          self.store.getState().setError(batch.collection, error);
       }
       throw error;
     }

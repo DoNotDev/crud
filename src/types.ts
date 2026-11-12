@@ -309,7 +309,8 @@ export interface CrudServiceInterface {
   ): Promise<string>;
 
   /**
-   * Transactional bulk write — one round-trip, one audit, one toast.
+   * Bulk write — one adapter call, one audit, one toast. Partial success: rows
+   * that fail are returned in `BulkResult.failed`; written rows stay written.
    *
    * @param schemas - `create` validates inserts + resolves their PII fields;
    *   `update` resolves PII fields on update patches.

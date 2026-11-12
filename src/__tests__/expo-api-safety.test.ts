@@ -54,6 +54,8 @@ vi.mock('@donotdev/core', () => ({
     ERROR: 'error',
   },
   FRAMEWORK_FEATURES: { CRUD: 'crud' },
+  // Built-in display formatters wrap the core text formatters at module load
+  FIELD_TEXT_FORMATTERS: new Proxy({}, { get: () => () => '' }),
   handleError: vi.fn(),
   isClient: () => false,
   isDev: () => false,

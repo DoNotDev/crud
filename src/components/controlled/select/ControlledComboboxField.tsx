@@ -41,7 +41,7 @@ export function ControlledComboboxField(
 
   const parentValue =
     dependsOn && formValues
-      ? formValues[(dependsOn as { field: Path<FieldValues> }).field]
+      ? formValues[dependsOn.field]
       : undefined;
 
   // Resolve options - support static arrays and dynamic functions
@@ -55,7 +55,7 @@ export function ControlledComboboxField(
       return options(formValues || {});
     }
 
-    return options as Array<{ value: string; label: string }>;
+    return options;
   }, [validation?.options, formValues, parentValue]);
 
   // Reset this field when parent changes and current value is no longer valid
@@ -68,8 +68,8 @@ export function ControlledComboboxField(
     const currentValue = formValues?.[name];
     if (!currentValue) return;
     const validValues = comboboxOptions.map((o) => o.value);
-    if (!validValues.includes(currentValue as string) && resetField) {
-      resetField(name as Path<FieldValues>);
+    if (!validValues.includes(currentValue) && resetField) {
+      resetField(name);
     }
   }, [parentValue]);
 
@@ -83,16 +83,20 @@ export function ControlledComboboxField(
     }));
   }, [comboboxOptions, t]);
 
+  // why: @donotdev/core declares no fieldSpecific shape for this field type, and FieldType is erased at registry dispatch
   const fieldSpecific = fieldOptions.fieldSpecific as
     | {
-        setParentOnChange?: (childValue: any, formValues: any) => any;
+        setParentOnChange?: (
+          childValue: string,
+          formValues: Record<string, unknown>
+        ) => unknown;
         creatable?: boolean;
       }
     | undefined;
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => {
@@ -112,7 +116,7 @@ export function ControlledComboboxField(
 
             if (parentValue !== undefined && parentValue !== null) {
               setValue(
-                (dependsOn as { field: Path<FieldValues> }).field,
+                dependsOn.field,
 
                 parentValue,
 
@@ -131,7 +135,7 @@ export function ControlledComboboxField(
             onBlur={field.onBlur}
             options={translatedOptions}
             error={!!fieldState.error}
-            helperText={fieldState.error?.message as string | undefined}
+            helperText={fieldState.error?.message}
             required={required}
             placeholder={placeholder || fieldOptions.placeholder}
             creatable={fieldSpecific?.creatable ?? false}

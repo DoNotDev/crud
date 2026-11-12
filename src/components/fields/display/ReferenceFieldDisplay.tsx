@@ -18,8 +18,10 @@ export interface ReferenceFieldDisplayProps {
   /** Field configuration */
   config: EntityField<'reference'>;
   /** Value to display */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: exported signature; narrowing it is a breaking change for importers (deferred to a major, any-audit 2026-11-11)
   value: any;
   /** Translation function */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: t prop signature shared by field components; narrowing it is a breaking change for callers
   t: (key: string, options?: Record<string, any>) => string;
   /** Additional CSS classes */
   className?: string;

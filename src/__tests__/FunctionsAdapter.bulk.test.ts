@@ -110,6 +110,7 @@ describe('FunctionsAdapter.bulk()', () => {
       insertedIds: [],
       updatedIds: [],
       deletedIds: [],
+      failed: [],
     });
     expect(callableCall).not.toHaveBeenCalled();
   });
@@ -127,6 +128,7 @@ describe('FunctionsAdapter.bulk()', () => {
       insertedIds: [],
       updatedIds: [],
       deletedIds: [],
+      failed: [],
     });
     expect(callableCall).not.toHaveBeenCalled();
   });

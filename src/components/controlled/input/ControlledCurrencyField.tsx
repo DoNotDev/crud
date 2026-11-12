@@ -3,7 +3,6 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { CurrencyFieldComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
@@ -21,13 +20,14 @@ export function ControlledCurrencyField(
 
   const options = fieldConfig.options || {};
 
+  // why: @donotdev/core declares no fieldSpecific shape for this field type, and FieldType is erased at registry dispatch
   const fieldSpecific = options.fieldSpecific as
     | { currency?: string; locale?: string }
     | undefined;
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => {
@@ -53,6 +53,7 @@ export function ControlledCurrencyField(
         };
 
         // Convert regular number to cents for CurrencyFieldComponent
+        // why: RHF types field.value as any for FieldValues; the stored value is a plain number
         const centsValue =
           field.value != null && !isNaN(field.value as number)
             ? Math.round((field.value as number) * 100)
@@ -66,7 +67,7 @@ export function ControlledCurrencyField(
             currency={fieldSpecific?.currency || 'EUR'}
             locale={fieldSpecific?.locale}
             error={!!fieldState.error}
-            helperText={fieldState.error?.message as string | undefined}
+            helperText={fieldState.error?.message}
             required={required}
             placeholder={placeholder}
           />

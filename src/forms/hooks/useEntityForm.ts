@@ -96,7 +96,7 @@ function stripBlobUrls(data: unknown): unknown {
     const obj = data as Record<string, unknown>;
     // Picture object — null it out if fullUrl is a blob
     if ('fullUrl' in obj && typeof obj['fullUrl'] === 'string') {
-      if (!isStorageUrl(obj['fullUrl'] as string)) return null;
+      if (!isStorageUrl(obj['fullUrl'])) return null;
       return obj;
     }
     const result: Record<string, unknown> = {};
@@ -185,9 +185,7 @@ export function useEntityForm<E extends AnyEntity>(
   // Initial values builders: schema-only for create, schema+record for edit.
   const schemaDefaults = useMemo(() => buildSchemaDefaults(entity), [entity]);
 
-  const recordDefaults = defaultValues as
-    | Partial<InferEntityData<E>>
-    | undefined;
+  const recordDefaults = defaultValues;
 
   const initialValues = useMemo(() => {
     // Defer initialization while data is loading to prevent stale defaultValues
@@ -445,7 +443,7 @@ export function useEntityForm<E extends AnyEntity>(
         Object.entries(formUploads).forEach(([fieldName, fieldState]) => {
           if (fieldState.status === 'error' && fieldState.error) {
             formMethods.setError(
-              fieldName as Parameters<typeof formMethods.setError>[0],
+              fieldName,
               {
                 type: 'upload',
                 message: fieldState.error,

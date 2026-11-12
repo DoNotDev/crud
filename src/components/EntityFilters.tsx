@@ -73,8 +73,16 @@ import { matchesFilter } from '../utils/matchesFilter';
 // Re-export for backward compatibility
 export { matchesFilter } from '../utils/matchesFilter';
 
+/**
+ * Inline filter columns: sized by the panel's width, so a select never gets
+ * narrower than 14rem (labels and values stay readable) whatever the viewport
+ * and the sidebar take. Range filters span two tracks.
+ */
+const INLINE_FILTER_COLS = 'repeat(auto-fill, minmax(min(100%, 14rem), 1fr))';
+
 /** Props for {@link EntityFilters}, auto-generates filter UI based on entity field types. */
 export interface EntityFiltersProps<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: interface-typed records have no implicit index signature; Record<string, unknown> would reject them
   T extends Record<string, any> & { id: string } = Record<string, any> & {
     id: string;
   },
@@ -88,7 +96,10 @@ export interface EntityFiltersProps<
   /** Layout variant: 'inline' (multi-column grid) or 'sidebar' (single column stack) */
   variant?: 'inline' | 'sidebar';
 
-  /** Override responsive grid columns. Default: [2, 4, 6, 8] for inline, 1 for sidebar. */
+  /**
+   * Override grid columns. Default for inline: as many columns of at least 14rem
+   * as the container fits (the filter panel's own width, not the viewport); 1 for sidebar.
+   */
   cols?: GridCols;
 
   /** Optional: Data array to extract unique values and min/max from (if not provided, fetches automatically) */
@@ -118,6 +129,7 @@ export interface EntityFiltersProps<
  */
 
 export function EntityFilters<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: interface-typed records have no implicit index signature; Record<string, unknown> would reject them
   T extends Record<string, any> & { id: string } = Record<string, any> & {
     id: string;
   },
@@ -145,7 +157,7 @@ export function EntityFilters<
   const { data: fetchedData } = useCrudCardList(entity, {
     enabled: !dataProp, // Only fetch if data not provided
   });
-  // Type assertion is safe: useCrudCardList returns items with id, and T extends Record<string, any> & { id: string }
+  // why: fetched items are untyped entity records; T is the caller-declared row shape (useCrudCardList returns items with id)
   const data = (dataProp ?? (fetchedData?.items || [])) as T[];
 
   // Get filters from CrudStore (self-contained like EntityFormRenderer/EntityDisplayRenderer)
@@ -382,7 +394,7 @@ export function EntityFilters<
     if (!value || value === '') {
       delete next[fieldName];
     } else if (Array.isArray(value)) {
-      next[fieldName] = value as string[];
+      next[fieldName] = value;
     } else if (typeof value === 'object' && 'min' in value) {
       // For range filters: delete if both min and max are empty
       const hasMin = value.min && value.min !== '';
@@ -475,7 +487,7 @@ export function EntityFilters<
         'min' in filterValue;
 
       const rangeFilter = isRangeFilter
-        ? (filterValue as { min?: string; max?: string })
+        ? (filterValue)
         : { min: '', max: '' };
       const rangeGridSpanStyle = {
         gridColumn: isSidebar ? 'span 1' : 'span 2',
@@ -483,7 +495,7 @@ export function EntityFilters<
 
       // Rating: clickable stars (click = min rating, click same = clear)
       if (filterType === 'rating') {
-        const max = (fieldConfig.validation?.max as number) ?? 5;
+        const max = fieldConfig.validation?.max ?? 5;
         const currentRating =
           typeof filterValue === 'string' && filterValue !== ''
             ? Number(filterValue)
@@ -608,11 +620,11 @@ export function EntityFilters<
               tCrud={tCrud}
               minYear={
                 yearMinMax?.min ??
-                (fieldConfig.validation?.min as number | undefined)
+                fieldConfig.validation?.min
               }
               maxYear={
                 yearMinMax?.max ??
-                (fieldConfig.validation?.max as number | undefined)
+                fieldConfig.validation?.max
               }
             />
           </div>
@@ -635,7 +647,7 @@ export function EntityFilters<
 
           // Always expect range format: { min?: string; max?: string }
           if (typeof filterValue === 'object' && 'min' in filterValue) {
-            const range = filterValue as { min?: string; max?: string };
+            const range = filterValue;
             return {
               min: range.min ? range.min.split('T')[0] || '' : '',
               max: range.max ? range.max.split('T')[0] || '' : '',
@@ -969,7 +981,7 @@ export function EntityFilters<
         });
       } else if (typeof value === 'object' && 'min' in value) {
         // Range filter
-        const range = value as { min?: string; max?: string };
+        const range = value;
         const parts: string[] = [];
         if (range.min) parts.push(range.min);
         if (range.max) parts.push(range.max);
@@ -1001,7 +1013,7 @@ export function EntityFilters<
         </Stack>
       )}
 
-      <Grid cols={cols ?? (isSidebar ? 1 : [2, 4, 6, 8])}>
+      <Grid cols={cols ?? (isSidebar ? 1 : INLINE_FILTER_COLS)}>
         {validFilterElements}
 
         <Button

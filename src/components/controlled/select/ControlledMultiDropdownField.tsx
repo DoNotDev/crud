@@ -28,7 +28,7 @@ export function ControlledMultiDropdownField(
   const dependsOn =
     'dependsOn' in fieldConfig ? fieldConfig.dependsOn : undefined;
   const dependsOnField = dependsOn
-    ? (dependsOn as { field: Path<FieldValues> }).field
+    ? dependsOn.field
     : undefined;
 
   const hasDynamicOptions = typeof validation?.options === 'function';
@@ -36,6 +36,7 @@ export function ControlledMultiDropdownField(
   // Watch ONLY the parent field (scoped subscription, no cascade re-renders)
   const parentValue = useWatch({
     control,
+    // why: useWatch has no overload for an optional name; `disabled` skips the watch when there is no parent
     name: dependsOnField as Path<FieldValues>,
     disabled: !dependsOnField,
   });
@@ -50,7 +51,7 @@ export function ControlledMultiDropdownField(
       return options(context);
     }
 
-    return options as Array<{ value: string; label: string }>;
+    return options;
   }, [validation?.options, hasDynamicOptions, dependsOnField, parentValue]);
 
   // Translate option labels
@@ -65,7 +66,7 @@ export function ControlledMultiDropdownField(
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => {
@@ -96,7 +97,7 @@ export function ControlledMultiDropdownField(
             onBlur={field.onBlur}
             options={translatedOptions}
             error={!!fieldState.error}
-            helperText={fieldState.error?.message as string | undefined}
+            helperText={fieldState.error?.message}
             required={required}
           />
         );

@@ -138,7 +138,10 @@ export function useCrudCardList<
   // Resolve entity for client processing
   const entity =
     typeof entityOrCollection === 'string' ? null : entityOrCollection;
-  const collection = entity?.collection ?? (entityOrCollection as string);
+  const collection =
+    typeof entityOrCollection === 'string'
+      ? entityOrCollection
+      : entityOrCollection.collection;
 
   // Read filters from CrudStore
   const { filters } = useCrudFilters({ collection });
@@ -151,7 +154,7 @@ export function useCrudCardList<
 
   // Client-side processing pipeline: filters → search → sort
   const { processed, filteredTotal } = useMemo(() => {
-    let items = result.items as (T & Record<string, any>)[];
+    let items: T[] = result.items;
 
     // Apply filters (only if entity is available for field type lookup)
     if (entity && Object.keys(filters).length > 0) {
@@ -170,7 +173,7 @@ export function useCrudCardList<
       items = applySort(items, resolvedSort);
     }
 
-    return { processed: items as T[], filteredTotal: total };
+    return { processed: items, filteredTotal: total };
   }, [result.items, filters, options.searchQuery, resolvedSort, entity]);
 
   // Return without total (card lists don't need pagination info)

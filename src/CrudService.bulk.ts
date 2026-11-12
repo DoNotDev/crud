@@ -1,9 +1,11 @@
 // packages/features/crud/src/CrudService.bulk.ts
 
 /**
- * @fileoverview CrudService bulk (transactional) orchestration
- * @description Service-layer implementation of `bulk()` — the single-round-trip,
- * atomic variant of add/update/delete. Mirrors the sequencing of
+ * @fileoverview CrudService bulk orchestration
+ * @description Service-layer implementation of `bulk()` — many rows of
+ * add/update/delete in as few adapter round-trips as possible, with partial
+ * success (rows that are written stay written; failures are reported per row
+ * in `BulkResult.failed`). Mirrors the sequencing of
  * {@link addImpl} / {@link updateImpl} / {@link deleteImpl} but folds all three
  * buckets into one adapter call, one audit entry, one rate-limit check, and
  * one toast. See `BULK_CRUD_TODO.md` §1-§10 for the binding contract.
@@ -64,8 +66,8 @@ export interface BulkSchemas<T extends Record<string, unknown>> {
 }
 
 /**
- * Tracks every optimistic op that was applied so failure can roll them back
- * atomically. Reverse order on revert (deletes → updates → inserts) mirrors
+ * Tracks every optimistic op that was applied so the rows the adapter did not
+ * write can be reverted. Reverse order on revert (deletes → updates → inserts) mirrors
  * the single-row rollback flows in `*Impl`.
  */
 interface BulkCacheLog<T extends Record<string, unknown>> {
@@ -121,11 +123,13 @@ function snapshotPreviousData<T extends Record<string, unknown>>(
 }
 
 /**
- * Transactional bulk CRUD: inserts + updates + deletes in one round-trip.
+ * Bulk CRUD: inserts + updates + deletes in one adapter call, partial success.
  *
- * Atomically applies optimistic state, calls the adapter under timeout + retry,
- * then either confirms all three buckets or rolls them back together. Emits a
- * single audit entry, a single rate-limit check, and at most one success toast.
+ * Applies optimistic state, calls the adapter under timeout + retry, then
+ * confirms the rows the adapter wrote and reverts only the rows it reports in
+ * `failed` (written rows are never undone). If the adapter throws (batch not
+ * attempted), every optimistic op is reverted. Emits a single audit entry, a
+ * single rate-limit check, and one toast (error when some rows failed).
  *
  * **Concurrency contract.** `bulk()` does not acquire the per-(collection,id)
  * locks used by single-row mutations (`runSerializedMutation`). A concurrent
@@ -139,10 +143,10 @@ function snapshotPreviousData<T extends Record<string, unknown>>(
  * @param ops - Bulk operations. Empty payload short-circuits with no side effects.
  * @param schemas - Schemas for insert validation + PII resolution.
  * @param options - Optional mutation options (toast suppression).
- * @returns Server-echoed ids, order-preserved per bucket.
+ * @returns Written ids per bucket (input order) and the rows that failed.
  * @throws {BulkCollisionError} Same id in two mutually-exclusive buckets.
  *   Surfaced **before** any side effect (no rate-limit, no optimistic, no adapter call).
- * @throws {Error} Wrapped adapter errors — surfaced after rollback.
+ * @throws {Error} Wrapped adapter errors (batch not attempted) — surfaced after rollback.
  *
  * @example
  * ```typescript
@@ -186,7 +190,7 @@ export async function bulkImpl<T extends Record<string, unknown>>(
   //    audit, zero toast, zero rate-limit. Contract BULK_CRUD_TODO §8.
   // -------------------------------------------------------------------------
   if (inserts.length === 0 && updates.length === 0 && deletes.length === 0) {
-    return { insertedIds: [], updatedIds: [], deletedIds: [] };
+    return { insertedIds: [], updatedIds: [], deletedIds: [], failed: [] };
   }
 
   // -------------------------------------------------------------------------
@@ -259,7 +263,7 @@ export async function bulkImpl<T extends Record<string, unknown>>(
     const encrypted =
       updatePiiFields.length > 0 && self.security
         ? (self.security.encryptPii(patchRecord, updatePiiFields) as Partial<T>)
-        : (patch as Partial<T>);
+        : patch;
     return { id, patch: encrypted };
   });
 
@@ -284,6 +288,27 @@ export async function bulkImpl<T extends Record<string, unknown>>(
 
   // Pre-mint temp ids for inserts (parallel array — server returns real ids).
   const insertTempIds = inserts.map(() => `temp_${generateUUID()}`);
+
+  // Undo one optimistic op (a row the adapter did not write, or the whole batch on throw).
+  const revertInsert = (tempId: string) => {
+    updateListCaches(self, collection, tempId, null, CRUD_OPERATION.DELETE);
+    if (self.store) self.store.getState().rejectOptimistic(collection, tempId);
+  };
+  const revertUpdate = (id: string, prev: T | null) => {
+    if (prev) {
+      updateListCaches(self, collection, id, prev, CRUD_OPERATION.UPDATE);
+    } else {
+      // No snapshot (cold cache) — invalidate to force refetch on next read.
+      void self.invalidateCollection(collection);
+    }
+    if (self.store) self.store.getState().rejectUpdate(collection, id);
+  };
+  const revertDelete = (id: string, prev: T | null) => {
+    if (prev) {
+      updateListCaches(self, collection, id, prev, CRUD_OPERATION.ADD);
+    }
+    if (self.store) self.store.getState().rejectDelete(collection, id);
+  };
 
   try {
     // 7a. Inserts — optimistic store + list cache.
@@ -340,12 +365,30 @@ export async function bulkImpl<T extends Record<string, unknown>>(
     );
 
     // ---------------------------------------------------------------------
-    // 9. Confirm — map temp ids to real ids, swap cache entries, clear
-    //    optimistic flags for all three buckets.
+    // 9. Partial success — confirm the rows the adapter wrote, revert only
+    //    the rows it reports in `failed` (written rows are never undone).
     // ---------------------------------------------------------------------
-    const realInsertedIds = result.insertedIds ?? [];
+    const failedInserts = new Set(
+      result.failed
+        .filter((f) => f.op === 'insert' && f.index !== undefined)
+        .map((f) => f.index!)
+    );
+    const failedUpdates = new Set(
+      result.failed.filter((f) => f.op === 'update').map((f) => f.id)
+    );
+    const failedDeletes = new Set(
+      result.failed.filter((f) => f.op === 'delete').map((f) => f.id)
+    );
+
+    // insertedIds lists the inserts that succeeded, in input order
+    const realInsertedIds = result.insertedIds;
+    let nextInserted = 0;
     insertTempIds.forEach((tempId, i) => {
-      const realId = realInsertedIds[i];
+      if (failedInserts.has(i)) {
+        revertInsert(tempId);
+        return;
+      }
+      const realId = realInsertedIds[nextInserted++];
       if (!realId) return;
       // Remove temp row, add real row (matches addImpl's cache swap).
       const row = inserts[i];
@@ -358,13 +401,15 @@ export async function bulkImpl<T extends Record<string, unknown>>(
       }
     });
 
-    (result.updatedIds ?? []).forEach((id) => {
-      if (self.store) self.store.getState().confirmUpdate(collection, id);
-    });
+    for (const { id, prev } of cacheLog.updates) {
+      if (failedUpdates.has(id)) revertUpdate(id, prev);
+      else if (self.store) self.store.getState().confirmUpdate(collection, id);
+    }
 
-    (result.deletedIds ?? []).forEach((id) => {
-      if (self.store) self.store.getState().confirmDelete(collection, id);
-    });
+    for (const { id, prev } of cacheLog.deletes) {
+      if (failedDeletes.has(id)) revertDelete(id, prev);
+      else if (self.store) self.store.getState().confirmDelete(collection, id);
+    }
 
     // ---------------------------------------------------------------------
     // 10. Audit — ONE entry with counts (BULK_CRUD_TODO §4).
@@ -390,14 +435,24 @@ export async function bulkImpl<T extends Record<string, unknown>>(
     }
 
     // ---------------------------------------------------------------------
-    // 11. Success toast — ONE, if any op succeeded and not suppressed.
+    // 11. Toast — ONE: error when some rows failed (the caller lists them
+    //     from `failed`), else success if any op succeeded and not suppressed.
     // ---------------------------------------------------------------------
     const anySucceeded =
       realInsertedIds.length +
-        (result.updatedIds?.length ?? 0) +
-        (result.deletedIds?.length ?? 0) >
+        result.updatedIds.length +
+        result.deletedIds.length >
       0;
-    if (anySucceeded && shouldShowSuccessToast(self, options)) {
+    if (result.failed.length > 0) {
+      const i18n = getI18nInstance();
+      toast(
+        'error',
+        i18n.t('messages.bulkPartialError', {
+          ns: 'crud',
+          count: result.failed.length,
+        })
+      );
+    } else if (anySucceeded && shouldShowSuccessToast(self, options)) {
       const i18n = getI18nInstance();
       const entityName = getEntityName(collection);
       toast(
@@ -411,38 +466,19 @@ export async function bulkImpl<T extends Record<string, unknown>>(
 
     return {
       insertedIds: realInsertedIds,
-      updatedIds: result.updatedIds ?? [],
-      deletedIds: result.deletedIds ?? [],
+      updatedIds: result.updatedIds,
+      deletedIds: result.deletedIds,
+      failed: result.failed,
     };
   } catch (error) {
     // ---------------------------------------------------------------------
-    // 12. Rollback — undo every optimistic op atomically. Runs in reverse
-    //     order (deletes → updates → inserts) so cache reconciliation
-    //     matches the single-row rollback flows.
+    // 12. Rollback — the adapter threw (batch not attempted): undo every
+    //     optimistic op. Reverse order (deletes → updates → inserts) so cache
+    //     reconciliation matches the single-row rollback flows.
     // ---------------------------------------------------------------------
-    // Restore deleted items to cache + store.
-    for (const { id, prev } of cacheLog.deletes) {
-      if (prev) {
-        updateListCaches(self, collection, id, prev, CRUD_OPERATION.ADD);
-      }
-      if (self.store) self.store.getState().rejectDelete(collection, id);
-    }
-    // Restore updated items (revert merged → prev).
-    for (const { id, prev } of cacheLog.updates) {
-      if (prev) {
-        updateListCaches(self, collection, id, prev, CRUD_OPERATION.UPDATE);
-      } else {
-        // No snapshot (cold cache) — invalidate to force refetch on next read.
-        void self.invalidateCollection(collection);
-      }
-      if (self.store) self.store.getState().rejectUpdate(collection, id);
-    }
-    // Remove inserted temp rows.
-    for (const { tempId } of cacheLog.inserts) {
-      updateListCaches(self, collection, tempId, null, CRUD_OPERATION.DELETE);
-      if (self.store)
-        self.store.getState().rejectOptimistic(collection, tempId);
-    }
+    for (const { id, prev } of cacheLog.deletes) revertDelete(id, prev);
+    for (const { id, prev } of cacheLog.updates) revertUpdate(id, prev);
+    for (const { tempId } of cacheLog.inserts) revertInsert(tempId);
 
     // BulkCollisionError from the adapter passes through unwrapped so callers
     // can `instanceof` it. Other adapter errors get the standard wrap.

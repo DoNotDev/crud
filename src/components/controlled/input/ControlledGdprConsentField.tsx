@@ -3,9 +3,9 @@
 
 import type { ChangeEvent, ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { GdprConsentFieldComponent } from '../../form/fields';
+import { fieldSpecificOf } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -17,15 +17,10 @@ export function ControlledGdprConsentField(
 ): ReactElement {
   const { control, fieldConfig, required } = props;
 
-  const { name, validation, options = {} } = fieldConfig;
+  const { name, validation } = fieldConfig;
 
   // Extract GDPR-specific options from fieldSpecific (typed via UIFieldOptions<gdprConsent>)
-  const fieldSpecific = options.fieldSpecific as
-    | {
-        privacyPolicyPath?: string;
-        termsPath?: string;
-      }
-    | undefined;
+  const fieldSpecific = fieldSpecificOf<'gdprConsent'>(fieldConfig);
 
   const privacyPolicyPath =
     fieldSpecific?.privacyPolicyPath || '/legal/privacy';
@@ -33,7 +28,7 @@ export function ControlledGdprConsentField(
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field }) => {

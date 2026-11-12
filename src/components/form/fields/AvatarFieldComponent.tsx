@@ -29,6 +29,7 @@ export interface AvatarFieldComponentProps extends Omit<
   /** Helper text */
   helperText?: string;
   /** Translation function */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: t prop signature shared by field components; narrowing it is a breaking change for callers
   t: (key: string, options?: Record<string, any>) => string;
 }
 

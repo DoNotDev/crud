@@ -10,6 +10,7 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { translateEntityLabel } from '@donotdev/core';
 import type { EntityField, FieldType } from '@donotdev/core';
 
 /**
@@ -23,6 +24,7 @@ import type { EntityField, FieldType } from '@donotdev/core';
  * 2. CRUD namespace (`crud`) - Framework defaults
  *
  * No dndev fallback - CRUD is optional and shouldn't pollute core framework namespace.
+ * Same as `translateEntityLabel` from `@donotdev/core` (the implementation; SEO uses it too).
  *
  * @param label - Label string to translate (may include namespace:key syntax)
  * @param t - Translation function from useTranslation hook (should be from multi-namespace hook like [entity.namespace, 'crud'])
@@ -40,39 +42,10 @@ import type { EntityField, FieldType } from '@donotdev/core';
  */
 export function translateLabel(
   label: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: t prop signature shared by field components; narrowing it is a breaking change for callers
   t: (key: string, options?: Record<string, any>) => string
 ): string {
-  // Handle namespace:key syntax (e.g., "crud:status.draft")
-  if (typeof label === 'string' && label.includes(':')) {
-    const parts = label.split(':');
-    const key = parts[1] ?? label;
-    const namespace = parts[0];
-
-    // Special handling for status labels: try entity namespace first (user overrides), then fall back to crud (framework defaults)
-    // Translation fallback order: entity-{name} → crud (never dndev)
-    // This allows entity-specific status translations (e.g., entity-inquiry:status.draft = "New")
-    // to override CRUD defaults (e.g., crud:status.draft = "Draft")
-    // No dndev fallback - CRUD is optional and shouldn't pollute core framework namespace
-    if (key.startsWith('status.')) {
-      // Try without namespace prefix first (uses t's default namespace order, typically entity namespace first)
-      const entityTranslation = t(key);
-      // If translation found (not just the key itself), use it
-      if (
-        entityTranslation !== key &&
-        entityTranslation !== `${namespace}:${key}`
-      ) {
-        return entityTranslation;
-      }
-      // Fall back to specified namespace
-      return t(key, { ns: namespace });
-    }
-
-    // For non-status labels, use specified namespace directly
-    return t(key, { ns: namespace });
-  }
-
-  // Direct translation (uses t's default namespace order)
-  return t(label);
+  return translateEntityLabel(label, t);
 }
 
 /**
@@ -115,6 +88,7 @@ export function translateLabel(
 export function translateFieldLabel<T extends FieldType = FieldType>(
   fieldName: string,
   config: EntityField<T> | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: t prop signature shared by field components; narrowing it is a breaking change for callers
   t: (key: string, options?: Record<string, any>) => string
 ): string {
   const label = config?.label || fieldName;

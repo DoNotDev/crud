@@ -24,14 +24,19 @@ import { Stack } from '@donotdev/components';
 import type { RichTextComponentProps } from '../types';
 
 // Optional peer dependency - graceful degradation if not installed
-// Use 'any' to avoid type conflicts when Tiptap is dynamically imported
+// why: @tiptap/* are optional peers and this package ships TS source; a type import would fail consumer typechecks when Tiptap is absent
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: see the why: comment above
 type Editor = any;
 
 /** Tiptap modules resolved after dynamic import */
 interface TiptapModules {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: @tiptap/* are optional peers loaded dynamically; a type import would fail consumer typechecks
   useEditor: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: @tiptap/* are optional peers loaded dynamically; a type import would fail consumer typechecks
   EditorContent: ComponentType<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: @tiptap/* are optional peers loaded dynamically; a type import would fail consumer typechecks
   StarterKit: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: @tiptap/* are optional peers loaded dynamically; a type import would fail consumer typechecks
   Placeholder: any;
 }
 

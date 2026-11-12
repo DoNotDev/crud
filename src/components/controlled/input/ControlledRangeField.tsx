@@ -3,7 +3,6 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { RangeFieldComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
@@ -25,13 +24,9 @@ export function ControlledRangeField(
 
   const options = fieldConfig.options || {};
 
-  const fieldSpecific = options.fieldSpecific as
-    | { showValue?: boolean }
-    | undefined;
-
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => (
@@ -46,12 +41,12 @@ export function ControlledRangeField(
             }
           }}
           error={!!fieldState.error}
-          helperText={fieldState.error?.message as string | undefined}
+          helperText={fieldState.error?.message}
           required={required}
           min={validation?.min}
           max={validation?.max}
           step={options.step}
-          showValue={fieldSpecific?.showValue}
+          showValue={options.showValue}
         />
       )}
     />

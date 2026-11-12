@@ -6,6 +6,8 @@ Common mistakes related to entity definition, forms, fields, and CRUD operations
 
 ## CRUD [Phase 2, 3]
 
+**Never `get(id)` / `query()` in a `useEffect` to render data.** Effects don't run on the server: on Next.js (SSR) the page HTML is a loader, invisible to crawlers and AI search. Use `useCrudDoc(entity, id)` for one record, `useCrudList` / `useCrudCardList` for lists: they read through the CRUD cache, which the server fills during the render.
+
 **Hidden fields are auto-added by `defineEntity()` - don't define them manually:**
 - `id`, `createdAt`, `updatedAt`, `createdById`, `updatedById`
 

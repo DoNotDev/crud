@@ -13,7 +13,6 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { RatingFieldComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
@@ -29,13 +28,14 @@ export function ControlledRatingField(
   const { name, label, validation } = fieldConfig;
   const options = fieldConfig.options || {};
 
+  // why: @donotdev/core declares no fieldSpecific shape for this field type, and FieldType is erased at registry dispatch
   const fieldSpecific = options.fieldSpecific as
     | { showValue?: boolean; max?: number }
     | undefined;
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => (
@@ -46,7 +46,7 @@ export function ControlledRatingField(
             field.onChange(value);
           }}
           error={!!fieldState.error}
-          helperText={fieldState.error?.message as string | undefined}
+          helperText={fieldState.error?.message}
           required={required}
           max={fieldSpecific?.max ?? validation?.max ?? 5}
           showValue={fieldSpecific?.showValue}

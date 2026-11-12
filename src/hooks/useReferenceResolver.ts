@@ -18,6 +18,7 @@ import type { AnyEntity } from '@donotdev/core';
 
 import { buildReferenceLabel } from '../components/controlled/select/ControlledReferenceField';
 import { useCrudList } from '../useCrudList';
+import { resolveReferenceEntity } from '../utils/referenceEntity';
 
 /** Lookup map: collection → { id → displayLabel } */
 export type ReferenceData = Record<string, Record<string, string>>;
@@ -25,6 +26,8 @@ export type ReferenceData = Record<string, Record<string, string>>;
 /** Internal type for collected reference field info */
 interface ReferenceFieldInfo {
   collection: string;
+  /** Referenced entity (registered by `defineEntity`); `undefined` keeps the raw id. */
+  entity?: AnyEntity;
   labelFields?: string[];
   displayField?: string;
 }
@@ -43,6 +46,7 @@ function collectReferenceFields(entity: AnyEntity): ReferenceFieldInfo[] {
         | undefined;
       seen.set(collection, {
         collection,
+        entity: resolveReferenceEntity(collection, `${entity.name}.${field.name}`),
         labelFields: fieldSpecific?.labelFields,
         displayField: fieldSpecific?.displayField,
       });
@@ -76,20 +80,20 @@ export function useReferenceResolver(
   const ref3 = refFields[3];
 
   const { items: items0 } = useCrudList<{ id: string }>(
-    ref0?.collection ?? '__disabled_0__',
-    { enabled: enabled && !!ref0 }
+    ref0?.entity ? ref0.collection : '__disabled_0__',
+    { enabled: enabled && !!ref0?.entity, entity: ref0?.entity }
   );
   const { items: items1 } = useCrudList<{ id: string }>(
-    ref1?.collection ?? '__disabled_1__',
-    { enabled: enabled && !!ref1 }
+    ref1?.entity ? ref1.collection : '__disabled_1__',
+    { enabled: enabled && !!ref1?.entity, entity: ref1?.entity }
   );
   const { items: items2 } = useCrudList<{ id: string }>(
-    ref2?.collection ?? '__disabled_2__',
-    { enabled: enabled && !!ref2 }
+    ref2?.entity ? ref2.collection : '__disabled_2__',
+    { enabled: enabled && !!ref2?.entity, entity: ref2?.entity }
   );
   const { items: items3 } = useCrudList<{ id: string }>(
-    ref3?.collection ?? '__disabled_3__',
-    { enabled: enabled && !!ref3 }
+    ref3?.entity ? ref3.collection : '__disabled_3__',
+    { enabled: enabled && !!ref3?.entity, entity: ref3?.entity }
   );
 
   const allResults = [
@@ -106,9 +110,8 @@ export function useReferenceResolver(
       if (!info || !items.length) continue;
       const lookup: Record<string, string> = {};
       for (const item of items) {
-        const rec = item as Record<string, any>;
-        lookup[rec.id] = buildReferenceLabel(
-          rec,
+        lookup[item.id] = buildReferenceLabel(
+          item,
           info.labelFields,
           info.displayField
         );

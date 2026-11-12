@@ -3,7 +3,6 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { PasswordFieldComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
@@ -25,7 +24,7 @@ export function ControlledPasswordField(
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => (
@@ -35,7 +34,7 @@ export function ControlledPasswordField(
           value={field.value ?? ''}
           onChange={field.onChange}
           error={!!fieldState.error}
-          helperText={fieldState.error?.message as string | undefined}
+          helperText={fieldState.error?.message}
           required={required}
           placeholder={placeholder || options.placeholder}
           className={options.className}

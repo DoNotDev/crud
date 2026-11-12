@@ -3,7 +3,6 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { RichTextComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
@@ -25,7 +24,7 @@ export function ControlledRichTextField(
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => (
@@ -33,8 +32,8 @@ export function ControlledRichTextField(
           label={t(label)}
           value={field.value ?? ''}
           onChange={(value) => field.onChange(value)}
-          error={fieldState.error?.message as string | undefined}
-          helperText={fieldState.error?.message as string | undefined}
+          error={fieldState.error?.message}
+          helperText={fieldState.error?.message}
           required={required}
           placeholder={placeholder || options.placeholder}
           className={options.className}

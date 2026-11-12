@@ -11,17 +11,24 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
-import { FEATURE_STATUS, isClient, useQuery } from '@donotdev/core';
+import {
+  FEATURE_STATUS,
+  isClient,
+  useQuery,
+  useQueryClient,
+} from '@donotdev/core';
 import type { AnyEntity, FeatureStatus, InferEntityRow } from '@donotdev/core';
 
+import { cachedListRow } from './CrudService.cache';
 import { useCrudStore } from './CrudStore';
 import type { OptimisticMeta } from './types';
 import { useCrud, getCrudServiceInstance } from './useCrud';
 import type { UseCrudOptions } from './useCrud';
 import { useServerPrefetch } from './useServerPrefetch';
 import { applyOptimisticToDoc } from './utils/mergeWithOptimistic';
+import { useRowTranslator } from './utils/useRowTranslator';
 
 /**
  * Options for the {@link useCrudDoc} hook.
@@ -131,7 +138,11 @@ export function useCrudDoc<
       ? service.getDocQueryOptions<T>(collection, id, schemas.get, cacheOptions)
       : null;
 
-  // 4. Subscribe to the cache entry
+  // 4. Subscribe to the cache entry. A document already in a list cache (full visible
+  // record) starts from that row: no request until the list entry is stale.
+  const queryClient = useQueryClient();
+  const listed =
+    query && id ? cachedListRow<T>(queryClient, collection, id) : undefined;
   const {
     data: queryData,
     isLoading,
@@ -143,11 +154,22 @@ export function useCrudDoc<
     queryKey: query?.queryKey ?? ['crud', collection, 'get', null],
     queryFn: query?.queryFn ?? (() => Promise.resolve(null)),
     staleTime: query?.staleTime,
+    ...(listed && {
+      initialData: listed.data,
+      initialDataUpdatedAt: listed.updatedAt,
+    }),
     enabled: enabled && !!query,
   });
 
   // 5. Server render: fetch before rendering (see useServerPrefetch)
   useServerPrefetch(query, enabled, scope);
+
+  // 5b. Translated fields in the current language (cache keeps stored rows)
+  const translateDoc = useRowTranslator(entityOrCollection, options);
+  const data = useMemo(
+    () => translateDoc(applyOptimisticToDoc(queryData ?? null, optimistic)),
+    [translateDoc, queryData, optimistic]
+  );
   const onServer = !isClient();
 
   // Stable: consumers may list it in effect dependencies. Guarded: refetch() runs even a
@@ -172,8 +194,6 @@ export function useCrudDoc<
       isAvailable: false,
     };
   }
-
-  const data = applyOptimisticToDoc(queryData ?? null, optimistic);
 
   // Server render: no data = loading (the browser's first pass, which fetches on mount,
   // reports loading too), and errors stay with the browser, which retries the read.

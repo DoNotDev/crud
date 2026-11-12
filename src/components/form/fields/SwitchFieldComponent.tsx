@@ -14,6 +14,8 @@ import type { ChangeEvent, ComponentType } from 'react';
 
 import { Switch, Text, Stack } from '@donotdev/components';
 
+import { InlineFieldRow } from './internal/InlineFieldRow';
+
 export interface SwitchFieldComponentProps {
   /** Field label */
   label: string;
@@ -58,19 +60,18 @@ const SwitchFieldComponent: ComponentType<SwitchFieldComponentProps> = ({
 
   return (
     <Stack gap="tight">
-      <Stack direction="row" align="center" style={{ flexWrap: 'wrap' }}>
-        <Text level="body" textAlign="start">
-          {label}:
-        </Text>
+      {/* [switch] label, like a checkbox. The track is muted while off, primary while on;
+          the label keeps its colour (muted text reads as disabled). */}
+      <InlineFieldRow>
         <Switch
           checked={checked}
           onCheckedChange={handleChange}
-          aria-label={label}
-          variant="muted"
+          label={label}
+          variant={checked ? 'primary' : 'muted'}
           uncheckedLabel={uncheckedLabel}
           checkedLabel={checkedLabel}
         />
-      </Stack>
+      </InlineFieldRow>
       {helperText && (
         <Text as="p" variant="muted" level="small">
           {helperText}

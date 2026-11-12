@@ -18,6 +18,7 @@
 // in @donotdev/core/schemas/getSchemaType.ts on module load.
 // This registry only handles UI components + filter/display metadata.
 
+import { lazy } from 'react';
 import type { ChangeEvent, ReactElement } from 'react';
 
 import {
@@ -27,24 +28,21 @@ import {
   Rating,
   CopyToClipboard,
 } from '@donotdev/components';
-import { formatCurrency, sanitizeHref } from '@donotdev/core';
+import {
+  FIELD_TEXT_FORMATTERS,
+  formatCurrency,
+  isEmptyFieldValue,
+  sanitizeHref,
+  stripHtmlTags,
+} from '@donotdev/core';
 import type { FieldType } from '@donotdev/core';
 import type { EntityField } from '@donotdev/core';
 
 import {
   ControlledCheckboxField,
   ControlledComboboxField,
-  ControlledDateField,
   ControlledDropdownField,
-  ControlledFileField,
-  ControlledMultiFileField,
-  ControlledDocumentField,
-  ControlledMultiDocumentField,
-  ControlledGeoPointField,
-  ControlledImageField,
-  ControlledMapField,
   ControlledMultiDropdownField,
-  ControlledMultiInputField,
   ControlledNumberField,
   ControlledPasswordField,
   ControlledPhoneField,
@@ -56,13 +54,7 @@ import {
   ControlledYearField,
   ControlledTextField,
   ControlledTextareaField,
-  ControlledRichTextField,
-  ControlledTimestampField,
-  ControlledAddressField,
-  ControlledFieldArrayField,
-  type SubFieldDef,
   ControlledSwitchField,
-  ControlledMultiImageField,
   ControlledGdprConsentField,
   ControlledCurrencyField,
   ControlledPriceField,
@@ -78,12 +70,101 @@ import {
 } from './components/form/fields';
 import type { UncontrolledFieldProps } from './FieldRegistry';
 import type {
+  ComponentRegistration,
   FieldTypeMetadata,
   DisplayFormatter,
-  DisplayFormatterOptions,
 } from './fieldTypeRegistry.types';
-import { translateLabel } from './forms/utils';
 import { sanitizeHtml } from './utils/sanitizeHtml';
+
+// Heavy editors load on first render in a form, not with the module: importing any
+// crud hook (a shop's card list) used to ship the upload stack (dnd-kit, react-easy-crop),
+// the calendar, rich text and maps. FormFieldRenderer renders them inside <Suspense>.
+const ControlledFileField = lazy(() =>
+  import('./components/controlled/file/ControlledFileField').then((m) => ({
+    default: m.ControlledFileField,
+  }))
+);
+const ControlledMultiFileField = lazy(() =>
+  import('./components/controlled/file/ControlledMultiFileField').then((m) => ({
+    default: m.ControlledMultiFileField,
+  }))
+);
+const ControlledDocumentField = lazy(() =>
+  import('./components/controlled/file/ControlledDocumentField').then((m) => ({
+    default: m.ControlledDocumentField,
+  }))
+);
+const ControlledMultiDocumentField = lazy(() =>
+  import('./components/controlled/file/ControlledMultiDocumentField').then(
+    (m) => ({
+      default: m.ControlledMultiDocumentField,
+    })
+  )
+);
+const ControlledImageField = lazy(() =>
+  import('./components/controlled/file/ControlledImageField').then((m) => ({
+    default: m.ControlledImageField,
+  }))
+);
+const ControlledMultiImageField = lazy(() =>
+  import('./components/controlled/file/ControlledMultiImageField').then(
+    (m) => ({
+      default: m.ControlledMultiImageField,
+    })
+  )
+);
+const ControlledDateField = lazy(() =>
+  import('./components/controlled/complex/ControlledDateField').then((m) => ({
+    default: m.ControlledDateField,
+  }))
+);
+const ControlledTimestampField = lazy(() =>
+  import('./components/controlled/complex/ControlledTimestampField').then(
+    (m) => ({
+      default: m.ControlledTimestampField,
+    })
+  )
+);
+const ControlledRichTextField = lazy(() =>
+  import('./components/controlled/complex/ControlledRichTextField').then(
+    (m) => ({
+      default: m.ControlledRichTextField,
+    })
+  )
+);
+const ControlledAddressField = lazy(() =>
+  import('./components/controlled/complex/ControlledAddressField').then(
+    (m) => ({
+      default: m.ControlledAddressField,
+    })
+  )
+);
+const ControlledGeoPointField = lazy(() =>
+  import('./components/controlled/complex/ControlledGeoPointField').then(
+    (m) => ({
+      default: m.ControlledGeoPointField,
+    })
+  )
+);
+const ControlledMapField = lazy(() =>
+  import('./components/controlled/complex/ControlledMapField').then((m) => ({
+    default: m.ControlledMapField,
+  }))
+);
+const ControlledMultiInputField = lazy(() =>
+  import('./components/controlled/complex/ControlledMultiInputField').then(
+    (m) => ({
+      default: m.ControlledMultiInputField,
+    })
+  )
+);
+const ControlledFieldArrayField = lazy(() =>
+  import('./components/controlled/complex/ControlledFieldArrayField').then(
+    (m) => ({
+      default: m.ControlledFieldArrayField,
+    })
+  )
+);
 
 // ============================================================================
 // Display Formatters
@@ -101,138 +182,60 @@ function renderEmpty(compact: boolean): ReactElement {
 }
 
 /**
+ * Text formatter of @donotdev/core for a built-in type (the card and SEO text).
+ */
+function text(type: string): DisplayFormatter {
+  const format = FIELD_TEXT_FORMATTERS[type];
+  if (!format) throw new Error(`No core text formatter for field type "${type}"`);
+  return (value, config, t, options) =>
+    format(value, config, t, { locale: options?.locale });
+}
+
+/**
+ * {@link text}, returning `emptyText` for an empty value.
+ */
+function textOr(emptyText: string, type: string): DisplayFormatter {
+  const format = text(type);
+  return (value, config, t, options) =>
+    isEmptyFieldValue(value) ? emptyText : format(value, config, t, options);
+}
+
+/**
+ * {@link text}, rendering the empty dash for an empty value or an empty text.
+ */
+function textOrEmpty(type: string): DisplayFormatter {
+  const format = text(type);
+  return (value, config, t, options) => {
+    const formatted = isEmptyFieldValue(value)
+      ? ''
+      : format(value, config, t, options);
+    return formatted || renderEmpty(options?.compact ?? false);
+  };
+}
+
+/**
  * Display formatters for each field type
  */
-const displayFormatters = {
-  // Date/time types
-  timestamp: (
-    value: any,
-    config: EntityField,
-    t: (key: string, options?: Record<string, any>) => string,
-    options?: DisplayFormatterOptions
-  ): string | ReactElement => {
-    const compact = options?.compact ?? false;
-    if (value === null || value === undefined || value === '') {
-      return renderEmpty(compact);
-    }
-    try {
-      const date = value instanceof Date ? value : new Date(value);
-      return date.toLocaleString(options?.locale);
-    } catch {
-      return String(value);
-    }
-  },
-  date: (value, config, t, options) => {
-    const compact = options?.compact ?? false;
-    if (value === null || value === undefined || value === '') {
-      return renderEmpty(compact);
-    }
-    try {
-      const date = value instanceof Date ? value : new Date(value);
-      return date.toLocaleDateString(options?.locale);
-    } catch {
-      return String(value);
-    }
-  },
-  'datetime-local': (value, config, t, options) => {
-    const compact = options?.compact ?? false;
-    if (value === null || value === undefined || value === '') {
-      return renderEmpty(compact);
-    }
-    try {
-      const date = value instanceof Date ? value : new Date(value);
-      return date.toLocaleString(options?.locale);
-    } catch {
-      return String(value);
-    }
-  },
-  time: (value, config, t, options) => {
-    const compact = options?.compact ?? false;
-    if (value === null || value === undefined || value === '') {
-      return renderEmpty(compact);
-    }
-    try {
-      const date = value instanceof Date ? value : new Date(value);
-      return date.toLocaleTimeString(options?.locale);
-    } catch {
-      return String(value);
-    }
-  },
-  week: (value, config, t, options) => {
-    const compact = options?.compact ?? false;
-    if (value === null || value === undefined || value === '') {
-      return renderEmpty(compact);
-    }
-    return String(value);
-  },
-  month: (value, config, t, options) => {
-    const compact = options?.compact ?? false;
-    if (value === null || value === undefined || value === '') {
-      return renderEmpty(compact);
-    }
-    return String(value);
-  },
+const displayFormatters: Record<string, DisplayFormatter> = {
+  // Date/time types (text: @donotdev/core FIELD_TEXT_FORMATTERS)
+  timestamp: textOrEmpty('timestamp'),
+  date: textOrEmpty('date'),
+  'datetime-local': textOrEmpty('datetime-local'),
+  time: textOrEmpty('time'),
+  week: textOrEmpty('week'),
+  month: textOrEmpty('month'),
 
   // Boolean types
-  boolean: (value, config, t) => {
-    return value ? 'Yes' : 'No';
-  },
-  checkbox: (value, config, t) => {
-    return value ? 'Yes' : 'No';
-  },
-  switch: (value, config, t) => {
-    const fieldSpecific = config.options?.fieldSpecific as
-      | {
-          uncheckedLabel?: string;
-          checkedLabel?: string;
-          uncheckedValue?: string | boolean;
-          checkedValue?: string | boolean;
-        }
-      | undefined;
-
-    if (fieldSpecific) {
-      const uncheckedValue = fieldSpecific.uncheckedValue ?? false;
-      const checkedValue = fieldSpecific.checkedValue ?? true;
-
-      if (value === checkedValue && fieldSpecific.checkedLabel) {
-        return translateLabel(fieldSpecific.checkedLabel, t);
-      }
-      if (value === uncheckedValue && fieldSpecific.uncheckedLabel) {
-        return translateLabel(fieldSpecific.uncheckedLabel, t);
-      }
-    }
-
-    return value ? 'Yes' : 'No';
-  },
+  boolean: text('boolean'),
+  checkbox: text('checkbox'),
+  switch: text('switch'),
 
   // Numeric types
-  year: (value, config, t) => {
-    return String(value);
-  },
-  number: (value, _config, _t, options) => {
-    if (value === null || value === undefined || value === '') return '—';
-    return typeof value === 'number'
-      ? value.toLocaleString(options?.locale)
-      : String(value);
-  },
-  currency: (value, config, t) => {
-    if (
-      value === null ||
-      value === undefined ||
-      value === '' ||
-      Number.isNaN(Number(value))
-    ) {
-      return '';
-    }
-    // Get currency code from field options
-    const options = config.options || {};
-    const fieldSpecific = options.fieldSpecific as
-      | { currency?: string }
-      | undefined;
-    const currencyCode = fieldSpecific?.currency || 'EUR';
-    return formatCurrency(value, currencyCode);
-  },
+  year: text('year'),
+  number: textOr('—', 'number'),
+  currency: textOr('', 'currency'),
   price: (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: field value type is erased at registry dispatch (FieldType)
     value: any,
     config: EntityField,
     t: (key: string, options?: Record<string, unknown>) => string,
@@ -266,61 +269,46 @@ const displayFormatters = {
     ) {
       return renderEmpty(compact);
     }
-    const currencyCode = normalized.currency || 'EUR';
-    const vatIncluded = normalized.vatIncluded ?? true;
     const discountPercent = normalized.discountPercent ?? 0;
-    const effective =
-      discountPercent > 0 ? amount * (1 - discountPercent / 100) : amount;
-    const vatLabel = vatIncluded
-      ? ` ${t('crud:price.vatIncluded', { defaultValue: 'VAT Incl.' })}`
-      : '';
-    if (discountPercent > 0) {
-      const formattedOriginal = formatCurrency(amount, currencyCode);
-      const formattedEffective = formatCurrency(effective, currencyCode);
-      const discountClue = ` ${t('crud:price.discountPercent', {
-        percent: Math.round(discountPercent),
-        defaultValue: '-{{percent}}%',
-      })}`;
-      if (asString) {
-        return `${formattedEffective}${vatLabel}${discountClue}`;
-      }
-      if (compact) {
-        return (
-          <Text variant="success" weight="bold">
-            {formattedEffective}
-            {vatLabel}
-            {discountClue}
-          </Text>
-        );
-      }
+    // Text (VAT label, discount clue): @donotdev/core, the same text SEO uses
+    const priceText = text('price')(normalized, config, t, options);
+    if (discountPercent <= 0 || asString) return priceText;
+    if (compact) {
       return (
-        <Stack direction="column" gap="tight" align="end">
-          <Text
-            variant="muted"
-            style={{
-              textDecoration: 'line-through',
-              fontSize: 'var(--font-size-sm)',
-            }}
-          >
-            {formattedOriginal}
-          </Text>
-          <Text variant="success" weight="bold">
-            {formattedEffective}
-            {vatLabel}
-          </Text>
-        </Stack>
+        <Text variant="success" weight="bold">
+          {priceText}
+        </Text>
       );
     }
-    return `${formatCurrency(amount, currencyCode)}${vatLabel}`;
+    const currencyCode = normalized.currency || 'EUR';
+    const vatLabel =
+      (normalized.vatIncluded ?? true)
+        ? ` ${t('crud:price.vatIncluded', { defaultValue: 'VAT Incl.' })}`
+        : '';
+    return (
+      <Stack direction="column" gap="tight" align="end">
+        <Text
+          variant="muted"
+          style={{
+            textDecoration: 'line-through',
+            fontSize: 'var(--font-size-sm)',
+          }}
+        >
+          {formatCurrency(amount, currencyCode)}
+        </Text>
+        <Text variant="success" weight="bold">
+          {formatCurrency(amount * (1 - discountPercent / 100), currencyCode)}
+          {vatLabel}
+        </Text>
+      </Stack>
+    );
   },
-  range: (value, _config, _t, options) => {
-    return typeof value === 'number'
-      ? value.toLocaleString(options?.locale)
-      : String(value);
-  },
+  range: text('range'),
   rating: (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: field value type is erased at registry dispatch (FieldType)
     value: any,
     config: EntityField,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: t prop signature shared by field components; narrowing it is a breaking change for callers
     t: (key: string, options?: Record<string, any>) => string,
     options?: { compact?: boolean }
   ): string | ReactElement => {
@@ -332,7 +320,7 @@ const displayFormatters = {
     if (isNaN(numValue)) {
       return renderEmpty(compact);
     }
-    const max = (config.validation?.max as number) ?? 5;
+    const max = config.validation?.max ?? 5;
     // Display mode with fractional rendering
     return (
       <Rating
@@ -343,129 +331,14 @@ const displayFormatters = {
       />
     );
   },
-  duration: (
-    value: any,
-    _config: EntityField,
-    t: (key: string, options?: Record<string, any>) => string,
-    options?: { compact?: boolean }
-  ): string | ReactElement => {
-    const compact = options?.compact ?? false;
-    if (value === null || value === undefined) {
-      return renderEmpty(compact);
-    }
-    const minutes =
-      typeof value === 'number' ? value : parseInt(String(value), 10);
-    if (Number.isNaN(minutes)) return renderEmpty(compact);
-    if (minutes === 0) {
-      return t('crud:duration.zero', { defaultValue: '—' });
-    }
-    if (minutes < 60) {
-      return t('crud:duration.minutes', {
-        count: minutes,
-        defaultValue: `${minutes} min`,
-      });
-    }
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    return t('crud:duration.hoursMinutes', {
-      hours: h,
-      minutes: m,
-      defaultValue: m === 0 ? `${h}h` : `${h}h ${m}min`,
-    });
-  },
-  gdprConsent: (
-    value: any,
-    _config: EntityField,
-    t: (key: string, options?: Record<string, any>) => string,
-    options?: DisplayFormatterOptions
-  ): string | ReactElement => {
-    const compact = options?.compact ?? false;
-    if (!value || typeof value !== 'object') {
-      return renderEmpty(compact);
-    }
-
-    const consent = (value as { gdprConsent?: boolean }).gdprConsent === true;
-    const date = (value as { gdprConsentDate?: string }).gdprConsentDate;
-    const version = (value as { gdprConsentVersion?: string })
-      .gdprConsentVersion;
-
-    const yesLabel = t('crud:gdprConsent.display.yes', {
-      defaultValue: 'Consented',
-    });
-    const noLabel = t('crud:gdprConsent.display.no', {
-      defaultValue: 'Not consented',
-    });
-
-    if (!consent) {
-      return noLabel;
-    }
-
-    const parts: string[] = [yesLabel];
-    if (date) {
-      try {
-        const d = new Date(date);
-        parts.push(d.toLocaleDateString(options?.locale));
-      } catch {
-        parts.push(date);
-      }
-    }
-    if (version) {
-      parts.push(`v${version}`);
-    }
-
-    return parts.join(' · ');
-  },
+  duration: textOrEmpty('duration'),
+  gdprConsent: textOrEmpty('gdprConsent'),
 
   // Selection types
-  select: (value, config, t) => {
-    const options = config.validation?.options;
-    if (Array.isArray(options)) {
-      const option = options.find(
-        (opt: { value: string; label: string }) => opt.value === value
-      );
-      const label = option?.label;
-      return label ? translateLabel(label, t) : String(value);
-    }
-    return String(value);
-  },
-  radio: (value, config, t) => {
-    const options = config.validation?.options;
-    if (Array.isArray(options)) {
-      const option = options.find(
-        (opt: { value: string; label: string }) => opt.value === value
-      );
-      const label = option?.label;
-      return label ? translateLabel(label, t) : String(value);
-    }
-    return String(value);
-  },
-  combobox: (value, config, t) => {
-    const options = config.validation?.options;
-    if (Array.isArray(options)) {
-      const option = options.find(
-        (opt: { value: string; label: string }) => opt.value === value
-      );
-      const label = option?.label;
-      return label ? translateLabel(label, t) : String(value);
-    }
-    return String(value);
-  },
-  multiselect: (value, config, t) => {
-    if (Array.isArray(value)) {
-      const options = config.validation?.options;
-      if (Array.isArray(options)) {
-        const labels = value.map((v) => {
-          const opt = options.find(
-            (o: { value: string; label: string }) => o.value === v
-          );
-          const label = opt?.label;
-          return label ? translateLabel(label, t) : v;
-        });
-        return labels.join(', ');
-      }
-    }
-    return String(value);
-  },
+  select: text('select'),
+  radio: text('radio'),
+  combobox: text('combobox'),
+  multiselect: text('multiselect'),
 
   // Image types
   image: (value, config, t, options) => {
@@ -545,6 +418,7 @@ const displayFormatters = {
     }
     return (
       <Stack gap="tight">
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: field value type is erased at registry dispatch (FieldType) */}
         {value.map((file: any, i) => (
           <a
             key={i}
@@ -581,6 +455,7 @@ const displayFormatters = {
     }
     return (
       <Stack gap="tight">
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: field value type is erased at registry dispatch (FieldType) */}
         {value.map((file: any, i) => (
           <a
             key={i}
@@ -681,33 +556,10 @@ const displayFormatters = {
       const resolved = options.referenceData[refCollection]?.[String(value)];
       if (resolved) return resolved;
     }
-    // Handle object references (e.g., { id: "...", displayName: "..." })
-    if (typeof value === 'object' && value !== null) {
-      const displayValue =
-        value.displayName || value.name || value.id || String(value);
-      return String(displayValue);
-    }
-    // Handle string IDs
-    return String(value);
+    return text('reference')(value, config, t, options);
   },
-  geopoint: (value, config, t, options) => {
-    const compact = options?.compact ?? false;
-    if (
-      value &&
-      typeof value === 'object' &&
-      'lat' in value &&
-      'lng' in value
-    ) {
-      return `${value.lat.toFixed(6)}, ${value.lng.toFixed(6)}`;
-    }
-    return renderEmpty(compact);
-  },
-  address: (value, config, t) => {
-    if (value && typeof value === 'object' && 'formatted_address' in value) {
-      return value.formatted_address;
-    }
-    return String(value);
-  },
+  geopoint: textOrEmpty('geopoint'),
+  address: text('address'),
   map: (value, config, t, options) => {
     const compact = options?.compact ?? false;
     if (value && typeof value === 'object') {
@@ -730,44 +582,10 @@ const displayFormatters = {
     }
     return renderEmpty(compact);
   },
-  array: (value, config, t, options) => {
-    const compact = options?.compact ?? false;
-    if (Array.isArray(value)) {
-      if (value.length === 0) {
-        return renderEmpty(compact);
-      }
-      return value.join(', ');
-    }
-    return renderEmpty(compact);
-  },
-  'field-array': (value, config, t, options) => {
-    const compact = options?.compact ?? false;
-    if (!Array.isArray(value) || value.length === 0)
-      return renderEmpty(compact);
-    const subFields = (
-      config.options?.fieldSpecific as { fields?: SubFieldDef[] }
-    )?.fields;
-    return value
-      .map((row) => {
-        if (typeof row !== 'object' || row == null) return '';
-        const obj = row as Record<string, unknown>;
-        const keys = subFields
-          ? subFields.map((sf) => sf.name)
-          : Object.keys(obj);
-        return keys
-          .map((k) => obj[k])
-          .filter((v) => v != null && v !== '')
-          .map((v) => (typeof v === 'object' ? JSON.stringify(v) : String(v)))
-          .join(' · ');
-      })
-      .filter(Boolean)
-      .join(', ');
-  },
-
+  array: textOrEmpty('array'),
+  'field-array': textOrEmpty('field-array'),
   // Text types
-  password: () => {
-    return '••••••••';
-  },
+  password: text('password'),
   email: (value, config, t) => {
     return (
       <Stack direction="row" gap="tight" align="center">
@@ -862,22 +680,20 @@ const displayFormatters = {
       </Stack>
     );
   },
-  textarea: (value, config, t) => {
-    return String(value);
-  },
-  text: (value, config, t) => {
-    return String(value);
-  },
+  textarea: text('textarea'),
+  text: text('text'),
   richtext: (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: field value type is erased at registry dispatch (FieldType)
     value: any,
     config: EntityField,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: t prop signature shared by field components; narrowing it is a breaking change for callers
     t: (key: string, options?: Record<string, any>) => string,
     options?: { compact?: boolean }
   ): string | ReactElement => {
     const compact = options?.compact ?? false;
     if (value && typeof value === 'string') {
       if (compact) {
-        const textOnly = value.replace(/<[^>]*>/g, '').trim();
+        const textOnly = stripHtmlTags(value);
         return (
           textOnly || (
             <span style={{ color: 'var(--muted-foreground)' }}>—</span>
@@ -897,7 +713,7 @@ const displayFormatters = {
     }
     return renderEmpty(compact);
   },
-} as Record<string, DisplayFormatter>;
+};
 
 // ============================================================================
 // Type-safe helpers
@@ -936,8 +752,8 @@ export function registerAllBuiltinFieldTypes(
   fieldRegistry: {
     registerComponent: (
       type: string,
-      controlled: any,
-      uncontrolled?: any
+      controlled: ComponentRegistration['controlled'],
+      uncontrolled?: ComponentRegistration['uncontrolled']
     ) => void;
   }
 ): void {

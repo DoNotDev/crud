@@ -3,9 +3,9 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { TextAreaComponent } from '../../form/fields';
+import { controlledFieldOptions } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -23,11 +23,11 @@ export function ControlledTextareaField(
 
   const { name, label, validation } = fieldConfig;
 
-  const options = fieldConfig.options || {};
+  const options = controlledFieldOptions(fieldConfig);
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => (
@@ -36,15 +36,15 @@ export function ControlledTextareaField(
           label={t(label)}
           value={field.value ?? ''}
           onChange={field.onChange}
-          error={fieldState.error?.message as string | undefined}
-          helperText={fieldState.error?.message as string | undefined}
+          error={fieldState.error?.message}
+          helperText={fieldState.error?.message}
           required={required}
           placeholder={placeholder || options.placeholder}
           maxLength={validation?.maxLength}
-          showCharCount={(options as any).showCharCount}
-          autoResize={(options as any).autoResize}
-          rows={(options as any).rows}
-          className={(options as any).className}
+          showCharCount={options.showCharCount}
+          autoResize={options.autoResize}
+          rows={options.rows}
+          className={options.className}
         />
       )}
     />

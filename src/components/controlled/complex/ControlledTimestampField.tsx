@@ -3,7 +3,6 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { TimestampFieldComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
@@ -25,7 +24,7 @@ export function ControlledTimestampField(
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => (
@@ -34,7 +33,7 @@ export function ControlledTimestampField(
           label={t(label)}
           value={field.value ?? null}
           onChange={(value) => field.onChange(value)}
-          error={fieldState.error?.message as string | undefined}
+          error={fieldState.error?.message}
           required={required}
         />
       )}

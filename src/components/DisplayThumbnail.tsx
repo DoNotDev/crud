@@ -36,12 +36,9 @@ function getFirstThumbUrl(
 ): string | null {
   if (pictures == null) return null;
   if (typeof pictures === 'string') return pictures || null;
-  const first =
-    Array.isArray(pictures) && pictures.length > 0
-      ? pictures[0]
-      : (pictures as Picture);
+  const first = Array.isArray(pictures) ? pictures[0] : pictures;
   if (!first || typeof first !== 'object') return null;
-  const url = (first as Picture).thumbUrl ?? (first as Picture).fullUrl;
+  const url = first.thumbUrl ?? first.fullUrl;
   return typeof url === 'string' ? url : null;
 }
 

@@ -3,7 +3,6 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { MapFieldComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
@@ -23,11 +22,13 @@ export function ControlledMapField(props: ControlledFieldProps): ReactElement {
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => {
+        // why: mirrors MapFieldComponent's public onChange type; `'target' in value` cannot narrow a Record<string, unknown> branch away
         const handleChange = (
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: see the why: comment above
           value: Record<string, any> | React.ChangeEvent<HTMLInputElement>
         ) => {
           if ('target' in value) {
@@ -53,7 +54,7 @@ export function ControlledMapField(props: ControlledFieldProps): ReactElement {
             value={field.value || {}}
             onChange={handleChange}
             error={!!fieldState.error}
-            helperText={fieldState.error?.message as string | undefined}
+            helperText={fieldState.error?.message}
             required={required}
           />
         );

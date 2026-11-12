@@ -101,7 +101,7 @@ export class FunctionsAdapter implements ICrudAdapter {
     const getFn = await this.getCallableFn<{ id: string }, T>(functionName);
     try {
       const result = await getFn({ id });
-      const data = result.data as T;
+      const data = result.data;
       // Validate response if schema provided
       if (schema) {
         const validated = validateWithSchema(
@@ -252,7 +252,7 @@ export class FunctionsAdapter implements ICrudAdapter {
 
     // 2. Empty bulk → no callable, zeroed response.
     if (inserts.length === 0 && updates.length === 0 && deletes.length === 0) {
-      return { insertedIds: [], updatedIds: [], deletedIds: [] };
+      return { insertedIds: [], updatedIds: [], deletedIds: [], failed: [] };
     }
 
     // 3. Validate the wire body locally. Fail loud on malformed input.
@@ -319,10 +319,12 @@ export class FunctionsAdapter implements ICrudAdapter {
         );
       }
 
+      // The bulk callable commits the batch in one transaction: no per-row failures
       return {
         insertedIds: validated.insertedIds,
         updatedIds: validated.updatedIds,
         deletedIds: validated.deletedIds,
+        failed: [],
       };
     } catch (error) {
       // BulkCollisionError from upstream (shouldn't happen here, but pass through).

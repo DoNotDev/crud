@@ -10,9 +10,11 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { Suspense } from 'react';
 import type { ReactElement } from 'react';
 import type { Control, FieldValues } from 'react-hook-form';
 
+import { Skeleton } from '@donotdev/components';
 import { handleError } from '@donotdev/core';
 import type { EntityField, FieldType, ValueTypeForField } from '@donotdev/core';
 
@@ -27,6 +29,7 @@ import { TextFieldComponent } from './form/fields';
 interface FormFieldRendererBaseProps<T extends FieldType = FieldType> {
   name: string;
   config: EntityField<T>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: t prop signature shared by field components; narrowing it is a breaking change for callers
   t: (key: string, options?: Record<string, any>) => string;
 }
 
@@ -55,6 +58,9 @@ export type FormFieldRendererProps<
   TFieldValues extends FieldValues = FieldValues,
 > = UncontrolledProps<T> | ControlledProps<T, TFieldValues>;
 
+/** Placeholder of a lazy field editor: about one input row, so the form does not jump. */
+const FIELD_FALLBACK_STYLE = { height: '2.5rem', width: '100%' } as const;
+
 /**
  * FormFieldRenderer - renders fields via registry lookup
  */
@@ -67,7 +73,9 @@ export function FormFieldRenderer<
   t,
   ...props
 }: FormFieldRendererProps<T, TFieldValues>): ReactElement {
+  // why: one wrapper feeds registry components whose onChange value type is erased at dispatch (FieldType)
   const createSafeChangeHandler =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: see the why: comment above
     (onChange: (value: any) => void) => (value: any) => {
       try {
         onChange(value);
@@ -115,7 +123,12 @@ export function FormFieldRenderer<
 
     const Component = registry.getControlledComponent(config.type);
     if (Component) {
-      return <Component {...controlledProps} />;
+      // Heavy editors are lazy (registerBuiltinFieldTypes): hold their slot while they load
+      return (
+        <Suspense fallback={<Skeleton style={FIELD_FALLBACK_STYLE} />}>
+          <Component {...controlledProps} />
+        </Suspense>
+      );
     }
 
     // Unregistered type fallback
@@ -170,7 +183,7 @@ export function FormFieldRenderer<
     <TextFieldComponent
       label={config.label || name}
       value={value as string}
-      onChange={safeChangeHandler}
+      onChange={(event) => safeChangeHandler(event.target.value)}
       error={error || undefined}
       {...config.options}
     />

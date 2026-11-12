@@ -212,7 +212,7 @@ const FileFieldComponent = forwardRef<
 
       try {
         if (item.uploaded && 'url' in item.uploaded) {
-          await deleteFile(item.uploaded as FileAsset);
+          await deleteFile(item.uploaded);
         }
         removeFile(id);
       } catch (err) {
@@ -304,13 +304,13 @@ const FileFieldComponent = forwardRef<
             {files.map((fileData, index) => {
               const mimeType =
                 fileData.uploaded && 'mimeType' in fileData.uploaded
-                  ? (fileData.uploaded as FileAsset).mimeType
+                  ? fileData.uploaded.mimeType
                   : fileData.file.type;
               const iconType = getFileIcon(mimeType || '', fileData.file.name);
               const isFileUploading = fileData.status === 'uploading';
               const fileSize =
                 fileData.uploaded && 'size' in fileData.uploaded
-                  ? (fileData.uploaded as FileAsset).size
+                  ? fileData.uploaded.size
                   : fileData.file.size;
 
               return (

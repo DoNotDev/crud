@@ -25,9 +25,11 @@ export interface AddressFieldComponentProps {
     formatted_address: string;
     latitude?: number;
     longitude?: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: exported signature; narrowing it is a breaking change for importers (deferred to a major, any-audit 2026-11-11)
     [key: string]: any;
   };
   /** Change handler */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: exported signature; narrowing it is a breaking change for importers (deferred to a major, any-audit 2026-11-11)
   onChange: (value: any) => void;
   /**
    * Whether to enable Google Maps autocomplete (default: false).
@@ -81,13 +83,71 @@ function persistCache(cache: Map<string, AddressOption[]>) {
 function evictOldest(map: Map<string, unknown>) {
   if (map.size > MAX_CACHE_SIZE) {
     const firstKey = map.keys().next().value;
-    if (firstKey !== undefined) map.delete(firstKey as string);
+    if (firstKey !== undefined) map.delete(firstKey);
   }
+}
+
+/**
+ * Subset of the Google Maps JS API (Places + Geocoding) this component calls.
+ * `@types/google.maps` is not a dependency, so the surface is declared here.
+ */
+interface GoogleLatLng {
+  lat(): number;
+  lng(): number;
+}
+interface GoogleAddressComponent {
+  types?: string[];
+  longText?: string | null;
+  long_name?: string;
+}
+interface GooglePlace {
+  fetchFields(request: { fields: string[] }): Promise<unknown>;
+  formattedAddress?: string | null;
+  location?: GoogleLatLng | null;
+  addressComponents?: GoogleAddressComponent[] | null;
+}
+interface GooglePlacePrediction {
+  mainText?: { text: string } | null;
+  secondaryText?: { text: string } | null;
+  toPlace(): GooglePlace;
+}
+interface GoogleAutocompleteSuggestion {
+  placePrediction?: GooglePlacePrediction | null;
+}
+/** Opaque Places session token. */
+type GoogleSessionToken = object;
+interface GooglePlacesLibrary {
+  AutocompleteSuggestion: {
+    fetchAutocompleteSuggestions(request: {
+      input: string;
+      sessionToken: GoogleSessionToken | null;
+    }): Promise<{ suggestions: GoogleAutocompleteSuggestion[] }>;
+  };
+  AutocompleteSessionToken: new () => GoogleSessionToken;
+}
+interface GoogleGeocodingLibrary {
+  Geocoder: new () => {
+    geocode(request: { address: string }): Promise<{
+      results?: Array<{ geometry?: { location?: GoogleLatLng } }>;
+    }>;
+  };
+}
+interface GoogleMapsNamespace {
+  maps?: {
+    places?: GooglePlacesLibrary;
+    importLibrary?: (name: string) => Promise<unknown>;
+  };
+}
+
+/** `window.google`, set by the Maps JS API script (or the bootstrap loader). */
+function getGoogle(): GoogleMapsNamespace | undefined {
+  // why: the Maps script attaches `google` to window at runtime; Window has no such declaration
+  return (window as unknown as { google?: GoogleMapsNamespace }).google;
 }
 
 const globalSuggestionCache = loadCache();
 // Predictions are non-serializable Google SDK objects — keep in-memory only.
-const globalPredictions = new Map<string, any>();
+const globalPredictions = new Map<string, GooglePlacePrediction>();
 
 /**
  * Google Maps JS API bootstrap loader.
@@ -96,11 +156,12 @@ const globalPredictions = new Map<string, any>();
  * @see https://developers.google.com/maps/documentation/javascript/load-maps-js-api#dynamic-library-import
  */
 function installBootstrapLoader(key: string) {
-  const g = { key, v: 'weekly' } as Record<string, string>;
+  const g: Record<string, string> = { key, v: 'weekly' };
   const c = 'google';
   const l = 'importLibrary';
   const q = '__ib__';
   const m = document;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: verbatim Google bootstrap snippet; it builds `google.maps` with dynamic private keys (_p, __ib__, importLibrary)
   const b = window as any;
   b[c] = b[c] || {};
   const d = b[c].maps || (b[c].maps = {});
@@ -169,7 +230,7 @@ const AddressFieldComponent = ({
   const [apiError, setApiError] = useState(false);
   const [mapsLoaded, setMapsLoaded] = useState(false);
 
-  const sessionTokenRef = useRef<any>(null);
+  const sessionTokenRef = useRef<GoogleSessionToken | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const apiKey = getPlatformEnvVar('GOOGLE_MAPS_API_KEY') || '';
@@ -185,7 +246,7 @@ const AddressFieldComponent = ({
   useEffect(() => {
     if (!isGoogleMapsEnabled || mapsLoaded) return;
 
-    const g = (window as any).google;
+    const g = getGoogle();
     if (g?.maps?.places?.AutocompleteSuggestion) {
       sessionTokenRef.current = new g.maps.places.AutocompleteSessionToken();
       setMapsLoaded(true);
@@ -195,14 +256,13 @@ const AddressFieldComponent = ({
     let cancelled = false;
     (async () => {
       try {
-        if (!(window as any).google?.maps?.importLibrary) {
+        if (!getGoogle()?.maps?.importLibrary) {
           installBootstrapLoader(apiKey);
         }
-        await (window as any).google.maps.importLibrary('places');
+        await getGoogle()!.maps!.importLibrary!('places');
         if (cancelled) return;
-        sessionTokenRef.current = new (
-          window as any
-        ).google.maps.places.AutocompleteSessionToken();
+        sessionTokenRef.current =
+          new (getGoogle()!.maps!.places!.AutocompleteSessionToken)();
         setMapsLoaded(true);
       } catch (err) {
         console.error(
@@ -236,7 +296,7 @@ const AddressFieldComponent = ({
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const places = (window as any).google.maps.places;
+        const places = getGoogle()!.maps!.places!;
         const { suggestions } =
           await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
             input: inputValue,
@@ -244,9 +304,9 @@ const AddressFieldComponent = ({
           });
 
         const newOptions: AddressOption[] = suggestions
-          .filter((s: any) => s.placePrediction)
-          .map((s: any) => {
-            const pred = s.placePrediction;
+          .filter((s) => s.placePrediction)
+          .map((s) => {
+            const pred = s.placePrediction!;
             const label = [pred.mainText?.text, pred.secondaryText?.text]
               .filter(Boolean)
               .join(', ');
@@ -291,7 +351,7 @@ const AddressFieldComponent = ({
       }
 
       let prediction = globalPredictions.get(selectedLabel);
-      const places = (window as any).google?.maps?.places;
+      const places = getGoogle()?.maps?.places;
       if (!places) return;
 
       if (!prediction) {
@@ -303,7 +363,7 @@ const AddressFieldComponent = ({
               input: selectedLabel,
               sessionToken: sessionTokenRef.current,
             });
-          const match = suggestions.find((s: any) => {
+          const match = suggestions.find((s) => {
             const label = [
               s.placePrediction?.mainText?.text,
               s.placePrediction?.secondaryText?.text,
@@ -346,9 +406,10 @@ const AddressFieldComponent = ({
         // Coord fallback: geocode the address if Places returned none
         if (lat === 0 && lng === 0 && formattedAddress) {
           try {
-            const geocodingLib: any = await (
-              window as any
-            ).google.maps.importLibrary('geocoding');
+            // why: importLibrary returns the library untyped; 'geocoding' resolves to the Geocoding library
+            const geocodingLib = (await getGoogle()!.maps!.importLibrary!(
+              'geocoding'
+            )) as GoogleGeocodingLibrary;
             const geocoder = new geocodingLib.Geocoder();
             const geocodeResult = await geocoder.geocode({
               address: formattedAddress,
@@ -366,14 +427,19 @@ const AddressFieldComponent = ({
           }
         }
 
-        const newValue: any = {
+        const newValue: {
+          formatted_address: string;
+          latitude: number;
+          longitude: number;
+          district_code?: number | null;
+        } = {
           formatted_address: formattedAddress,
           latitude: lat,
           longitude: lng,
         };
 
         if (extractDistrictCode) {
-          const components: any[] = place.addressComponents || [];
+          const components = place.addressComponents || [];
           const postal =
             components.find((c) => (c.types || []).includes('postal_code'))
               ?.longText ||

@@ -274,7 +274,7 @@ const DocumentFieldComponent = forwardRef<
 
       try {
         if (item.uploaded && 'url' in item.uploaded) {
-          await deleteFile(item.uploaded as FileAsset);
+          await deleteFile(item.uploaded);
         }
         removeFile(id);
       } catch (err) {
@@ -289,7 +289,7 @@ const DocumentFieldComponent = forwardRef<
     // Handle preview (PDF only)
     function handlePreview(doc: FileEntry) {
       if (doc.uploaded && 'url' in doc.uploaded) {
-        const asset = doc.uploaded as FileAsset;
+        const asset = doc.uploaded;
         if (asset.mimeType === 'application/pdf') {
           setPreviewUrl(asset.url);
         }
@@ -374,7 +374,7 @@ const DocumentFieldComponent = forwardRef<
               {files.map((docData) => {
                 const mimeType =
                   docData.uploaded && 'mimeType' in docData.uploaded
-                    ? (docData.uploaded as FileAsset).mimeType
+                    ? docData.uploaded.mimeType
                     : docData.file.type;
                 const iconType = getFileIcon(mimeType || '', docData.file.name);
                 const isDocUploading = docData.status === 'uploading';
@@ -383,7 +383,7 @@ const DocumentFieldComponent = forwardRef<
                   docData.file.name.toLowerCase().endsWith('.pdf');
                 const fileSize =
                   docData.uploaded && 'size' in docData.uploaded
-                    ? (docData.uploaded as FileAsset).size
+                    ? docData.uploaded.size
                     : docData.file.size;
 
                 return (

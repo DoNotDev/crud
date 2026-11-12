@@ -63,6 +63,7 @@ export type ClientSort<T = Record<string, unknown>> =
  * const filtered = applyFilters(items, { status: 'active' }, productEntity);
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: interface-typed records have no implicit index signature; Record<string, unknown> would reject them
 export function applyFilters<T extends Record<string, any>>(
   items: T[],
   filters: FilterState,
@@ -130,6 +131,7 @@ export function getSearchableFields(entity: AnyEntity): string[] {
  * const results = applySearch(items, 'bmw', carEntity);
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: interface-typed records have no implicit index signature; Record<string, unknown> would reject them
 export function applySearch<T extends Record<string, any>>(
   items: T[],
   query: string,
@@ -186,6 +188,7 @@ export function applySearch<T extends Record<string, any>>(
  * const sorted = applySort(items, (a, b) => a.priority - b.priority);
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: interface-typed records have no implicit index signature; Record<string, unknown> would reject them
 export function applySort<T extends Record<string, any>>(
   items: T[],
   sort: ClientSort<T>

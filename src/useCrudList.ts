@@ -156,7 +156,10 @@ export function useCrudList<
   // Resolve entity for client processing
   const entity =
     typeof entityOrCollection === 'string' ? null : entityOrCollection;
-  const collection = entity?.collection ?? (entityOrCollection as string);
+  const collection =
+    typeof entityOrCollection === 'string'
+      ? entityOrCollection
+      : entityOrCollection.collection;
 
   // Read filters from CrudStore
   const { filters } = useCrudFilters({ collection });
@@ -169,7 +172,7 @@ export function useCrudList<
 
   // Client-side processing pipeline: filters → search → sort
   const { processed, filteredTotal } = useMemo(() => {
-    let result = baseResult.items as (T & Record<string, any>)[];
+    let result: T[] = baseResult.items;
 
     // Apply filters (only if entity is available for field type lookup)
     if (entity && Object.keys(filters).length > 0) {
@@ -188,7 +191,7 @@ export function useCrudList<
       result = applySort(result, resolvedSort);
     }
 
-    return { processed: result as T[], filteredTotal: total };
+    return { processed: result, filteredTotal: total };
   }, [baseResult.items, filters, options.searchQuery, resolvedSort, entity]);
 
   return {

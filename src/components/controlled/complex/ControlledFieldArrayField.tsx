@@ -13,7 +13,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useFieldArray, Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { Button } from '@donotdev/components';
 import type { EntityField, FieldType } from '@donotdev/core';
@@ -59,6 +58,7 @@ export function ControlledFieldArrayField(
   const { control, fieldConfig, required, t } = props;
   const { name, label, validation } = fieldConfig;
 
+  // why: @donotdev/core declares no fieldSpecific shape for this field type, and FieldType is erased at registry dispatch
   const fieldSpecific = (fieldConfig.options?.fieldSpecific ??
     {}) as FieldArrayFieldSpecific;
   const subFields = fieldSpecific.fields ?? [];
@@ -66,7 +66,7 @@ export function ControlledFieldArrayField(
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name: name as never,
+    name,
   });
 
   const registry = getFieldRegistry();
@@ -77,7 +77,7 @@ export function ControlledFieldArrayField(
     for (const sf of subFields) {
       emptyRow[sf.name] = getEmptyValue(sf.type);
     }
-    append(emptyRow as never);
+    append(emptyRow);
   };
 
   if (subFields.length === 0) {
@@ -142,7 +142,7 @@ export function ControlledFieldArrayField(
         >
           {subFields.map((sf) => {
             const subFieldPath =
-              `${name}.${rowIndex}.${sf.name}` as Path<FieldValues>;
+              `${name}.${rowIndex}.${sf.name}`;
 
             const subFieldConfig: EntityField = {
               name: subFieldPath,

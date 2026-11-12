@@ -19,6 +19,8 @@ import { Suspense } from 'react';
 import type { ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+import type { AnyEntity } from '@donotdev/core';
+
 // -----------------------------------------------------------------------------
 // Hoisted state — fake backend, fake service, minimal CrudStore.
 // -----------------------------------------------------------------------------
@@ -55,6 +57,8 @@ const { db, readSpy, fakeService, store, env } = vi.hoisted(() => {
     client: true,
     status: 'ready',
     scope: undefined as object | undefined,
+    authProvider: false,
+    language: 'fr',
   };
 
   return { db, readSpy, fakeService, store, env };
@@ -62,7 +66,13 @@ const { db, readSpy, fakeService, store, env } = vi.hoisted(() => {
 
 vi.mock('@donotdev/core', async () => {
   const rq = await import('@tanstack/react-query');
+  const translations = await import(
+    '../../../../core/utils/src/common/entityTranslations'
+  );
   return {
+    useTranslation: () => ({ language: env.language }),
+    getTranslatedFieldNames: translations.getTranslatedFieldNames,
+    translateRow: translations.translateRow,
     FEATURE_STATUS: {
       INITIALIZING: 'initializing',
       READY: 'ready',
@@ -70,7 +80,7 @@ vi.mock('@donotdev/core', async () => {
       ERROR: 'error',
     },
     isClient: () => env.client,
-    hasProvider: () => false,
+    hasProvider: () => env.authProvider,
     useAuthSessionSnapshot: () => null,
     useQuery: rq.useQuery,
     useQueryClient: rq.useQueryClient,
@@ -145,6 +155,8 @@ beforeEach(() => {
   env.client = true;
   env.status = 'ready';
   env.scope = undefined;
+  env.authProvider = false;
+  env.language = 'fr';
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -407,6 +419,18 @@ describe('useCrudDoc', () => {
       expect(result.current.error).toBeNull();
     });
 
+    it('session unknown (auth provider, no snapshot): not read on the server', () => {
+      env.client = false;
+      env.authProvider = true;
+      const fetchSpy = vi.spyOn(queryClient, 'fetchQuery');
+      const { result } = renderHook(() => useCrudDoc<Car>('cars', 'c1'), {
+        wrapper: suspenseWrapper,
+      });
+
+      expect(result.current.loading).toBe(true);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
     it('scoped (tenant) entities are never read on the server', () => {
       env.client = false;
       env.scope = { provider: 'company', field: 'companyId' };
@@ -419,5 +443,53 @@ describe('useCrudDoc', () => {
       expect(result.current.loading).toBe(true);
       expect(fetchSpy).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('useCrudDoc translated fields', () => {
+  // `model` is translated (i18n: true); passed as options.entity like the reference resolver does.
+  const carEntity = {
+    name: 'Car',
+    collection: 'cars',
+    fields: { model: { name: 'model', type: 'text', i18n: true } },
+  } as unknown as AnyEntity;
+
+  function renderTranslated(options?: { translate?: boolean }) {
+    return renderHook(
+      () => useCrudDoc<Car>('cars', 'c3', { entity: carEntity, ...options }),
+      { wrapper }
+    );
+  }
+
+  beforeEach(() => {
+    db.set('c3', { id: 'c3', model: 'Berline', modelI18n: { en: 'Sedan', de: '' }, price: 5 });
+  });
+
+  it('shows the current language', async () => {
+    env.language = 'en';
+    const { result } = renderTranslated();
+    await waitFor(() => expect(result.current.data?.model).toBe('Sedan'));
+  });
+
+  it('falls back to the stored value when the translation is missing or empty', async () => {
+    env.language = 'de';
+    const { result } = renderTranslated();
+    await waitFor(() => expect(result.current.data?.model).toBe('Berline'));
+  });
+
+  it('returns stored values with translate: false (edit forms)', async () => {
+    env.language = 'en';
+    const { result } = renderTranslated({ translate: false });
+    await waitFor(() => expect(result.current.data?.model).toBe('Berline'));
+    expect((result.current.data as Record<string, unknown> | null)?.modelI18n).toEqual({ en: 'Sedan', de: '' });
+  });
+
+  it('switches language without a new read', async () => {
+    const { result, rerender } = renderTranslated();
+    await waitFor(() => expect(result.current.data?.model).toBe('Berline'));
+    env.language = 'en';
+    rerender();
+    expect(result.current.data?.model).toBe('Sedan');
+    expect(readSpy).toHaveBeenCalledTimes(1);
   });
 });

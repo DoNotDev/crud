@@ -4,10 +4,10 @@
 import { useMemo } from 'react';
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { readImageProcessingOptions } from '../../../utils/imageProcessing';
 import { ImageFieldComponent } from '../../form/fields';
+import { controlledFieldOptions, uploadFieldSpecific } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -25,12 +25,11 @@ export function ControlledMultiImageField(
 
   const { name, label, validation } = fieldConfig;
 
-  const options = fieldConfig.options || {};
+  const options = controlledFieldOptions(fieldConfig);
+  const fieldSpecific = uploadFieldSpecific(fieldConfig);
   // Stable across renders: the upload callback depends on it, and a new object each
   // render would re-register the field's pending upload on every keystroke.
-  const imageOptions = (
-    options.fieldSpecific as { image?: unknown } | undefined
-  )?.image;
+  const imageOptions = fieldSpecific?.image;
   const processing = useMemo(
     () => readImageProcessingOptions({ image: imageOptions }),
     // Keyed on content: entity configs are often inline literals.
@@ -40,7 +39,7 @@ export function ControlledMultiImageField(
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => {
@@ -59,12 +58,12 @@ export function ControlledMultiImageField(
             value={arrayValue}
             onChange={(value) => field.onChange(value)}
             error={!!fieldState.error}
-            helperText={fieldState.error?.message as string | undefined}
+            helperText={fieldState.error?.message}
             required={required}
             multiple={true}
-            maxFiles={(options as any).maxFiles ?? 10}
-            maxSize={(options as any).maxSize}
-            storagePath={(options.fieldSpecific as any)?.storagePath}
+            maxFiles={options.maxFiles ?? 10}
+            maxSize={fieldSpecific?.maxSize}
+            storagePath={fieldSpecific?.storagePath}
             processing={processing}
           />
         );

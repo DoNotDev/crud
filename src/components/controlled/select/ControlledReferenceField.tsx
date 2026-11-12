@@ -4,10 +4,11 @@
 import { useMemo } from 'react';
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { useCrudList } from '../../../useCrudList';
+import { resolveReferenceEntity } from '../../../utils/referenceEntity';
 import ReferenceFieldComponent from '../../form/fields/ReferenceFieldComponent';
+import { fieldSpecificOf } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /** Auto-detect fields to use as label from an item's keys */
@@ -23,6 +24,7 @@ const AUTO_DETECT_FIELDS = ['name', 'title', 'label', 'displayName'];
  * 4. Fallback: document `id`
  */
 export function buildReferenceLabel(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: exported signature; narrowing it is a breaking change for importers (deferred to a major, any-audit 2026-11-11)
   item: Record<string, any>,
   labelFields?: string[],
   displayField?: string
@@ -62,26 +64,22 @@ export function ControlledReferenceField(
 
   const { name, label, validation, options: fieldOptions = {} } = fieldConfig;
 
-  const collectionName = validation?.reference as string | undefined;
+  const collectionName = validation?.reference;
 
-  const fieldSpecific = fieldOptions.fieldSpecific as
-    | {
-        labelFields?: string[];
-        displayField?: string;
-        searchFields?: string[];
-        preloadLimit?: number;
-      }
-    | undefined;
+  const fieldSpecific = fieldSpecificOf<'reference'>(fieldConfig);
 
-  // Fetch referenced collection
+  // Fetch referenced collection with its entity (registered by defineEntity)
+  const referencedEntity = collectionName
+    ? resolveReferenceEntity(collectionName, name)
+    : undefined;
   const { items, loading } = useCrudList<{ id: string }>(
-    collectionName ?? '__disabled__',
-    { enabled: !!collectionName }
+    referencedEntity ? referencedEntity.collection : '__disabled__',
+    { enabled: !!referencedEntity, entity: referencedEntity }
   );
 
   // Build combobox options
   const referenceOptions = useMemo(() => {
-    return items.map((item: Record<string, any>) => ({
+    return items.map((item) => ({
       id: item.id,
       label: buildReferenceLabel(
         item,
@@ -93,7 +91,7 @@ export function ControlledReferenceField(
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => (
@@ -105,11 +103,9 @@ export function ControlledReferenceField(
           options={referenceOptions}
           isLoading={loading}
           error={!!fieldState.error}
-          helperText={fieldState.error?.message as string | undefined}
+          helperText={fieldState.error?.message}
           required={required}
-          placeholder={
-            placeholder || (fieldOptions.placeholder as string | undefined)
-          }
+          placeholder={placeholder || fieldOptions.placeholder}
         />
       )}
     />

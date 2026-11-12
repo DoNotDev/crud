@@ -70,7 +70,7 @@ function formatPresetLabel(
       : minutes % 60 === 0
         ? `${minutes / 60}h`
         : `${Math.floor(minutes / 60)}h${minutes % 60}`;
-  const key = PRESET_I18N_KEYS[minutes as keyof typeof PRESET_I18N_KEYS];
+  const key = PRESET_I18N_KEYS[minutes];
   if (!t || !key) return fallback;
   return t(`crud:${key}`, { defaultValue: fallback }) ?? fallback;
 }

@@ -3,9 +3,9 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { SwitchFieldComponent } from '../../form/fields';
+import { fieldSpecificOf } from '../fieldOptions';
 import type { ControlledFieldProps } from '../types';
 
 /**
@@ -21,19 +21,9 @@ export function ControlledSwitchField(
 ): ReactElement {
   const { control, fieldConfig, t, onChange } = props;
 
-  const { name, label, options = {} } = fieldConfig;
+  const { name, label } = fieldConfig;
 
-  const fieldSpecific = options.fieldSpecific as
-    | {
-        uncheckedLabel?: string;
-
-        checkedLabel?: string;
-
-        uncheckedValue?: string | boolean;
-
-        checkedValue?: string | boolean;
-      }
-    | undefined;
+  const fieldSpecific = fieldSpecificOf<'switch'>(fieldConfig);
 
   // Default values
 
@@ -47,7 +37,7 @@ export function ControlledSwitchField(
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       render={({ field: { value, onChange: fieldOnChange }, fieldState }) => {
         // Value is normalized in useEntityForm to never be null/undefined
@@ -71,7 +61,7 @@ export function ControlledSwitchField(
             onChange={(e) => handleChange(e.target.checked)}
             uncheckedLabel={uncheckedLabel ? t(uncheckedLabel) : undefined}
             checkedLabel={checkedLabel ? t(checkedLabel) : undefined}
-            helperText={fieldState.error?.message as string | undefined}
+            helperText={fieldState.error?.message}
           />
         );
       }}

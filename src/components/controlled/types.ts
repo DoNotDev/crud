@@ -66,7 +66,7 @@ export function convertPatternToRegex(
       }
     }
 
-    return new RegExp(pattern as string);
+    return new RegExp(pattern);
   } catch (e) {
     console.error('Error converting pattern to regex:', e);
 
@@ -80,6 +80,7 @@ export function convertPatternToRegex(
 
  */
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: public export; typing `validation` is a consumer-visible signature change (see any-audit report)
 export function convertValidationRules(validation: any): RegisterOptions {
   if (!validation) return {};
 

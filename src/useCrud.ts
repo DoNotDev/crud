@@ -85,7 +85,7 @@ export function getCrudServiceInstance(): CrudServiceInterface | null {
 function readyCrudService(): CrudServiceInterface | null {
   const crudState = getCrudState();
   const service =
-    crudState.service ?? (getCrudService() as CrudServiceInterface);
+    crudState.service ?? getCrudService();
   if (!service.attachProvider()) return null;
   if (!crudState.service) {
     service.setStore(useCrudStore);
@@ -107,6 +107,14 @@ export interface UseCrudOptions<T> {
   staleTime?: number;
   /** Disable caching (bypass TanStack Query) */
   noCache?: boolean;
+  /**
+   * Read hooks (`useCrudDoc`, `useCrudList`, `useCrudCardList`): show fields defined
+   * with `i18n: true` in the current language (default true). Edit forms pass false:
+   * they must load and save the stored default-language values.
+   *
+   * @since 0.2.3
+   */
+  translate?: boolean;
 }
 
 /**
@@ -116,10 +124,11 @@ export interface UseCrudReturn<
   T extends Record<string, unknown>,
 > extends CrudAPI<T> {
   /**
-   * Transactional bulk write — inserts + updates + deletes in one round-trip.
-   * One audit entry, one rate-limit hit, one (optional) toast. Partial failures
-   * roll every optimistic op back together. Throws `BulkCollisionError` when
-   * the payload carries the same id in two mutually-exclusive buckets.
+   * Bulk write — inserts + updates + deletes in one adapter call. Partial
+   * success: rows that are written stay written; rows that fail are listed in
+   * `result.failed` (with the reason) and only they are reverted in the cache.
+   * One audit entry, one rate-limit hit, one toast. Throws `BulkCollisionError`
+   * when the payload carries the same id in two mutually-exclusive buckets.
    *
    * @example
    * ```tsx
@@ -262,6 +271,7 @@ export function useCrud<
   const schemas: OperationSchemas | undefined = useMemo(() => {
     if (isStatusCheck) return undefined;
     if (options.schema) {
+      // why: OperationSchemas is not generic; the caller's dndevSchema<T> is stored row-type-erased
       const schemaTyped = options.schema as dndevSchema<
         Record<string, unknown>
       >;
@@ -343,7 +353,7 @@ export function useCrud<
         }
 
         const service = getCrudService();
-        crudState.service = service as CrudServiceInterface;
+        crudState.service = service;
 
         service.setStore(useCrudStore);
         await service.initialize();
@@ -375,6 +385,7 @@ export function useCrud<
   // ==========================================================================
   // CRUD Methods (thin wrappers around CrudService)
   // ==========================================================================
+  // why: `schemas` is built per collection at runtime (OperationSchemas holds dndevSchema<Record<string, unknown>>); the `as dndevSchema<T>` casts below re-attach the caller's row type T
   const get = useCallback(
     async (id: string): Promise<T | null> => {
       const service = getCrudServiceInstance();
@@ -399,8 +410,7 @@ export function useCrud<
       if (!service || !schemas) return;
       // Inject scope for multi-tenancy
       const scopedData = injectScope(setData, scope);
-      const isDraft =
-        (scopedData as Record<string, unknown>)?.status === 'draft';
+      const isDraft = scopedData?.status === 'draft';
       const schemaToUse = isDraft ? schemas.draft : schemas.create;
       await service.set(
         collection,
@@ -450,8 +460,7 @@ export function useCrud<
       if (!service || !schemas) return '';
       // Inject scope for multi-tenancy
       const scopedData = injectScope(addData, scope);
-      const isDraft =
-        (scopedData as Record<string, unknown>)?.status === 'draft';
+      const isDraft = scopedData?.status === 'draft';
       const schemaToUse = isDraft ? schemas.draft : schemas.create;
       return service.add(
         collection,
@@ -482,7 +491,7 @@ export function useCrud<
     ): Promise<BulkResult> => {
       const service = getCrudServiceInstance();
       if (!service || !schemas)
-        return { insertedIds: [], updatedIds: [], deletedIds: [] };
+        return { insertedIds: [], updatedIds: [], deletedIds: [], failed: [] };
       // Inject scope on inserts; updates/deletes are scope-checked server-side.
       const scopedOps: BulkOperations<T> = {
         inserts: ops.inserts?.map((row) => injectScope(row, scope)),
@@ -511,10 +520,11 @@ export function useCrud<
       // Auto-inject scope filter for multi-tenancy
       const scopedQueryOptions = injectScopeFilter(queryOptions, scope);
 
+      // Full visible record: same read and cache entry as useCrudList / useCrudCardList
       const result = await service.query<T>(
         collection,
         scopedQueryOptions,
-        schemas.list as dndevSchema<T>,
+        schemas.get as dndevSchema<T>,
         cacheOptions
       );
       return result.items;
@@ -555,7 +565,7 @@ export function useCrud<
         collection,
         queryOptions,
         callback,
-        schemas.list as dndevSchema<T>
+        schemas.get as dndevSchema<T>
       );
     },
     [collection, schemas ? 'hasSchema' : 'noSchema']
@@ -580,6 +590,7 @@ export function useCrud<
   if (!isAvailable) {
     // Return degraded API + internal getters (for child hooks)
     return {
+      // why: DEGRADED_CRUD_API is one non-generic module constant; its stubs are valid for every T
       ...(DEGRADED_CRUD_API as unknown as UseCrudReturn<T>),
       status, // keep actual status (degraded/error)
       loading, // keep actual loading state

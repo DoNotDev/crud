@@ -3,9 +3,9 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { AddressFieldComponent } from '../../form/fields';
+import { fieldSpecificOf } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -25,13 +25,11 @@ export function ControlledAddressField(
 
   const options = fieldConfig.options || {};
 
-  const fieldSpecific = options.fieldSpecific as
-    | { enableGoogleMaps?: boolean; extractDistrictCode?: boolean }
-    | undefined;
+  const fieldSpecific = fieldSpecificOf<'address'>(fieldConfig);
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => (
@@ -40,7 +38,7 @@ export function ControlledAddressField(
           value={field.value ?? undefined}
           onChange={(value) => field.onChange(value)}
           error={!!fieldState.error}
-          helperText={fieldState.error?.message as string | undefined}
+          helperText={fieldState.error?.message}
           required={required}
           enableGoogleMaps={fieldSpecific?.enableGoogleMaps}
           extractDistrictCode={fieldSpecific?.extractDistrictCode}

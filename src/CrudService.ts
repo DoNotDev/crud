@@ -32,8 +32,9 @@
  * - Toast notifications
  *
  * **Caching strategy (aggressive / optimal):**
- * - One cache key per (collection, queryOptions): `['crud', collection, 'query', JSON.stringify(queryOptions)]`.
- *   list and listCard share that same key — one network read, both views get data.
+ * - One cache key per (collection, queryOptions): `listQueryKey()` in CrudService.cache.ts.
+ *   list and listCard share it — both read the full visible record (`schemas.get`); one network
+ *   read, both views get data, and the doc cache starts from those rows.
  * - Create/Update/Delete update both the GET cache `['crud', collection, 'get', id]` and all
  *   list caches via `updateListCaches` so the UI stays in sync without any refetch.
  * - `subscribeToCollection` writes to the same list cache key; real-time updates and mutations
@@ -343,10 +344,11 @@ export class CrudService implements CrudServiceInternal {
   }
 
   /**
-   * Execute a transactional bulk CRUD operation.
+   * Execute a bulk CRUD operation (partial success).
    *
-   * All three buckets commit atomically in one adapter round-trip. Emits one
-   * audit entry, one rate-limit hit, one toast. Collisions (same id in two
+   * All three buckets go to the adapter in one call. Rows that are written stay
+   * written; rows that fail are returned in `BulkResult.failed` and only those
+   * are reverted in the cache. Emits one audit entry, one rate-limit hit, one toast. Collisions (same id in two
    * mutually-exclusive buckets) reject up-front with `BulkCollisionError`
    * before any optimistic mutation. Empty payloads short-circuit without
    * hitting the adapter.
@@ -408,7 +410,7 @@ export class CrudService implements CrudServiceInternal {
   ): Promise<BulkAcrossResult> {
     return bulkAcrossImpl(
       this,
-      batches as BulkAcrossBatch<Record<string, unknown>>[],
+      batches,
       options
     );
   }

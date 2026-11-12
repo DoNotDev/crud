@@ -3,10 +3,10 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { TextFieldComponent } from '../../form/fields';
 import type { TextFieldComponentProps } from '../../form/fields';
+import { controlledFieldOptions } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -19,7 +19,8 @@ import { convertValidationRules, type ControlledFieldProps } from '../types';
 export function ControlledTextField(props: ControlledFieldProps): ReactElement {
   const { control, fieldConfig, t, placeholder, required } = props;
 
-  const { name, label, validation, options = {} } = fieldConfig;
+  const { name, label, validation } = fieldConfig;
+  const options = controlledFieldOptions(fieldConfig);
 
   const rules = validation ? convertValidationRules(validation) : undefined;
 
@@ -34,7 +35,7 @@ export function ControlledTextField(props: ControlledFieldProps): ReactElement {
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={rules}
       render={({ field, fieldState }) => (
@@ -45,14 +46,14 @@ export function ControlledTextField(props: ControlledFieldProps): ReactElement {
           onChange={field.onChange}
           onBlur={field.onBlur}
           label={t(label)}
-          error={fieldState.error?.message as string | undefined}
-          helperText={fieldState.error?.message as string | undefined}
+          error={fieldState.error?.message}
+          helperText={fieldState.error?.message}
           type={inputType}
           required={required}
-          placeholder={placeholder || (options as any).placeholder}
+          placeholder={placeholder || options.placeholder}
           maxLength={validation?.maxLength}
-          showCharCount={(options as any).showCharCount}
-          className={(options as any).className}
+          showCharCount={options.showCharCount}
+          className={options.className}
         />
       )}
     />

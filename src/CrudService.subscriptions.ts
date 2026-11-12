@@ -25,6 +25,7 @@ import {
   decryptPiiRow,
   ensureAdapter,
 } from './CrudService.internal';
+import { listQueryKey } from './CrudService.cache';
 import type { CrudServiceInternal } from './types';
 
 export function subscribeImpl<T>(
@@ -166,7 +167,7 @@ function subscribeToCollectionSync<T>(
           self
             .getQueryClient()
             .setQueryData(
-              ['crud', collection, 'query', JSON.stringify(options)],
+              listQueryKey(collection, options),
               (old: PaginatedQueryResult<T> | undefined) =>
                 old ? { ...old, items: data } : { items: data }
             );

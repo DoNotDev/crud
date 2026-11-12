@@ -11,6 +11,7 @@
  */
 
 import { useMemo, useCallback } from 'react';
+import type { FieldPath } from 'react-hook-form';
 
 import type { AnyEntity, EntityField } from '@donotdev/core';
 
@@ -84,9 +85,7 @@ export function useEntityField<
   const { entity, operation, viewerRole, fields } = form;
 
   // Get the field definition from entity
-  const fieldDef = entity.fields[fieldName as string] as
-    | EntityField
-    | undefined;
+  const fieldDef = entity.fields[fieldName as string];
 
   // Get field config (defineEntity ensures name/label are set)
   const config: EntityField = useMemo(() => {
@@ -131,9 +130,9 @@ export function useEntityField<
   }, [isVisible, operation, config.visibility, config.editable, viewerRole]);
 
   // Use React Hook Form's useController for field state
-  // Cast to any to avoid complex generic type issues with FieldPath
+  // why: K is a top-level key of the form data, hence a FieldPath, but TS cannot relate `keyof` to FieldPath for a generic entity
   const { field, fieldState } = useController({
-    name: fieldName as any,
+    name: fieldName as unknown as FieldPath<InferEntityData<E>>,
     control: form.control,
   });
 

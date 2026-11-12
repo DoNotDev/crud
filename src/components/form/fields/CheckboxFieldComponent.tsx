@@ -13,6 +13,8 @@ import type { ChangeEvent, ComponentType, ReactNode } from 'react';
 
 import { Checkbox } from '@donotdev/components';
 
+import { InlineFieldRow } from './internal/InlineFieldRow';
+
 export interface CheckboxFieldComponentProps {
   /** The label for the checkbox - can be a string or ReactNode (e.g., with links) */
   label: string | ReactNode;
@@ -48,12 +50,14 @@ const CheckboxFieldComponent: ComponentType<CheckboxFieldComponentProps> = ({
   };
 
   return (
-    <Checkbox
-      checked={checked}
-      onCheckedChange={handleChange}
-      label={label}
-      required={required}
-    />
+    <InlineFieldRow>
+      <Checkbox
+        checked={checked}
+        onCheckedChange={handleChange}
+        label={label}
+        required={required}
+      />
+    </InlineFieldRow>
   );
 };
 

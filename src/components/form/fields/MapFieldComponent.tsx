@@ -18,9 +18,11 @@ export interface MapFieldComponentProps {
   /** Field label */
   label: string;
   /** Map data as an object */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: exported signature; narrowing it is a breaking change for importers (deferred to a major, any-audit 2026-11-11)
   value?: Record<string, any>;
   /** Change handler - accepts both event and direct value */
   onChange: (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: exported signature; narrowing it is a breaking change for importers (deferred to a major, any-audit 2026-11-11)
     value: Record<string, any> | ChangeEvent<HTMLInputElement>
   ) => void;
   /** Error state */

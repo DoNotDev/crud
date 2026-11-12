@@ -3,9 +3,9 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { FileFieldComponent } from '../../form/fields';
+import { controlledFieldOptions, uploadFieldSpecific } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -23,11 +23,12 @@ export function ControlledMultiFileField(
 
   const { name, label, validation } = fieldConfig;
 
-  const options = fieldConfig.options || {};
+  const options = controlledFieldOptions(fieldConfig);
+  const fieldSpecific = uploadFieldSpecific(fieldConfig);
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => {
@@ -46,12 +47,12 @@ export function ControlledMultiFileField(
             value={arrayValue}
             onChange={(value) => field.onChange(value)}
             error={!!fieldState.error}
-            helperText={fieldState.error?.message as string | undefined}
+            helperText={fieldState.error?.message}
             required={required}
             multiple={true}
-            maxFiles={(options as any).maxFiles ?? 10}
-            maxSize={(options as any).maxSize}
-            storagePath={(options as any).storagePath}
+            maxFiles={options.maxFiles ?? 10}
+            maxSize={fieldSpecific?.maxSize}
+            storagePath={fieldSpecific?.storagePath}
           />
         );
       }}

@@ -45,13 +45,12 @@ export function shouldShowSuccessToast(
 }
 
 /**
- * Resolve PII fields for a collection from the schema metadata (if available).
+ * Resolve PII fields for a collection from `schema.metadata.security.piiFields`
+ * (copied from `entity.security` by createSchemas).
  * Returns empty array when no security config or piiFields defined.
  */
 export function getPiiFields(schema?: dndevSchema<unknown>): string[] {
-  const meta = (schema as { security?: { piiFields?: string[] } } | undefined)
-    ?.security;
-  return meta?.piiFields ?? [];
+  return schema?.metadata.security?.piiFields ?? [];
 }
 
 /**
@@ -60,7 +59,7 @@ export function getPiiFields(schema?: dndevSchema<unknown>): string[] {
  * reactive query descriptors, subscriptions), so cached rows are always plaintext.
  *
  * @param self - CrudService (its security context; none = no decryption)
- * @param schema - Schema carrying `security.piiFields`
+ * @param schema - Schema carrying `metadata.security.piiFields`
  * @param row - Row as returned by the adapter
  * @returns The row with PII fields decrypted
  */

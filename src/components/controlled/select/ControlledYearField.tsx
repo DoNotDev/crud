@@ -4,7 +4,6 @@
 import { useMemo } from 'react';
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { translateLabel } from '../../../forms/utils';
 import { ComboboxComponent } from '../../form/fields';
@@ -35,7 +34,7 @@ export function ControlledYearField(props: ControlledFieldProps): ReactElement {
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => {
@@ -62,7 +61,7 @@ export function ControlledYearField(props: ControlledFieldProps): ReactElement {
             onBlur={field.onBlur}
             options={yearOptions}
             error={!!fieldState.error}
-            helperText={fieldState.error?.message as string | undefined}
+            helperText={fieldState.error?.message}
             required={required}
             placeholder={placeholder || fieldOptions.placeholder}
             translationNamespace="crud"

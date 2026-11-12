@@ -13,8 +13,10 @@
 import { useState } from 'react';
 import type { ChangeEvent, ComponentType, MouseEvent } from 'react';
 
-import { Checkbox, Label, Sheet, Stack, Text } from '@donotdev/components';
+import { Checkbox, Label, Sheet, Text } from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
+
+import { InlineFieldRow } from './internal/InlineFieldRow';
 
 export interface GdprConsentFieldComponentProps {
   /** Whether the checkbox is checked */
@@ -97,7 +99,7 @@ const GdprConsentFieldComponent: ComponentType<
 
   return (
     <>
-      <Stack direction="row" align="center" gap="tight">
+      <InlineFieldRow>
         <Checkbox checked={checked} onCheckedChange={handleChange} />
         <Label
           required={required}
@@ -125,7 +127,7 @@ const GdprConsentFieldComponent: ComponentType<
             {andText}
           </Text>
         </Label>
-      </Stack>
+      </InlineFieldRow>
       <Sheet
         open={privacyOpen}
         onOpenChange={setPrivacyOpen}

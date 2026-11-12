@@ -16,7 +16,7 @@ import { useMemo } from 'react';
 
 import { Card, Stack, Text, ActionButton } from '@donotdev/components';
 import { useTranslation, getListCardFieldNames } from '@donotdev/core';
-import type { CrudCardProps, ListCardLayout, Picture } from '@donotdev/core';
+import type { CrudCardProps, Picture } from '@donotdev/core';
 
 import { formatValue } from './DisplayFieldRenderer';
 import { DisplayThumbnail } from './DisplayThumbnail';
@@ -34,12 +34,11 @@ function useResolvedSlots(entity: CrudCardProps['entity']) {
   return useMemo(() => {
     const l = entity.listCardFields;
     if (l && !Array.isArray(l)) {
-      const layout = l as ListCardLayout;
       return {
-        titleFields: layout.title ?? [],
-        subtitleFields: layout.subtitle ?? [],
-        contentFields: layout.content ?? [],
-        footerFields: layout.footer ?? [],
+        titleFields: l.title ?? [],
+        subtitleFields: l.subtitle ?? [],
+        contentFields: l.content ?? [],
+        footerFields: l.footer ?? [],
       };
     }
     const fieldsToShow = getListCardFieldNames(entity);
@@ -62,12 +61,13 @@ function useResolvedSlots(entity: CrudCardProps['entity']) {
 
 /**
  * CrudCard — Presentational card from entity + item + field slots.
- * No routing: use onClick for interaction. Parent wraps with Link if needed.
+ * Navigation: `href` renders a real link (router-aware); `onClick` for other interactions.
  */
 export function CrudCard({
   item,
   entity,
   onClick,
+  href,
   titleFields: titleFieldsProp,
   subtitleFields: subtitleFieldsProp,
   contentFields: contentFieldsProp,
@@ -87,7 +87,7 @@ export function CrudCard({
   const footerFields = footerFieldsProp ?? resolved.footerFields;
 
   // Shared options for formatValue — passes item for displayValue resolvers
-  const fvItem = item as Record<string, unknown>;
+  const fvItem: Record<string, unknown> = item;
 
   const title = useMemo(() => {
     if (!titleFields?.length) return item.id ?? '';
@@ -156,6 +156,7 @@ export function CrudCard({
         return (
           <DisplayThumbnail
             key={fieldName}
+            // why: isImageType(config.type) fixes the stored shape; AnyFieldValue cannot be narrowed by the field config
             pictures={value as Picture | Picture[] | string}
             alt={String(title)}
             aspectRatio="16/9"
@@ -199,7 +200,8 @@ export function CrudCard({
           return (
             <DisplayThumbnail
               key={fieldName}
-              pictures={value as Picture | Picture[] | string}
+              // why: isImageType(config.type) fixes the stored shape; AnyFieldValue cannot be narrowed by the field config
+            pictures={value as Picture | Picture[] | string}
               alt=""
               aspectRatio="1"
             />
@@ -256,11 +258,13 @@ export function CrudCard({
             loadingText={tCrud('delete.loading', {
               defaultValue: 'Deleting...',
             })}
+            confirmLabel={tCrud('actions.delete')}
+            cancelLabel={tCrud('actions.cancel')}
             variant="destructive"
             icon={Trash2}
-            aria-label={tCrud('delete', { defaultValue: 'Delete' })}
+            aria-label={tCrud('actions.delete')}
           >
-            {tCrud('delete', { defaultValue: 'Delete' })}
+            {tCrud('actions.delete')}
           </ActionButton>
         )}
       </div>
@@ -274,6 +278,7 @@ export function CrudCard({
       footer={footerNode}
       clickable
       elevated
+      href={href}
       onClick={onClick ? () => onClick(item.id) : undefined}
       className={className}
       overlay={actionsNode ?? undefined}

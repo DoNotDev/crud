@@ -29,6 +29,7 @@ import type { UseCrudOptions } from './useCrud';
 import { useServerPrefetch } from './useServerPrefetch';
 import { mergeWithOptimistic } from './utils/mergeWithOptimistic';
 import { injectScopeFilter, getCurrentScopeValue } from './utils/scopeUtils';
+import { useRowTranslator } from './utils/useRowTranslator';
 
 /** Cursor cache for server-side pagination */
 type CursorCache = Map<number, string | null>;
@@ -135,8 +136,9 @@ export function useBaseCrudList<T extends { id: string } = { id: string }>(
     const service = getCrudServiceInstance();
     if (!service) return null;
 
-    // Get the correct schema based on type
-    const schema = schemaType === 'listCard' ? schemas.listCard : schemas.list;
+    // Read the full visible record for both views (one shared cache entry, which also
+    // seeds the doc cache). listFields / listCardFields only choose what is displayed.
+    const schema = schemas.get;
 
     // Inject scope filter for multi-tenancy
     const scopedQueryOptions = injectScopeFilter(options.queryOptions, scope);
@@ -240,6 +242,8 @@ export function useBaseCrudList<T extends { id: string } = { id: string }>(
   }, [queryData, pagination?.mode, autoSwitchedToServer]);
 
   // 8. Process query result and handle server-side pagination cursors
+  // Translated fields in the current language (cache keeps stored rows)
+  const translateRow = useRowTranslator(entityOrCollection, options);
   const processedData = useMemo(() => {
     if (!queryData || !isAvailable) return { items: [], total: undefined };
 
@@ -302,13 +306,14 @@ export function useBaseCrudList<T extends { id: string } = { id: string }>(
     const adjustedTotal = baseTotal + optimisticAdditions - optimisticDeletions;
 
     return {
-      items: mergedItems,
+      items: mergedItems.map(translateRow),
       // Always return total so auto-mode can detect when to switch
       total: adjustedTotal,
     };
   }, [
     queryData,
     optimistic,
+    translateRow,
     isAvailable,
     effectiveMode,
     pagination?.page,

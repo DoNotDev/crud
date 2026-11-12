@@ -12,7 +12,6 @@
 
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
-import type { FieldValues, Path } from 'react-hook-form';
 
 import { DurationFieldComponent } from '../../form/fields';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
@@ -26,13 +25,14 @@ export function ControlledDurationField(
   const { control, fieldConfig, t, required } = props;
   const { name, label, validation } = fieldConfig;
   const options = fieldConfig.options || {};
+  // why: @donotdev/core declares no fieldSpecific shape for this field type, and FieldType is erased at registry dispatch
   const fieldSpecific = options.fieldSpecific as
     | { min?: number; max?: number; step?: number }
     | undefined;
 
   return (
     <Controller
-      name={name as Path<FieldValues>}
+      name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => (
@@ -41,7 +41,7 @@ export function ControlledDurationField(
           value={field.value ?? 0}
           onChange={(value) => field.onChange(value)}
           error={!!fieldState.error}
-          helperText={fieldState.error?.message as string | undefined}
+          helperText={fieldState.error?.message}
           required={required}
           disabled={field.disabled}
           min={fieldSpecific?.min ?? 0}

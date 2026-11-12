@@ -7,7 +7,7 @@
  *
  * Cache keys:
  * - `['crud', collection, 'get', id]`            single document
- * - `['crud', collection, 'query', JSON(opts)]`  list + listCard (shared)
+ * - `['crud', collection, 'query', JSON(opts)]`  list + listCard (shared, full visible rows)
  *
  * Prefix `['crud', collection]` fans out across both — used when a mutation
  * must refresh every derived view.
@@ -17,11 +17,56 @@
  * @author AMBROISE PARK Consulting
  */
 
-import type { dndevSchema } from '@donotdev/core';
+import type { dndevSchema, QueryClient, QueryOptions } from '@donotdev/core';
 import { handleError } from '@donotdev/core';
 
 import { CRUD_OPERATION } from './types';
 import type { CrudOperation, CrudServiceInternal } from './types';
+
+/**
+ * Cache key of one list query, shared by list and listCard: both read the full
+ * visible record (`schemas.get`), and `listFields` / `listCardFields` only choose
+ * what each view displays. One network read serves both views and the doc cache.
+ */
+export function listQueryKey(
+  collection: string,
+  options: QueryOptions
+): readonly ['crud', string, 'query', string] {
+  return ['crud', collection, 'query', JSON.stringify(options)];
+}
+
+/**
+ * The freshest cached list row of one document. List reads hold the full visible
+ * record (same read as `get`), so a document already listed opens without a request:
+ * the doc query starts from this row (`initialData`) and refetches only once the
+ * list entry it came from is stale.
+ *
+ * @param queryClient - The client that renders (request-scoped on the server)
+ * @returns The row and its list entry's `dataUpdatedAt`, or undefined when not listed
+ */
+export function cachedListRow<T>(
+  queryClient: QueryClient,
+  collection: string,
+  id: string
+): { data: T; updatedAt: number } | undefined {
+  let found: { data: T; updatedAt: number } | undefined;
+  for (const query of queryClient
+    .getQueryCache()
+    .findAll({ queryKey: ['crud', collection, 'query'] })) {
+    const items = (query.state.data as { items?: unknown[] } | undefined)
+      ?.items;
+    const row = items?.find(
+      (item) =>
+        item != null &&
+        typeof item === 'object' &&
+        (item as { id?: unknown }).id === id
+    );
+    if (row && (!found || query.state.dataUpdatedAt > found.updatedAt)) {
+      found = { data: row as T, updatedAt: query.state.dataUpdatedAt };
+    }
+  }
+  return found;
+}
 
 /** Document with required id field for cache operations */
 interface DocumentWithId {
@@ -228,7 +273,7 @@ export function checkUniquenessFromCache<T>(
   const allItems: DocumentWithId[] = [];
   for (const [, queryData] of queries) {
     if (queryData && typeof queryData === 'object' && 'items' in queryData) {
-      allItems.push(...(queryData as { items: DocumentWithId[] }).items);
+      allItems.push(...queryData.items);
     } else if (Array.isArray(queryData)) {
       allItems.push(...(queryData as DocumentWithId[]));
     }
@@ -236,7 +281,7 @@ export function checkUniquenessFromCache<T>(
 
   if (allItems.length === 0) return null;
 
-  const payload = data as Record<string, unknown>;
+  const payload = data;
 
   for (const uniqueKey of uniqueKeys) {
     // Skip if payload doesn't have all uniqueKey fields
@@ -250,11 +295,11 @@ export function checkUniquenessFromCache<T>(
       uniqueKey.fields.every((field) => {
         const payloadVal =
           typeof payload[field] === 'string'
-            ? (payload[field] as string).toLowerCase()
+            ? payload[field].toLowerCase()
             : payload[field];
         const itemVal =
           typeof item[field] === 'string'
-            ? (item[field] as string).toLowerCase()
+            ? item[field].toLowerCase()
             : item[field];
         return payloadVal === itemVal;
       })

@@ -28,6 +28,7 @@ import {
   ensureAdapter,
   withResilience,
 } from './CrudService.internal';
+import { cachedListRow, listQueryKey } from './CrudService.cache';
 import type { CacheOptions, CrudServiceInternal } from './types';
 
 /** Default stale time - data never becomes stale. Mutations handle cache updates. */
@@ -69,14 +70,8 @@ export function getListQueryOptionsImpl<T>(
   cacheOptions?: CacheOptions,
   schemaType: ListSchemaType = LIST_SCHEMA_TYPE.LIST
 ): CrudListQuery<T> {
-  // Single cache key for list + listCard — one network read shared by both
   return {
-    queryKey: [
-      'crud',
-      collection,
-      'query',
-      JSON.stringify(queryOptions),
-    ] as const,
+    queryKey: listQueryKey(collection, queryOptions),
     queryFn: async ({ client }): Promise<PaginatedQueryResult<T>> => {
       await ensureAdapter(self);
       if (!self.adapter) throw new Error('Adapter not initialized');
@@ -116,7 +111,7 @@ async function readDocument<T>(
 /**
  * Run one list query: access check, adapter query, PII decryption per row.
  * The one read path behind `query()` and `getListQueryOptions()`: both fill the cache
- * key `['crud', collection, 'query', JSON(options)]`, so both must produce the same value.
+ * key `listQueryKey(collection, options)`, so both must produce the same value.
  */
 async function readQuery<T>(
   self: CrudServiceInternal,
@@ -182,10 +177,15 @@ export async function getImpl<T>(
   }
 
   try {
-    // Use TanStack Query for caching
+    // Use TanStack Query for caching. A listed document starts from its list row.
     const queryClient = self.getQueryClient();
+    const listed = cachedListRow<T>(queryClient, collection, id);
     return await queryClient.fetchQuery({
       queryKey: ['crud', collection, 'get', id],
+      ...(listed && {
+        initialData: listed.data,
+        initialDataUpdatedAt: listed.updatedAt,
+      }),
       queryFn: () => getFromAdapter(self, collection, id, schema, false), // Pass false to skip loading set
       staleTime: options?.staleTime ?? DEFAULT_STALE_TIME,
     });
@@ -274,10 +274,9 @@ export async function queryImpl<T>(
   }
 
   try {
-    // Use TanStack Query for caching — one cache for list and listCard (same key)
     const queryClient = self.getQueryClient();
     const result = await queryClient.fetchQuery({
-      queryKey: ['crud', collection, 'query', JSON.stringify(options)],
+      queryKey: listQueryKey(collection, options),
       queryFn: () =>
         queryFromAdapter(self, collection, options, schema, false, schemaType), // Pass false to skip loading set
       staleTime: cacheOptions?.staleTime ?? DEFAULT_STALE_TIME,

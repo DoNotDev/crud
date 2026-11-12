@@ -107,13 +107,15 @@ describe('EntityFilters', () => {
     expect(clearButtons.length).toBeGreaterThan(0);
   });
 
-  it('uses responsive cols for inline variant', () => {
+  it('sizes inline columns by the panel width (selects never under 14rem)', () => {
     const { container } = render(
       <EntityFilters entity={mockEntity} viewerRole="user" variant="inline" />
     );
     const grid = container.querySelector('[data-cols]');
     expect(grid).toBeTruthy();
-    expect(JSON.parse(grid!.getAttribute('data-cols')!)).toEqual([2, 4, 6, 8]);
+    expect(JSON.parse(grid!.getAttribute('data-cols')!)).toBe(
+      'repeat(auto-fill, minmax(min(100%, 14rem), 1fr))'
+    );
   });
 
   it('uses 1 col for sidebar variant', () => {

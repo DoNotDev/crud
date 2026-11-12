@@ -38,6 +38,7 @@ import { getFilterType } from '../fieldTypeRegistry.store';
  * ```
  */
 export function matchesFilter(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: exported signature; narrowing it is a breaking change for importers (deferred to a major, any-audit 2026-11-11)
   itemValue: any,
 
   filterValue:
@@ -242,12 +243,8 @@ export function matchesFilter(
           min?: { date: string; time?: string };
           max?: { date: string; time?: string };
         };
-        const minObj = datetimeRange.min as
-          | { date: string; time?: string }
-          | undefined;
-        const maxObj = datetimeRange.max as
-          | { date: string; time?: string }
-          | undefined;
+        const minObj = datetimeRange.min;
+        const maxObj = datetimeRange.max;
 
         const hasMin = minObj?.date && minObj.date !== '';
         const hasMax = maxObj?.date && maxObj.date !== '';

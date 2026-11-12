@@ -3,8 +3,8 @@
 /**
  * @fileoverview Read-path parity: every read that fills the cache yields the same rows
  * @description get() / getDocQueryOptions share `['crud', c, 'get', id]`; query() /
- * getListQueryOptions share `['crud', c, 'query', JSON(opts)]`; subscriptions write
- * both. All must apply the same access check (on the adapter that reads), PII
+ * getListQueryOptions share `['crud', c, 'query', JSON(opts)]` (list + listCard);
+ * subscriptions write both. All must apply the same access check (on the adapter that reads), PII
  * decryption and request-scoped adapter. Regression: the reactive descriptors and
  * subscriptions read the adapter directly, caching ciphertext and skipping the check.
  *
@@ -46,8 +46,14 @@ import type { CrudServiceInternal } from '../types';
 type Row = { id: string; name: string; email: string };
 
 const STORED: Row = { id: 'c1', name: 'Ada', email: 'enc(ada@x.io)' };
-const piiSchema = { security: { piiFields: ['email'] } };
-const restrictedSchema = { restricted: true };
+const piiSchema = {
+  metadata: { collection: 'customers', security: { piiFields: ['email'] } },
+};
+const restrictedSchema = {
+  restricted: true,
+  metadata: { collection: 'customers' },
+};
+const plainSchema = { metadata: { collection: 'customers' } };
 
 function makeAdapter(row: Row | null, flags: Record<string, boolean> = {}) {
   return {
@@ -166,7 +172,7 @@ describe('getDocQueryOptions — same read path as get()', () => {
       self,
       'customers',
       'c1',
-      {} as never
+      plainSchema as never
     );
 
     expect((await query.queryFn({ client: requestClient }))?.name).toBe(
@@ -217,6 +223,55 @@ describe('getListQueryOptions — same read path as query()', () => {
       /restricted field visibility/
     );
     expect(adapter.query).not.toHaveBeenCalled();
+  });
+
+  it('shares one entry between list and listCard: one read serves both views', async () => {
+    const adapter = makeAdapter(STORED);
+    const { self } = makeService(adapter, queryClient);
+    const list = getListQueryOptionsImpl<Row>(
+      self,
+      'customers',
+      {},
+      piiSchema as never,
+      undefined,
+      'list'
+    );
+    const card = getListQueryOptionsImpl<Row>(
+      self,
+      'customers',
+      {},
+      piiSchema as never,
+      undefined,
+      'listCard'
+    );
+    expect(list.queryKey).toEqual(card.queryKey);
+
+    await queryClient.fetchQuery(list);
+    await queryImpl<Row>(
+      self,
+      'customers',
+      {},
+      piiSchema as never,
+      undefined,
+      'listCard'
+    );
+    expect(adapter.query).toHaveBeenCalledTimes(1);
+  });
+
+  it('get() of a listed document reads the list row, not the backend', async () => {
+    const adapter = makeAdapter(STORED);
+    const { self } = makeService(adapter, queryClient);
+    await queryImpl<Row>(self, 'customers', {}, piiSchema as never);
+
+    const doc = await getImpl<Row>(
+      self,
+      'customers',
+      STORED.id,
+      piiSchema as never
+    );
+
+    expect(doc?.email).toBe('ada@x.io');
+    expect(adapter.get).not.toHaveBeenCalled();
   });
 });
 

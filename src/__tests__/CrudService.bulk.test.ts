@@ -194,6 +194,7 @@ function makeService(
         insertedIds: (ops.inserts ?? []).map((_, i) => `real-${i + 1}`),
         updatedIds: (ops.updates ?? []).map((u) => u.id),
         deletedIds: (ops.deletes ?? []).slice(),
+        failed: [],
       })
     );
 
@@ -293,6 +294,7 @@ describe('CrudService.bulk()', () => {
       insertedIds: ['real-1', 'real-2'],
       updatedIds: ['e1'],
       deletedIds: ['e2', 'e3'],
+      failed: [],
     });
   });
 
@@ -318,6 +320,7 @@ describe('CrudService.bulk()', () => {
       insertedIds: [],
       updatedIds: [],
       deletedIds: [],
+      failed: [],
     });
   });
 
@@ -336,6 +339,7 @@ describe('CrudService.bulk()', () => {
       insertedIds: [],
       updatedIds: [],
       deletedIds: [],
+      failed: [],
     });
   });
 
@@ -358,6 +362,51 @@ describe('CrudService.bulk()', () => {
     expect(state.addOptimistic).not.toHaveBeenCalled();
     expect(state.updateOptimistic).not.toHaveBeenCalled();
     expect(state.setLoading).not.toHaveBeenCalled();
+  });
+
+  it('partial success: written rows are confirmed, only failed rows are reverted', async () => {
+    const adapterBulk = vi.fn(async () => ({
+      insertedIds: ['real-2'],
+      updatedIds: ['e1'],
+      deletedIds: [],
+      failed: [
+        { op: 'insert' as const, index: 0, error: 'denied' },
+        { op: 'update' as const, id: 'e9', error: 'denied' },
+        { op: 'delete' as const, id: 'e2', error: 'denied' },
+      ],
+    }));
+    const { service, state } = makeService({ adapterBulk });
+
+    const result = await bulkImpl<Event>(
+      service,
+      'events',
+      {
+        inserts: [{ title: 'A' }, { title: 'B' }],
+        updates: [
+          { id: 'e1', patch: { title: 'r' } },
+          { id: 'e9', patch: { title: 'r' } },
+        ],
+        deletes: ['e2'],
+      },
+      schemas
+    );
+
+    expect(result.failed).toHaveLength(3);
+    // Insert 0 failed (reverted), insert 1 confirmed with the only real id
+    expect(state.rejectOptimistic).toHaveBeenCalledTimes(1);
+    expect(state.confirmOptimistic).toHaveBeenCalledTimes(1);
+    expect(state.confirmOptimistic).toHaveBeenCalledWith(
+      'events',
+      expect.stringMatching(/^temp_/),
+      'real-2',
+      { title: 'B' }
+    );
+    expect(state.confirmUpdate).toHaveBeenCalledWith('events', 'e1');
+    expect(state.confirmUpdate).not.toHaveBeenCalledWith('events', 'e9');
+    expect(state.rejectUpdate).toHaveBeenCalledWith('events', 'e9');
+    expect(state.rejectUpdate).not.toHaveBeenCalledWith('events', 'e1');
+    expect(state.rejectDelete).toHaveBeenCalledWith('events', 'e2');
+    expect(toastMock).toHaveBeenCalledWith('error', expect.any(String));
   });
 
   it('atomicity: adapter rejection reverts all optimistic ops atomically', async () => {
