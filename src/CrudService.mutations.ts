@@ -15,7 +15,13 @@
 
 import { toast } from '@donotdev/components';
 import type { CrudCreateInput, dndevSchema } from '@donotdev/core';
-import { generateUUID, getI18nInstance, handleError } from '@donotdev/core';
+import {
+  generateUUID,
+  getI18nInstance,
+  handleError,
+  prepareCreate,
+  prepareUpdate,
+} from '@donotdev/core';
 
 import {
   checkUniquenessFromCache,
@@ -25,6 +31,7 @@ import {
 import {
   assertCanAccess,
   auditCrud,
+  decryptPiiRow,
   ensureAdapter,
   getEntityName,
   getPiiFields,
@@ -33,6 +40,7 @@ import {
   shouldShowSuccessToast,
   withResilience,
 } from './CrudService.internal';
+import { entitySchemasOf, storedRowsFor, writtenOf } from './CrudService.writeRules';
 import { CRUD_OPERATION } from './types';
 import type { CrudServiceInternal, MutationOptions } from './types';
 
@@ -40,10 +48,18 @@ export async function setImpl<T>(
   self: CrudServiceInternal,
   collection: string,
   id: string,
-  data: T,
-  schema: dndevSchema<T>,
+  input: T,
+  _schema: dndevSchema<T>,
   options?: MutationOptions
-): Promise<void> {
+): Promise<Record<string, unknown>> {
+  // CRUD create rules (core/schemas crud/create) on the entity's schemas: a full write is
+  // validated like a create. The caller's schema is not used: the rules pick it.
+  const schemas = entitySchemasOf(collection);
+  const prepared = prepareCreate(schemas, input as Record<string, unknown>);
+  // why: the entity's schemas are built at runtime (dndevSchema<unknown>); the adapter API carries the caller's row type T
+  const schema = schemas[prepared.schemaKey] as dndevSchema<T>;
+  const data = writtenOf(prepared, collection, 'set') as T;
+
   // Auto-initialize with Firestore if not already initialized
   await ensureAdapter(self);
 
@@ -85,15 +101,25 @@ export async function setImpl<T>(
         : data;
 
     const adapter = self.adapter;
-    await runSerializedMutation(self, collection, id, async () => {
-      await withResilience(() =>
-        adapter.set<T>(collection, id, payload, schema)
-      );
-    });
+    const written = await runSerializedMutation(self, collection, id, () =>
+      withResilience(() =>
+        adapter.set<T>(collection, id, payload, schema, {
+          readSchema: options?.readSchema,
+        })
+      )
+    );
+    // What the backend stored (its own values included), PII decrypted like a read.
+    const stored = decryptPiiRow(self, schema, written);
 
     // Update TanStack Query caches FIRST (before removing optimistic flag)
     // Use SET (full replacement) — not UPDATE (partial merge)
-    updateListCaches(self, collection, id, data, CRUD_OPERATION.SET);
+    updateListCaches(
+      self,
+      collection,
+      id,
+      { ...(data as Record<string, unknown>), ...stored, id } as T,
+      CRUD_OPERATION.SET
+    );
 
     // Then confirm optimistic (removes the flag)
     if (self.store) {
@@ -111,6 +137,7 @@ export async function setImpl<T>(
         i18n.t('messages.updateSuccess', { ns: 'crud', entity: entityName })
       );
     }
+    return stored;
   } catch (error) {
     // Rollback: restore original data to cache (full replacement, matching SET semantics)
     if (previousData) {
@@ -155,12 +182,22 @@ export async function updateImpl<T>(
   self: CrudServiceInternal,
   collection: string,
   id: string,
-  data: Partial<T>,
-  schema?: dndevSchema<T>,
+  patch: Partial<T>,
+  _schema?: dndevSchema<T>,
   options?: MutationOptions
-): Promise<void> {
+): Promise<Record<string, unknown>> {
   // Auto-initialize with Firestore if not already initialized
   await ensureAdapter(self);
+
+  // CRUD update rules (core/schemas crud/update) on the entity's schemas and the stored
+  // row (cache, else read). The caller's schema is not used: the rules pick it.
+  const schemas = entitySchemasOf(collection);
+  const patchRecord = patch as Record<string, unknown>;
+  const storedRows = await storedRowsFor(self, collection, [{ id, patch: patchRecord }], schemas.get);
+  const prepared = prepareUpdate(schemas, { id, patch: patchRecord, stored: storedRows.get(id) });
+  // why: the entity's schemas are built at runtime (dndevSchema<unknown>); the adapter API carries the caller's row type T
+  const schema = schemas[prepared.schemaKey] as dndevSchema<T>;
+  const data = writtenOf(prepared, collection, 'update') as Partial<T>;
 
   if (self.store) {
     self.store.getState().setLoading(collection, true);
@@ -190,11 +227,7 @@ export async function updateImpl<T>(
     if (!self.adapter) {
       throw new Error('Adapter not initialized');
     }
-    if (schema) {
-      assertCanAccess(self.adapter, collection, schema);
-      // No full-schema validation here — update payloads are partial by definition.
-      // The adapter validates field-level constraints on the fields it receives.
-    }
+    assertCanAccess(self.adapter, collection, schema);
 
     // SOC2: rate limit write, encrypt PII fields
     if (self.security) {
@@ -203,7 +236,7 @@ export async function updateImpl<T>(
         'write'
       );
     }
-    const piiFields = schema ? getPiiFields(schema) : [];
+    const piiFields = getPiiFields(schema);
     const payload =
       piiFields.length > 0 && self.security
         ? (self.security.encryptPii(
@@ -213,16 +246,23 @@ export async function updateImpl<T>(
         : data;
 
     const adapter = self.adapter;
-    await runSerializedMutation(self, collection, id, async () => {
-      await withResilience(() => adapter.update<T>(collection, id, payload));
-    });
+    const written = await runSerializedMutation(self, collection, id, () =>
+      withResilience(() =>
+        adapter.update<T>(collection, id, payload, {
+          readSchema: options?.readSchema,
+        })
+      )
+    );
+    // What the backend stored (its own values included), PII decrypted like a read.
+    const stored = decryptPiiRow(self, schema, written);
 
-    // Update TanStack Query caches FIRST (before removing optimistic flag)
+    // Update TanStack Query caches FIRST (before removing optimistic flag):
+    // the stored values over the optimistic merge.
     updateListCaches(
       self,
       collection,
       id,
-      mergedData as T,
+      { ...mergedData, ...stored } as T,
       CRUD_OPERATION.UPDATE
     );
 
@@ -242,6 +282,7 @@ export async function updateImpl<T>(
         i18n.t('messages.updateSuccess', { ns: 'crud', entity: entityName })
       );
     }
+    return stored;
   } catch (error) {
     // Rollback: restore original data to cache
     if (previousData) {
@@ -386,10 +427,18 @@ export async function deleteImpl(
 export async function addImpl<T extends Record<string, unknown>>(
   self: CrudServiceInternal,
   collection: string,
-  data: CrudCreateInput<T>,
-  schema: dndevSchema<T>,
+  input: CrudCreateInput<T>,
+  _schema: dndevSchema<T>,
   options?: MutationOptions
 ): Promise<string> {
+  // CRUD create rules (core/schemas crud/create) on the entity's schemas: status (default
+  // `available`), schema, parse. The caller's schema is not used: the rules pick it.
+  const schemas = entitySchemasOf(collection);
+  const prepared = prepareCreate(schemas, input as Record<string, unknown>);
+  // why: the entity's schemas are built at runtime (dndevSchema<unknown>); the adapter API carries the caller's row type T
+  const schema = schemas[prepared.schemaKey] as dndevSchema<T>;
+  const data = writtenOf(prepared, collection, 'add') as CrudCreateInput<T>;
+
   // Auto-initialize with Firestore if not already initialized
   await ensureAdapter(self);
 
@@ -438,16 +487,11 @@ export async function addImpl<T extends Record<string, unknown>>(
           ) as T)
         : data;
 
-    // Create flows start as drafts unless the caller explicitly publishes.
-    // Form flows usually inject this already, but programmatic add() can omit status.
-    const record = payload as Record<string, unknown>;
-    if (record.status === undefined || record.status === null) {
-      record.status = 'draft';
-    }
-
     const adapter = self.adapter;
     const addResult = await withResilience(() =>
-      adapter.add<T>(collection, payload as T, schema)
+      adapter.add<T>(collection, payload as T, schema, {
+        readSchema: options?.readSchema,
+      })
     );
     const realId = addResult.id;
     // Use server-returned data for cache (correct for findOrCreate)

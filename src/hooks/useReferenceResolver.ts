@@ -14,6 +14,7 @@
 
 import { useMemo } from 'react';
 
+import { describeEntity } from '@donotdev/core';
 import type { AnyEntity } from '@donotdev/core';
 
 import { buildReferenceLabel } from '../components/controlled/select/ControlledReferenceField';
@@ -32,15 +33,22 @@ interface ReferenceFieldInfo {
   displayField?: string;
 }
 
+/** Referenced collections one entity resolves (hooks must be called unconditionally: one slot each). */
+const MAX_REFERENCED_COLLECTIONS = 4;
+
 /**
- * Scan entity fields and collect unique referenced collections with their label config.
+ * Scan entity fields and collect unique referenced collections with their label
+ * config: fields whose descriptor value is a reference (`value.kind === 'ref'`: any
+ * type with `validation.reference`, custom ones included). Throws beyond
+ * {@link MAX_REFERENCED_COLLECTIONS} collections (a fifth would silently show raw ids).
  */
 function collectReferenceFields(entity: AnyEntity): ReferenceFieldInfo[] {
   const seen = new Map<string, ReferenceFieldInfo>();
+  const { fields } = describeEntity(entity);
 
-  for (const field of Object.values(entity.fields)) {
-    const collection = field.validation?.reference;
-    if (typeof collection === 'string' && !seen.has(collection)) {
+  for (const [name, field] of Object.entries(entity.fields)) {
+    const collection = fields[name]?.value.ref;
+    if (collection !== undefined && !seen.has(collection)) {
       const fieldSpecific = field.options?.fieldSpecific as
         | { labelFields?: string[]; displayField?: string }
         | undefined;
@@ -53,6 +61,12 @@ function collectReferenceFields(entity: AnyEntity): ReferenceFieldInfo[] {
     }
   }
 
+  if (seen.size > MAX_REFERENCED_COLLECTIONS) {
+    throw new Error(
+      `useReferenceResolver: entity "${entity.name}" references ${seen.size} collections (${[...seen.keys()].join(', ')}); at most ${MAX_REFERENCED_COLLECTIONS} are resolved.`
+    );
+  }
+
   return Array.from(seen.values());
 }
 
@@ -61,10 +75,13 @@ function collectReferenceFields(entity: AnyEntity): ReferenceFieldInfo[] {
  *
  * Supports up to 4 unique referenced collections. Each collection is fetched via useCrudList.
  * Because hooks must be called unconditionally, we always call all 4 useCrudList slots
- * and disable unused ones.
+ * and disable unused ones. Reference fields come from the entity descriptor
+ * (`value.kind === 'ref'`).
  *
  * @param entity - The entity whose reference fields to resolve
+ * @param enabled - Fetch the referenced collections (default `true`)
  * @returns ReferenceData lookup map
+ * @throws When the entity references more than 4 collections
  */
 export function useReferenceResolver(
   entity: AnyEntity,

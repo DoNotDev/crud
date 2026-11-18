@@ -8,6 +8,7 @@ import type { FieldValues, Path } from 'react-hook-form';
 
 import { translateLabel } from '../../../forms/utils';
 import { MultiDropdownComponent } from '../../form/fields';
+import { fieldInfo } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -92,6 +93,7 @@ export function ControlledMultiDropdownField(
           <MultiDropdownComponent
             {...field}
             label={t(label)}
+            info={fieldInfo(fieldConfig, t)}
             value={Array.isArray(field.value) ? field.value : []}
             onChange={handleChange}
             onBlur={field.onBlur}

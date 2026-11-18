@@ -16,7 +16,6 @@ import { getFieldRegistry } from './FieldRegistry';
 import type { FieldTypeMetadata } from './fieldTypeRegistry.types';
 import type { DisplayFormatter } from './fieldTypeRegistry.types';
 import type { FilterType } from './fieldTypeRegistry.types';
-import type { ValueType } from './fieldTypeRegistry.types';
 
 // --- Storage (globalThis-backed to survive chunk splits) ---
 
@@ -77,10 +76,6 @@ export function getDisplayFormatter(
 export function isFilterable(type: string): boolean {
   if (getFieldRegistry().isFilterable(type)) return true;
   return getMetadataRegistry().get(type)?.filterable ?? false;
-}
-
-export function getValueType(type: string): ValueType | undefined {
-  return getMetadataRegistry().get(type)?.valueType;
 }
 
 export function clearFieldTypeRegistry(): void {

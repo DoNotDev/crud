@@ -21,6 +21,8 @@ export interface TextFieldComponentProps extends Omit<
 > {
   /** Field label */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Current value */
   value?: string;
   /** Change handler */
@@ -69,6 +71,7 @@ export interface TextFieldComponentProps extends Omit<
  */
 function TextFieldComponent({
   label,
+  info,
   value = '',
   onChange,
   error,
@@ -106,6 +109,7 @@ function TextFieldComponent({
         value={value}
         onChange={onChange}
         label={label}
+        info={info}
         disabled={disabled || loading}
         maxLength={maxLength}
         required={required}

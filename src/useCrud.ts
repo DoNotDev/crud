@@ -15,6 +15,7 @@ import { useEffect, useMemo, useCallback } from 'react';
 
 import {
   useFeatureConsent,
+  AtomicBulkError,
   FRAMEWORK_FEATURES,
   FEATURE_STATUS,
   handleError,
@@ -26,6 +27,7 @@ import {
 import type {
   AnyEntity,
   BulkAcrossBatch,
+  BulkAcrossOptions,
   BulkAcrossResult,
   BulkOperations,
   BulkResult,
@@ -142,9 +144,11 @@ export interface UseCrudReturn<
   ) => Promise<BulkResult>;
 
   /**
-   * Cross-collection atomic bulk write. Does NOT require the hook's own entity
-   * to be one of the collections. Each batch carries its own schemas.
-   * One optimistic pass, writes in topological order, one toast, coordinated rollback.
+   * Ordered cross-collection bulk write, NOT a database transaction. Does NOT
+   * require the hook's own entity to be one of the collections. Each batch
+   * carries its own schemas. One optimistic pass, writes in topological waves.
+   * Failure stops subsequent waves after all started writes settle, reverts
+   * optimistic state, then refetches. Committed rows survive; the call rejects.
    *
    * @example
    * ```tsx
@@ -158,7 +162,7 @@ export interface UseCrudReturn<
    */
   bulkAcross: (
     batches: BulkAcrossBatch[],
-    options?: MutationOptions
+    options?: BulkAcrossOptions
   ) => Promise<BulkAcrossResult>;
 
   // --- Internal getters for child hooks (useCrudList, useCrudCardList) ---
@@ -400,25 +404,24 @@ export function useCrud<
     [collection, schemas ? 'hasSchema' : 'noSchema', cacheOptions]
   );
 
+  // The CRUD rules (core/schemas crud/) run in the service, on the entity's schemas.
+  // why: `schemas` is built per collection at runtime (dndevSchema<unknown>); the service API re-attaches the caller's row type T
+  const writeSchemas = schemas as { create: dndevSchema<T>; update: dndevSchema<T>; get: dndevSchema<T> } | undefined;
+
   const set = useCallback(
     async (
       id: string,
       setData: T,
       options?: MutationOptions
-    ): Promise<void> => {
+    ): Promise<Record<string, unknown> | undefined> => {
       const service = getCrudServiceInstance();
-      if (!service || !schemas) return;
+      if (!service || !writeSchemas) return undefined;
       // Inject scope for multi-tenancy
       const scopedData = injectScope(setData, scope);
-      const isDraft = scopedData?.status === 'draft';
-      const schemaToUse = isDraft ? schemas.draft : schemas.create;
-      await service.set(
-        collection,
-        id,
-        scopedData,
-        schemaToUse as dndevSchema<T>,
-        options
-      );
+      return service.set(collection, id, scopedData, writeSchemas.create, {
+        ...options,
+        readSchema: writeSchemas.get,
+      });
     },
     [collection, schemas ? 'hasSchema' : 'noSchema', scope?.provider]
   );
@@ -428,16 +431,22 @@ export function useCrud<
       id: string,
       updateData: Partial<T>,
       options?: MutationOptions
-    ): Promise<void> => {
+    ): Promise<Record<string, unknown> | undefined> => {
       const service = getCrudServiceInstance();
-      if (!service) return;
-      await service.update(
-        collection,
-        id,
-        updateData,
-        schemas?.update as dndevSchema<T> | undefined,
-        options
-      );
+      if (!service || !writeSchemas) return undefined;
+      return service.update(collection, id, updateData, writeSchemas.update, {
+        ...options,
+        readSchema: writeSchemas.get,
+      });
+    },
+    [collection, schemas]
+  );
+
+  const remove = useCallback(
+    async (id: string): Promise<void> => {
+      const service = getCrudServiceInstance();
+      if (!service || !writeSchemas) return;
+      await service.remove(collection, id);
     },
     [collection, schemas]
   );
@@ -457,17 +466,13 @@ export function useCrud<
       options?: MutationOptions
     ): Promise<string> => {
       const service = getCrudServiceInstance();
-      if (!service || !schemas) return '';
+      if (!service || !writeSchemas) return '';
       // Inject scope for multi-tenancy
       const scopedData = injectScope(addData, scope);
-      const isDraft = scopedData?.status === 'draft';
-      const schemaToUse = isDraft ? schemas.draft : schemas.create;
-      return service.add(
-        collection,
-        scopedData,
-        schemaToUse as dndevSchema<T>,
-        options
-      );
+      return service.add(collection, scopedData, writeSchemas.create, {
+        ...options,
+        readSchema: writeSchemas.get,
+      });
     },
     [collection, schemas ? 'hasSchema' : 'noSchema', scope?.provider]
   );
@@ -475,10 +480,15 @@ export function useCrud<
   const bulkAcrossFn = useCallback(
     async (
       batches: BulkAcrossBatch[],
-      options?: MutationOptions
+      options?: BulkAcrossOptions
     ): Promise<BulkAcrossResult> => {
       const service = getCrudServiceInstance();
-      if (!service) return { results: {} };
+      if (!service) {
+        if (options?.execution === 'atomic') {
+          throw new AtomicBulkError('CRUD service is unavailable', 'not-committed');
+        }
+        return { results: {} };
+      }
       return service.bulkAcross(batches, options);
     },
     [] // batches carry their own schemas — no hook-level deps
@@ -627,6 +637,7 @@ export function useCrud<
     get,
     set,
     update,
+    remove,
     delete: deleteDoc,
     add: addFn,
     bulk: bulkFn,

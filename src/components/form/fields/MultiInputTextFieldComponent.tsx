@@ -19,6 +19,8 @@ import { useTranslation } from '@donotdev/core';
 export interface MultiInputTextFieldComponentProps {
   /** Label for the input field */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Array of current text entries */
   value: string[];
   /** Handler for value changes - accepts both event and direct value */
@@ -31,7 +33,7 @@ export interface MultiInputTextFieldComponentProps {
 
 const MultiInputTextFieldComponent: ComponentType<
   MultiInputTextFieldComponentProps
-> = ({ label, value = [], onChange, className, required }) => {
+> = ({ label, info, value = [], onChange, className, required }) => {
   const { t } = useTranslation('crud');
   const [inputValue, setInputValue] = useState('');
 
@@ -61,6 +63,7 @@ const MultiInputTextFieldComponent: ComponentType<
       <Stack direction="row" align="end">
         <Input
           label={label}
+          info={info}
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}

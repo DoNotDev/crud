@@ -429,7 +429,7 @@ const DocumentFieldComponent = forwardRef<
                         <Progress
                           value={docData.progress || 0}
                           max={100}
-                          style={{ marginTop: 'var(--gap-xs)' }}
+                          style={{ marginTop: 'var(--gap-sm)' }}
                         />
                       )}
                     </Stack>
@@ -473,7 +473,7 @@ const DocumentFieldComponent = forwardRef<
             <Text
               level="caption"
               variant={error ? 'destructive' : 'muted'}
-              style={{ marginTop: 'var(--gap-xs)' }}
+              style={{ marginTop: 'var(--gap-sm)' }}
             >
               {helperText}
             </Text>

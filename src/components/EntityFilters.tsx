@@ -53,7 +53,7 @@ import {
   Text,
 } from '@donotdev/components';
 import type { GridCols } from '@donotdev/components';
-import type { AnyEntity } from '@donotdev/core';
+import type { AnyEntity, EntityField } from '@donotdev/core';
 import {
   useTranslation,
   handleError,
@@ -66,6 +66,7 @@ import { YearFilter } from './YearFilter';
 import { getFilterType, isFilterable } from '../fieldTypeRegistry';
 import { translateFieldLabel, translateLabel } from '../forms/utils';
 import { useCrudFilters } from '../hooks/useCrudFilters';
+import { useReferenceResolver } from '../hooks/useReferenceResolver';
 import type { FilterState } from '../types';
 import { useCrudCardList } from '../useCrudCardList';
 import { matchesFilter } from '../utils/matchesFilter';
@@ -73,12 +74,72 @@ import { matchesFilter } from '../utils/matchesFilter';
 // Re-export for backward compatibility
 export { matchesFilter } from '../utils/matchesFilter';
 
+/** Narrowest inline filter column: labels and values stay readable. */
+const FILTER_TRACK_MIN = '14rem';
+
+/** As many columns of at least {@link FILTER_TRACK_MIN} as fit, at most 2 (mobile, tablet). */
+const FILTER_COLS_UP_TO_2 = `repeat(auto-fit, minmax(max(min(100%, ${FILTER_TRACK_MIN}), calc((100% - var(--gap-md)) / 2)), 1fr))`;
+
+/** As many columns of at least {@link FILTER_TRACK_MIN} as fit (laptop, desktop). */
+const FILTER_COLS_ALL = `repeat(auto-fit, minmax(min(100%, ${FILTER_TRACK_MIN}), 1fr))`;
+
 /**
  * Inline filter columns: sized by the panel's width, so a select never gets
- * narrower than 14rem (labels and values stay readable) whatever the viewport
- * and the sidebar take. Range filters span two tracks.
+ * narrower than 14rem whatever the viewport and the sidebar take; `auto-fit`
+ * collapses empty columns so the filters fill the row. Range filters span two tracks.
  */
-const INLINE_FILTER_COLS = 'repeat(auto-fill, minmax(min(100%, 14rem), 1fr))';
+const INLINE_FILTER_COLS: GridCols = [
+  FILTER_COLS_UP_TO_2,
+  FILTER_COLS_UP_TO_2,
+  FILTER_COLS_ALL,
+  FILTER_COLS_ALL,
+];
+
+/** Inline clear button: its own width beside the filters, the whole line once wrapped below them. */
+const INLINE_CLEAR_BUTTON_STYLE = { flex: '1 1 auto' } as const;
+
+/** Value of the single-select "any" option (never a stored option value). */
+const ANY_OPTION_VALUE = '__dndev_filter_any__';
+
+/** Option `{ value, label }` of a select / multiselect field (`validation.options`). */
+type FieldOption = { value: string; label: string };
+
+/** The field's declared options (`validation.options`, array or function). */
+function declaredOptionsOf(fieldConfig: EntityField): FieldOption[] {
+  const validation = fieldConfig.validation as
+    | {
+        options?:
+          | ReadonlyArray<FieldOption | string>
+          | (() => ReadonlyArray<FieldOption | string>);
+      }
+    | undefined;
+  const raw =
+    typeof validation?.options === 'function'
+      ? validation.options()
+      : (validation?.options ?? []);
+  return raw.map((opt) =>
+    typeof opt === 'string' ? { value: opt, label: opt } : opt
+  );
+}
+
+/**
+ * Stored values a row's field contributes to option counts: each item of an array
+ * value, the formatted address of an address, else the value itself.
+ */
+function filterValuesOf(value: unknown, isAddress: boolean): string[] {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => item !== null && item !== undefined)
+      .map(String);
+  }
+  if (isAddress && typeof value === 'object' && 'formatted_address' in value) {
+    const address = (value as { formatted_address?: string })
+      .formatted_address;
+    return address ? [String(address)] : [];
+  }
+  return [String(value)];
+}
 
 /** Props for {@link EntityFilters}, auto-generates filter UI based on entity field types. */
 export interface EntityFiltersProps<
@@ -98,7 +159,9 @@ export interface EntityFiltersProps<
 
   /**
    * Override grid columns. Default for inline: as many columns of at least 14rem
-   * as the container fits (the filter panel's own width, not the viewport); 1 for sidebar.
+   * as the container fits (the filter panel's own width, not the viewport), at most
+   * 2 below laptop; 1 for sidebar. Inline, the clear button sits beside the filters
+   * when they all fit on one row, else on its own full-width line below.
    */
   cols?: GridCols;
 
@@ -106,6 +169,19 @@ export interface EntityFiltersProps<
   data?: T[];
   /** Current viewer role — defaults to 'guest'. Fields with visibility above this role are hidden. */
   viewerRole?: string;
+  /**
+   * Key of the filter state in CrudStore (read it with `useCrudFilters({ collection: filterKey })`).
+   * Default: the entity's collection, shared with the lists of that collection.
+   * Give a separate key to filters that must not affect them (e.g. a picker dialog).
+   * @since 0.2.5
+   */
+  filterKey?: string;
+  /**
+   * Sync the filter state with the URL (`f_<field>` params). Default: on for the
+   * entity's collection key, off with a `filterKey` (see `useCrudFilters` `urlSync`).
+   * @since 0.3.0
+   */
+  urlSync?: boolean;
 }
 
 /**
@@ -116,7 +192,10 @@ export interface EntityFiltersProps<
 
  * Features:
 
- * - String/Select fields: Combobox with unique values
+ * - Select/radio/multiselect/reference fields: multi-select Combobox (exact match,
+ *   OR within the field; reference options labelled like list cells; a field's
+ *   `filter.wildcard` value is never offered and matches every option)
+ * - Text fields: Combobox with the unique values (substring match)
 
  * - Number fields: Min/Max inputs + Slider (2 rows)
 
@@ -124,7 +203,8 @@ export interface EntityFiltersProps<
 
  * - Filters wrap naturally with flex-wrap
 
- * - Clear individual filters or all filters
+ * - Clear individual filters (chips with option labels) or all filters
+ * - URL sync of the entity collection's state (`urlSync`, CRUD.md "Filters")
 
  */
 
@@ -140,13 +220,15 @@ export function EntityFilters<
   variant = 'inline',
   cols,
   viewerRole = 'guest',
+  filterKey,
+  urlSync,
 }: EntityFiltersProps<T>) {
   const isSidebar = variant === 'sidebar';
 
   const { t: tCrud, i18n } = useTranslation('crud');
 
   // Entity + crud namespaces so translateLabel can resolve crud:status.* etc.
-  const { t } = useTranslation(entity.namespace);
+  const { t } = useTranslation([entity.namespace, 'crud']);
 
   // Get current locale for date formatting
   const locale = i18n?.language || 'en';
@@ -162,7 +244,9 @@ export function EntityFilters<
 
   // Get filters from CrudStore (self-contained like EntityFormRenderer/EntityDisplayRenderer)
   const { filters, setFilters } = useCrudFilters({
-    collection: entity.collection,
+    collection: filterKey ?? entity.collection,
+    urlSync,
+    entity,
   });
 
   // Draft state for range text inputs — decoupled from store for debounced writes
@@ -225,6 +309,33 @@ export function EntityFilters<
     });
   }, [fieldsToFilter, entity.listFields, entity.fields, viewerRole]);
 
+  // Reference filters: labels of the referenced documents (same lookup as list cells)
+  const hasReferenceFilter = fieldsToShow.some(
+    (fieldName) =>
+      getFilterType(entity.fields[fieldName]?.type || 'text') === 'reference'
+  );
+  const referenceData = useReferenceResolver(entity, hasReferenceFilter);
+
+  /**
+   * Display label of a stored filter value: the translated option label (select,
+   * multiselect), the referenced document's label (reference, raw id until resolved
+   * or when the document is unknown, as in list cells), else the value.
+   */
+  const optionLabel = (fieldConfig: EntityField, value: string): string => {
+    if (getFilterType(fieldConfig.type || 'text') === 'reference') {
+      const collection = fieldConfig.validation?.reference;
+      return (
+        (typeof collection === 'string'
+          ? referenceData[collection]?.[value]
+          : undefined) ?? value
+      );
+    }
+    const option = declaredOptionsOf(fieldConfig).find(
+      (opt) => opt.value === value
+    );
+    return option ? translateLabel(option.label, t) : value;
+  };
+
   // Pre-compute filtered datasets for each field (excluding that field from filters)
 
   // This memoizes the actual results, not just the function
@@ -254,7 +365,12 @@ export function EntityFilters<
 
             const fieldType = fieldConfig?.type || 'text';
 
-            return matchesFilter(itemValue, filterValue, fieldType);
+            return matchesFilter(
+              itemValue,
+              filterValue,
+              fieldType,
+              fieldConfig?.filter
+            );
           }
         );
       });
@@ -479,6 +595,8 @@ export function EntityFilters<
 
       const isMultiSelect = filterType === 'multiselect';
 
+      const isReference = filterType === 'reference';
+
       const filterValue = filters[fieldName];
 
       const isRangeFilter =
@@ -550,8 +668,8 @@ export function EntityFilters<
             <RangeInput
               type="number"
               label={label}
-              minPlaceholder={tCrud('filter.min', { defaultValue: 'Min' })}
-              maxPlaceholder={tCrud('filter.max', { defaultValue: 'Max' })}
+              minPlaceholder={tCrud('filter.min')}
+              maxPlaceholder={tCrud('filter.max')}
               minValue={draftRanges[fieldName]?.min ?? rangeFilter.min ?? ''}
               maxValue={draftRanges[fieldName]?.max ?? rangeFilter.max ?? ''}
               actualMin={sliderMin}
@@ -691,66 +809,43 @@ export function EntityFilters<
         );
       }
 
-      // String/Select: Combobox (1 row) with FloatingLabel
+      // String/Select/Reference: Combobox (1 row) with FloatingLabel
 
-      // Get all options from entity definition
-
-      const hasOptions =
-        (isSelect || isMultiSelect) &&
-        fieldConfig.validation &&
-        'options' in fieldConfig.validation;
+      // Declared options (select, multiselect); the wildcard is never a choice
+      const wildcard = fieldConfig.filter?.wildcard;
 
       const selectEntityOptions =
-        hasOptions && fieldConfig.validation
-          ? Array.isArray(fieldConfig.validation.options)
-            ? fieldConfig.validation.options
-            : typeof fieldConfig.validation.options === 'function'
-              ? fieldConfig.validation.options()
-              : []
+        isSelect || isMultiSelect
+          ? declaredOptionsOf(fieldConfig).filter(
+              (opt) => opt.value !== wildcard
+            )
           : [];
 
-      // Get available values from pre-computed filtered data (excluding current field)
+      // Faceted counts from the rows matching the other filters, per stored value
+      // (array values: per item). A row holding the wildcard counts for every option.
 
       const filteredDataExcludingField =
         filteredDataPerField[fieldName] || data;
 
-      const availableValues = new Set<string>();
-
       const isAddress = filterType === 'address';
 
-      filteredDataExcludingField.forEach((item) => {
-        const val = item[fieldName];
-
-        if (val !== null && val !== undefined) {
-          if (
-            isAddress &&
-            typeof val === 'object' &&
-            'formatted_address' in val
-          ) {
-            const addr = val as { formatted_address?: string };
-            if (addr.formatted_address) {
-              availableValues.add(String(addr.formatted_address));
-            }
-          } else {
-            availableValues.add(String(val));
-          }
-        }
-      });
-
-      // Compute faceted counts per option value
       const valueCounts = new Map<string, number>();
+
+      let wildcardCount = 0;
+
       filteredDataExcludingField.forEach((item) => {
-        const val = item[fieldName];
-        if (val !== null && val !== undefined) {
-          const key =
-            isAddress && typeof val === 'object' && 'formatted_address' in val
-              ? String(
-                  (val as { formatted_address?: string }).formatted_address
-                )
-              : String(val);
-          valueCounts.set(key, (valueCounts.get(key) || 0) + 1);
+        const values = new Set(filterValuesOf(item[fieldName], isAddress));
+        if (wildcard !== undefined && values.has(wildcard)) {
+          wildcardCount += 1;
+          return;
         }
+        values.forEach((value) =>
+          valueCounts.set(value, (valueCounts.get(value) ?? 0) + 1)
+        );
       });
+
+      const countOf = (value: string) =>
+        (valueCounts.get(value) ?? 0) + wildcardCount;
 
       // Build options: show all from entity definition, disable ones not in filtered data
 
@@ -766,93 +861,61 @@ export function EntityFilters<
         count?: number;
       }> = [
         {
-          value: 'all',
+          value: ANY_OPTION_VALUE,
 
-          label: tCrud('filter.selectPlaceholder', { defaultValue: 'All' }),
+          label: tCrud('filter.selectPlaceholder'),
 
           count: filteredDataExcludingField.length,
         },
       ];
 
       if (selectEntityOptions.length > 0) {
-        // Separate available and disabled options
+        const translated = selectEntityOptions.map((opt) => ({
+          value: opt.value,
+          label: translateLabel(opt.label, t),
+          count: countOf(opt.value),
+        }));
 
-        const available: Array<{ value: string; label: string }> = [];
+        const byLabel = (a: { label: string }, b: { label: string }) =>
+          a.label.localeCompare(b.label);
 
-        const disabled: Array<{ value: string; label: string }> = [];
+        // Available options first, then disabled ones, each sorted by label
+        translated
+          .filter((opt) => opt.count > 0)
+          .sort(byLabel)
+          .forEach((opt) => options.push({ ...opt, disabled: false }));
 
-        selectEntityOptions.forEach(
-          (opt: { value: string; label: string } | string) => {
-            const value = typeof opt === 'string' ? opt : opt.value;
-
-            const label = typeof opt === 'string' ? opt : opt.label;
-
-            const isAvailable = availableValues.has(value);
-
-            if (isAvailable) {
-              available.push({ value, label });
-            } else {
-              disabled.push({ value, label });
-            }
-          }
-        );
-
-        // Sort each group alphabetically by label
-
-        available.sort((a, b) => a.label.localeCompare(b.label));
-
-        disabled.sort((a, b) => a.label.localeCompare(b.label));
-
-        // Add available options first (not disabled) - translate labels
-
-        available.forEach((opt) => {
-          options.push({
-            value: opt.value,
-
-            label: translateLabel(opt.label, t),
-
-            disabled: false,
-
-            count: valueCounts.get(opt.value) ?? 0,
-          });
-        });
-
-        // Then add disabled options - translate labels
-
-        disabled.forEach((opt) => {
-          options.push({
-            value: opt.value,
-
-            label: translateLabel(opt.label, t),
-
-            disabled: true,
-
-            count: 0,
-          });
-        });
+        translated
+          .filter((opt) => opt.count === 0)
+          .sort(byLabel)
+          .forEach((opt) => options.push({ ...opt, disabled: true }));
       } else {
-        // Fallback: use unique values from data (no entity options defined)
-
-        Array.from(availableValues)
-
-          .sort()
-
+        // No declared options: the values present in the data (references: labelled)
+        Array.from(valueCounts.keys())
+          .filter((value) => value !== wildcard)
+          .map((value) => ({
+            value,
+            label: isReference ? optionLabel(fieldConfig, value) : value,
+            count: countOf(value),
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label))
           .slice(0, 100) // Limit to 100 options
-
-          .forEach((val) => {
-            options.push({
-              value: val,
-              label: val,
-              count: valueCounts.get(val) ?? 0,
-            });
-          });
+          .forEach((opt) => options.push(opt));
       }
 
-      // Multiselect: Combobox with multiple mode, array values
-      if (isMultiSelect) {
-        // Remove "all" option for multiselect - doesn't make sense with checkboxes
-        const multiOptions = options.filter((o) => o.value !== 'all');
-        const selectedValues = Array.isArray(filterValue) ? filterValue : [];
+      // Select / radio / multiselect / reference: several values (OR within the
+      // field, exact per value); the state is an array. A string state (set by code)
+      // reads as one selected value.
+      if (isSelect || isMultiSelect || isReference) {
+        // No "any" option: an empty selection is "any"
+        const multiOptions = options.filter(
+          (o) => o.value !== ANY_OPTION_VALUE
+        );
+        const selectedValues = Array.isArray(filterValue)
+          ? filterValue
+          : typeof filterValue === 'string' && filterValue !== ''
+            ? [filterValue]
+            : [];
 
         return (
           <div
@@ -866,21 +929,25 @@ export function EntityFilters<
               label={label}
               value={selectedValues}
               onValueChange={(value) => {
-                const arr = Array.isArray(value) ? value : [value];
+                const arr = (Array.isArray(value) ? value : [value]).filter(
+                  (v): v is string => typeof v === 'string' && v !== ''
+                );
                 handleFilterChange(fieldName, arr.length > 0 ? arr : undefined);
               }}
               options={multiOptions}
-              placeholder={tCrud('filter.placeholder', {
-                defaultValue: 'Filter...',
+              placeholder={tCrud('filter.placeholder')}
+              selectedLabel={tCrud('filters.selected', {
+                count: selectedValues.length,
               })}
               multiple
               clearable
+              clearLabel={tCrud('filter.clear')}
             />
           </div>
         );
       }
 
-      // Single select / text: Combobox (1 row)
+      // Text / address: one value among those in the data (substring match)
       return (
         <div
           key={fieldName}
@@ -896,14 +963,13 @@ export function EntityFilters<
               handleFilterChange(
                 fieldName,
 
-                value === 'all' || !value ? '' : String(value)
+                value === ANY_OPTION_VALUE || !value ? '' : String(value)
               );
             }}
             options={options}
-            placeholder={tCrud('filter.placeholder', {
-              defaultValue: 'Filter...',
-            })}
+            placeholder={tCrud('filter.placeholder')}
             clearable
+            clearLabel={tCrud('filter.clear')}
           />
         </div>
       );
@@ -922,13 +988,9 @@ export function EntityFilters<
     tCrud,
 
     filteredDataPerField,
+
+    referenceData,
   ]);
-
-  if (!filterElements || filterElements.length === 0) return null;
-
-  // Filter out null elements
-
-  const validFilterElements = filterElements.filter(Boolean);
 
   const hasActiveFilters = Object.keys(filters).length > 0;
 
@@ -944,16 +1006,14 @@ export function EntityFilters<
       const fieldLabel = translateFieldLabel(fieldName, fieldConfig, t);
 
       if (typeof value === 'string') {
-        // String filter
-        const displayValue =
-          fieldConfig.validation && 'options' in fieldConfig.validation
-            ? translateLabel(value, t)
-            : value;
+        // String filter: option / reference label, free text as typed
+        const displayValue = optionLabel(fieldConfig, value);
         pills.push(
           <Tag
             key={fieldName}
             size="sm"
             variant="outline"
+            removeLabel={tCrud('form.remove')}
             onRemove={() => handleFilterChange(fieldName, undefined)}
           >
             {fieldLabel}: {displayValue}
@@ -967,6 +1027,7 @@ export function EntityFilters<
               key={`${fieldName}-${i}`}
               size="sm"
               variant="outline"
+              removeLabel={tCrud('form.remove')}
               onRemove={() => {
                 const next = value.filter((_, idx) => idx !== i);
                 handleFilterChange(
@@ -975,7 +1036,7 @@ export function EntityFilters<
                 );
               }}
             >
-              {fieldLabel}: {translateLabel(v, t)}
+              {fieldLabel}: {optionLabel(fieldConfig, v)}
             </Tag>
           );
         });
@@ -992,6 +1053,7 @@ export function EntityFilters<
               key={fieldName}
               size="sm"
               variant="outline"
+              removeLabel={tCrud('form.remove')}
               onRemove={() => handleFilterChange(fieldName, undefined)}
             >
               {fieldLabel}: {displayRange}
@@ -1002,7 +1064,37 @@ export function EntityFilters<
     });
 
     return pills.length > 0 ? pills : null;
-  }, [filters, entity.fields, t, tCrud, hasActiveFilters]);
+  }, [filters, entity.fields, t, tCrud, hasActiveFilters, referenceData]);
+
+  // After every hook (rules of hooks): nothing to filter → nothing rendered
+  if (!filterElements || filterElements.length === 0) return null;
+
+  // Filter out null elements
+
+  const validFilterElements = filterElements.filter(Boolean);
+
+  const clearButton = (
+    <Button
+      variant="outline"
+      icon={<FilterX size={18} />}
+      onClick={handleClearFilters}
+      disabled={!hasActiveFilters}
+      style={isSidebar ? undefined : INLINE_CLEAR_BUTTON_STYLE}
+    >
+      {tCrud('filter.clear')}
+    </Button>
+  );
+
+  // Inline: the clear button sits beside the filters while they all fit on one
+  // row at FILTER_TRACK_MIN (grid basis = their tracks, range = 2), else wraps below
+  // and takes the whole line. The grid's large grow factor keeps the button narrow.
+  const filterTracks = fieldsToShow.reduce((tracks, fieldName) => {
+    const fieldConfig = entity.fields[fieldName];
+    if (!fieldConfig) return tracks;
+    const filterType = getFilterType(fieldConfig.type || 'text');
+    if (!filterType) return tracks;
+    return tracks + (filterType === 'range' ? 2 : 1);
+  }, 0);
 
   const content = (
     <Stack direction="column" gap="tight">
@@ -1013,23 +1105,24 @@ export function EntityFilters<
         </Stack>
       )}
 
-      <Grid cols={cols ?? (isSidebar ? 1 : INLINE_FILTER_COLS)}>
-        {validFilterElements}
-
-        <Button
-          variant="outline"
-          icon={<FilterX size={18} />}
-          onClick={handleClearFilters}
-          disabled={!hasActiveFilters}
-          style={{
-            gridColumn: '1 / -1',
-
-            gridRow: 'span 1',
-          }}
-        >
-          {tCrud('filter.clear', { defaultValue: 'Clear Filters' })}
-        </Button>
-      </Grid>
+      {isSidebar ? (
+        <Stack direction="column" gap="medium">
+          <Grid cols={cols ?? 1}>{validFilterElements}</Grid>
+          {clearButton}
+        </Stack>
+      ) : (
+        <Stack direction="row" wrap="wrap" align="end" gap="medium">
+          <Grid
+            cols={cols ?? INLINE_FILTER_COLS}
+            style={{
+              flex: `999 1 calc(${filterTracks} * ${FILTER_TRACK_MIN} + ${filterTracks - 1} * var(--gap-md))`,
+            }}
+          >
+            {validFilterElements}
+          </Grid>
+          {clearButton}
+        </Stack>
+      )}
     </Stack>
   );
 

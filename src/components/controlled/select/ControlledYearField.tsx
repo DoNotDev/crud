@@ -7,6 +7,7 @@ import { Controller } from 'react-hook-form';
 
 import { translateLabel } from '../../../forms/utils';
 import { ComboboxComponent } from '../../form/fields';
+import { fieldInfo } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -52,6 +53,7 @@ export function ControlledYearField(props: ControlledFieldProps): ReactElement {
           <ComboboxComponent
             {...field}
             label={translateLabel(label, t)}
+            info={fieldInfo(fieldConfig, t)}
             value={
               field.value !== undefined && field.value !== null
                 ? String(field.value)

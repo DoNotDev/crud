@@ -17,6 +17,8 @@ import { useTranslation } from '@donotdev/core';
 export interface DropdownComponentProps {
   /** Field label */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Current value */
   value?: string | number | boolean;
   /** Available options */
@@ -44,6 +46,7 @@ export interface DropdownComponentProps {
  */
 const DropdownComponent: ComponentType<DropdownComponentProps> = ({
   label,
+  info,
   value,
   options,
   error,
@@ -72,6 +75,7 @@ const DropdownComponent: ComponentType<DropdownComponentProps> = ({
     <Stack gap="tight">
       <Select
         label={label}
+        info={info}
         value={displayValue}
         onValueChange={handleChange}
         onOpenChange={(open) => !open && onBlur?.()}

@@ -33,7 +33,7 @@ import type {
 import {
   BulkCollisionError,
   BulkRequestSchema,
-  BulkResponseSchema,
+  validateBulkOutcome,
   detectBulkCollisions,
   DoNotDevError,
   getProvider,
@@ -123,16 +123,18 @@ export class FunctionsAdapter implements ICrudAdapter {
     id: string,
     data: T,
     schema: dndevSchema<T>
-  ): Promise<void> {
+  ): Promise<Record<string, unknown>> {
     const validated = schema
       ? validateWithSchema(schema, data, 'FunctionsAdapter.set')
       : data;
     const functionName = `update_${collectionName}`; // Use update for set (overwrite)
-    const updateFn = await this.getCallableFn<{ id: string; payload: T }, T>(
-      functionName
-    );
+    const updateFn = await this.getCallableFn<
+      { id: string; payload: T },
+      Record<string, unknown>
+    >(functionName);
     try {
-      await updateFn({ id, payload: validated });
+      // The server function returns the stored row (read back after the write).
+      return await updateFn({ id, payload: validated });
     } catch (error) {
       throw wrapCrudError(error, 'FunctionsAdapter', 'set', collectionName, id);
     }
@@ -142,14 +144,15 @@ export class FunctionsAdapter implements ICrudAdapter {
     collectionName: string,
     id: string,
     data: Partial<T>
-  ): Promise<void> {
+  ): Promise<Record<string, unknown>> {
     const functionName = `update_${collectionName}`;
     const updateFn = await this.getCallableFn<
       { id: string; payload: Partial<T> },
-      T
+      Record<string, unknown>
     >(functionName);
     try {
-      await updateFn({ id, payload: data });
+      // The server function returns the stored row (read back after the write).
+      return await updateFn({ id, payload: data });
     } catch (error) {
       throw wrapCrudError(
         error,
@@ -197,7 +200,7 @@ export class FunctionsAdapter implements ICrudAdapter {
    *      — malformed payloads fail loud locally.
    *   4. Invokes the callable via the provider registry (identical path to
    *      `add` / `update` / `delete`).
-   *   5. Validates the server reply with {@link BulkResponseSchema} — a
+   *   5. Validates the server reply with {@link validateBulkOutcome} — a
    *      malformed server response surfaces as a clean error, never as a
    *      silent zeroed result.
    *   6. Any other failure is wrapped via {@link wrapCrudError} to preserve
@@ -295,9 +298,9 @@ export class FunctionsAdapter implements ICrudAdapter {
       }
 
       // 5. Validate response. Malformed reply fails loud.
-      let validated: BulkResponse;
+      let validated: BulkResult;
       try {
-        validated = v.parse(BulkResponseSchema, result.data);
+        validated = validateBulkOutcome(body, result.data);
       } catch (parseError) {
         throw new DoNotDevError(
           `FunctionsAdapter.bulk(${collection}): malformed server response`,
@@ -319,13 +322,7 @@ export class FunctionsAdapter implements ICrudAdapter {
         );
       }
 
-      // The bulk callable commits the batch in one transaction: no per-row failures
-      return {
-        insertedIds: validated.insertedIds,
-        updatedIds: validated.updatedIds,
-        deletedIds: validated.deletedIds,
-        failed: [],
-      };
+      return validated;
     } catch (error) {
       // BulkCollisionError from upstream (shouldn't happen here, but pass through).
       if (error instanceof BulkCollisionError) throw error;

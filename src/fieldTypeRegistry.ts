@@ -33,7 +33,6 @@ setRegistrationInit((registry) => {
 
 export type {
   FilterType,
-  ValueType,
   DisplayFormatterOptions,
   DisplayFormatter,
   ComponentRegistration,
@@ -47,7 +46,6 @@ export {
   getFilterType,
   getDisplayFormatter,
   isFilterable,
-  getValueType,
   clearFieldTypeRegistry,
 } from './fieldTypeRegistry.store';
 

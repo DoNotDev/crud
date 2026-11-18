@@ -5,6 +5,7 @@ import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
 
 import { CurrencyFieldComponent } from '../../form/fields';
+import { fieldInfo } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -62,6 +63,7 @@ export function ControlledCurrencyField(
         return (
           <CurrencyFieldComponent
             label={t(label)}
+            info={fieldInfo(fieldConfig, t)}
             value={centsValue}
             onChange={handleChange}
             currency={fieldSpecific?.currency || 'EUR'}

@@ -56,6 +56,7 @@
 
 import type {
   BulkAcrossBatch,
+  BulkAcrossOptions,
   BulkAcrossResult,
   BulkOperations,
   BulkResult,
@@ -70,12 +71,12 @@ import type {
   ListSchemaType,
   SecurityContext,
 } from '@donotdev/core';
-import { createSingleton, getQueryClient } from '@donotdev/core';
+import { createSingleton, getQueryClient, REMOVED_STATUS } from '@donotdev/core';
 
 import { bulkImpl } from './CrudService.bulk';
 import type { BulkSchemas } from './CrudService.bulk';
 import { bulkAcrossImpl } from './CrudService.bulkAcross';
-import { invalidateCollectionImpl } from './CrudService.cache';
+import { invalidateCollectionImpl, updateListCaches } from './CrudService.cache';
 import { attachProviderImpl, initializeImpl } from './CrudService.internal';
 import {
   addImpl,
@@ -99,6 +100,7 @@ import {
   subscribeImpl,
   subscribeToCollectionImpl,
 } from './CrudService.subscriptions';
+import { CRUD_OPERATION } from './types';
 import type {
   CacheOptions,
   CrudServiceInternal,
@@ -272,6 +274,25 @@ export class CrudService implements CrudServiceInternal {
     return invalidateCollectionImpl(this, collection);
   }
 
+  /**
+   * Cache a row stored by a write that did not go through this service (an app
+   * RPC, a server function): the document cache and every cached list holding it
+   * take the row as stored, without a refetch.
+   *
+   * @param collection - The row's collection
+   * @param row - The full row as the backend returned it, read-filtered for the requester
+   *
+   * @example
+   * ```ts
+   * const { data } = await supabase.rpc('shop_save_routine', params);
+   * getCrudService().cacheStored('routines', parseRoutineRecord(data.routine));
+   * ```
+   * @since 0.3.0
+   */
+  cacheStored<T extends { id: string }>(collection: string, row: T): void {
+    updateListCaches(this, collection, row.id, row, CRUD_OPERATION.SET);
+  }
+
   // ===================================================================
   // Read Operations (with Caching)
   // ===================================================================
@@ -312,7 +333,7 @@ export class CrudService implements CrudServiceInternal {
     data: T,
     schema: dndevSchema<T>,
     options?: MutationOptions
-  ): Promise<void> {
+  ): Promise<Record<string, unknown>> {
     return setImpl<T>(this, collection, id, data, schema, options);
   }
 
@@ -322,8 +343,18 @@ export class CrudService implements CrudServiceInternal {
     data: Partial<T>,
     schema?: dndevSchema<T>,
     options?: MutationOptions
-  ): Promise<void> {
+  ): Promise<Record<string, unknown>> {
     return updateImpl<T>(this, collection, id, data, schema, options);
+  }
+
+  /**
+   * Logical delete (CRUD rule 3): the update `{ status: 'deleted' }`. Required fields
+   * left empty never block it; the row leaves public reads. `delete` is the hard delete.
+   *
+   * @since 0.3.0
+   */
+  async remove(collection: string, id: string): Promise<void> {
+    await updateImpl<Record<string, unknown>>(this, collection, id, { status: REMOVED_STATUS });
   }
 
   delete(
@@ -375,10 +406,14 @@ export class CrudService implements CrudServiceInternal {
   }
 
   /**
-   * Cross-collection atomic bulk write.
+   * Ordered cross-collection partial-success bulk write, not a transaction.
    *
    * One optimistic pass across all collections, adapter writes in topological
-   * order (parallel within each wave), one toast, coordinated rollback.
+   * order (parallel within each wave), one toast. Failure stops later waves and
+   * reverts optimistic state before refetch; committed rows remain written.
+   * Bounded resilient outcomes are awaited, not uncancelled raw attempts; late
+   * settlement triggers authoritative refetch without reapplying optimistic data.
+   * Timeouts leave commit status uncertain, not cancelled or rolled back.
    * Batches with `dependsOn` run after their dependencies complete.
    *
    * @throws {BulkCollisionError} Same id in two mutually-exclusive buckets
@@ -406,7 +441,7 @@ export class CrudService implements CrudServiceInternal {
    */
   bulkAcross(
     batches: BulkAcrossBatch[],
-    options?: MutationOptions
+    options?: BulkAcrossOptions
   ): Promise<BulkAcrossResult> {
     return bulkAcrossImpl(
       this,

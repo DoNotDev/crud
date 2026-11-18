@@ -6,11 +6,12 @@ import { ControlledTextField } from '../ControlledTextField';
 
 // Mock @donotdev/components to provide Input and other primitives
 vi.mock('@donotdev/components', () => ({
-  Input: ({ value, label, ref: _ref, ...props }: any) => (
+  Input: ({ value, label, info, ref: _ref, ...props }: any) => (
     <input
       data-testid="text-input"
       value={value}
       aria-label={label}
+      data-info={info}
       {...props}
     />
   ),
@@ -28,7 +29,7 @@ vi.mock('@donotdev/components', () => ({
  * This test ensures the input displays the RHF default value, not empty string.
  */
 
-function Wrapper({ defaultValue }: { defaultValue: string }) {
+function Wrapper({ defaultValue, hint }: { defaultValue: string; hint?: string }) {
   const methods = useForm({ defaultValues: { reference: defaultValue } });
   return (
     <FormProvider {...methods}>
@@ -41,8 +42,9 @@ function Wrapper({ defaultValue }: { defaultValue: string }) {
           visibility: 'guest',
           editable: 'admin',
           validation: { required: true, minLength: 1 },
+          hint,
         }}
-        t={(key: string) => key}
+        t={(key: string) => `t:${key}`}
       />
     </FormProvider>
   );
@@ -53,6 +55,16 @@ describe('ControlledTextField', () => {
     render(<Wrapper defaultValue="APT-001" />);
     const input = screen.getByTestId('text-input');
     expect((input as HTMLInputElement).value).toBe('APT-001');
+  });
+
+  it('passes the translated entity hint as info, only when declared', () => {
+    render(<Wrapper defaultValue="" hint="hints.reference" />);
+    expect(screen.getByTestId('text-input').getAttribute('data-info')).toBe('t:hints.reference');
+  });
+
+  it('passes no info without a hint', () => {
+    render(<Wrapper defaultValue="" />);
+    expect(screen.getByTestId('text-input').hasAttribute('data-info')).toBe(false);
   });
 
   it('renders empty string when default value is empty', () => {

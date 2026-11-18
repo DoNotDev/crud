@@ -17,6 +17,8 @@ import { Input, FloatingLabel, Stack } from '@donotdev/components';
 export interface CurrencyFieldComponentProps {
   /** Field label */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Current value (number in cents/smallest unit) */
   value?: number;
   /** Change handler */
@@ -46,6 +48,7 @@ export interface CurrencyFieldComponentProps {
  */
 const CurrencyFieldComponent: ComponentType<CurrencyFieldComponentProps> = ({
   label,
+  info,
   value,
   onChange,
   currency = 'EUR',
@@ -134,6 +137,7 @@ const CurrencyFieldComponent: ComponentType<CurrencyFieldComponentProps> = ({
       <FloatingLabel
         htmlFor={id}
         label={label}
+        info={info}
         disabled={disabled}
         required={required}
       >

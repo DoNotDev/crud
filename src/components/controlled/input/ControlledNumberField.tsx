@@ -5,6 +5,7 @@ import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
 
 import { NumberFieldComponent } from '../../form/fields';
+import { fieldInfo } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -57,6 +58,7 @@ export function ControlledNumberField(
           <NumberFieldComponent
             {...field}
             label={t(label)}
+            info={fieldInfo(fieldConfig, t)}
             value={field.value ?? undefined}
             onChange={handleChange}
             error={!!fieldState.error}

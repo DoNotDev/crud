@@ -67,6 +67,27 @@ describe('FunctionsAdapter.bulk()', () => {
     resetMocks();
   });
 
+  it('preserves partial failures with input-index identity', async () => {
+    const outcome = {
+      insertedIds: ['new-1'], updatedIds: [], deletedIds: [],
+      failed: [{ op: 'insert', index: 1, error: 'denied' }],
+    };
+    callableCall.mockResolvedValueOnce(outcome);
+    await expect(new FunctionsAdapter().bulk('events', { inserts: [{}, {}] }))
+      .resolves.toEqual(outcome);
+    expect(callableCall).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { insertedIds: [], updatedIds: [], deletedIds: [] },
+    { insertedIds: [], updatedIds: [], deletedIds: ['other'] },
+    { insertedIds: [], updatedIds: [], deletedIds: ['a'], failed: null },
+  ])('rejects incomplete or contradictory replies without replay: %j', async (outcome) => {
+    callableCall.mockResolvedValueOnce(outcome);
+    await expect(new FunctionsAdapter().bulk('events', { deletes: ['a'] })).rejects.toThrow();
+    expect(callableCall).toHaveBeenCalledTimes(1);
+  });
+
   it('invokes bulk_${collection} once with the exact wire shape and preserves order', async () => {
     callableCall.mockResolvedValueOnce({
       insertedIds: ['evt_1', 'evt_2'],

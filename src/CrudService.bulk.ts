@@ -28,14 +28,18 @@ import type {
 import {
   BulkCollisionError,
   detectBulkCollisions,
-  DEFAULT_STATUS_VALUE,
+  DEFAULT_CRUD_TIMEOUT,
   generateUUID,
   getI18nInstance,
   handleError,
-  validateWithSchema,
+  prepareCreate,
+  prepareUpdate,
+  validateBulkOutcome,
+  withTimeout,
 } from '@donotdev/core';
 
-import { updateListCaches } from './CrudService.cache';
+import { updateGetCache } from './CrudService.cache';
+import { createBulkReconciliation } from './CrudService.bulkReconciliation';
 import {
   assertCanAccess,
   ensureAdapter,
@@ -43,25 +47,21 @@ import {
   getPiiFields,
   rateLimitKey,
   shouldShowSuccessToast,
-  withResilience,
 } from './CrudService.internal';
 import { CRUD_OPERATION } from './types';
+import { entitySchemasOf, storedRowsFor, writtenOf } from './CrudService.writeRules';
 import type { CrudServiceInternal, MutationOptions } from './types';
 
 /**
- * Bucketed schemas supplied by the hook layer.
+ * Schemas a caller may pass with a bulk (0.2 API). The CRUD rules run on the entity's
+ * own schemas (`entitySchemasOf(collection)`), whatever is passed here.
  *
- * Split out from `OperationSchemas` so the service can accept either a full
- * schema pack (`useCrud`) or a hand-rolled one — whichever fits the caller.
- *
+ * @version 0.4.0
  * @since 0.2.0
  */
 export interface BulkSchemas<T extends Record<string, unknown>> {
-  /** Schema used to validate / encrypt inserted rows. Required when `inserts` is non-empty. */
   create?: dndevSchema<T>;
-  /** Schema used to validate inserted rows when `status === 'draft'`. Optional. */
   draft?: dndevSchema<T>;
-  /** Schema used to resolve PII fields for update patches. Optional — updates are partial. */
   update?: dndevSchema<T>;
 }
 
@@ -74,6 +74,23 @@ interface BulkCacheLog<T extends Record<string, unknown>> {
   inserts: Array<{ tempId: string; data: T }>;
   updates: Array<{ id: string; prev: T | null; merged: T }>;
   deletes: Array<{ id: string; prev: T | null }>;
+}
+
+/**
+ * Detail row of an acknowledged insert: the written create payload plus its real id.
+ * TypeScript cannot prove `Omit<T, 'id'> & { id: string }` is a generic `T` (`T['id']`
+ * may be narrower than `string`), hence the one conversion; server-side defaults are
+ * absent and come from the next refetch.
+ */
+function insertedRow<T extends Record<string, unknown>>(
+  inserts: readonly CrudCreateInput<T>[],
+  index: number,
+  id: string
+): T {
+  const data = inserts[index];
+  // Insert payloads and cache-log entries are built one-to-one from `ops.inserts`.
+  if (data === undefined) throw new Error('Bulk insert payload missing');
+  return { ...data, id } as unknown as T;
 }
 
 /**
@@ -125,10 +142,11 @@ function snapshotPreviousData<T extends Record<string, unknown>>(
 /**
  * Bulk CRUD: inserts + updates + deletes in one adapter call, partial success.
  *
- * Applies optimistic state, calls the adapter under timeout + retry, then
+ * Applies optimistic state, calls the adapter once under timeout (no replay), then
  * confirms the rows the adapter wrote and reverts only the rows it reports in
- * `failed` (written rows are never undone). If the adapter throws (batch not
- * attempted), every optimistic op is reverted. Emits a single audit entry, a
+ * `failed` (written rows are never undone). A thrown or malformed acknowledgement
+ * leaves commit status unknown: remove optimistic state and refetch; late raw
+ * settlement triggers another authoritative refetch. Emits a single audit entry, a
  * single rate-limit check, and one toast (error when some rows failed).
  *
  * **Concurrency contract.** `bulk()` does not acquire the per-(collection,id)
@@ -141,12 +159,14 @@ function snapshotPreviousData<T extends Record<string, unknown>>(
  * @param self - CrudService instance (DI).
  * @param collection - Target collection.
  * @param ops - Bulk operations. Empty payload short-circuits with no side effects.
- * @param schemas - Schemas for insert validation + PII resolution.
+ * @param schemas - Write schemas: insert and update-patch validation + PII resolution.
  * @param options - Optional mutation options (toast suppression).
  * @returns Written ids per bucket (input order) and the rows that failed.
  * @throws {BulkCollisionError} Same id in two mutually-exclusive buckets.
  *   Surfaced **before** any side effect (no rate-limit, no optimistic, no adapter call).
- * @throws {Error} Wrapped adapter errors (batch not attempted) — surfaced after rollback.
+ * @throws {DoNotDevError} `validation-failed`: an insert or update patch fails the CRUD rules
+ *   schema, or a draft published misses a required field — before any optimistic state or write.
+ * @throws {Error} Adapter/acknowledgement errors — surfaced after local cleanup and refetch.
  *
  * @example
  * ```typescript
@@ -158,14 +178,14 @@ function snapshotPreviousData<T extends Record<string, unknown>>(
  * // → one audit entry, one toast, one adapter round-trip
  * ```
  *
- * @version 0.1.0
+ * @version 0.2.0
  * @since 0.2.0
  */
 export async function bulkImpl<T extends Record<string, unknown>>(
   self: CrudServiceInternal,
   collection: string,
   ops: BulkOperations<T>,
-  schemas: BulkSchemas<T>,
+  _schemas: BulkSchemas<T>,
   options?: MutationOptions
 ): Promise<BulkResult> {
   // -------------------------------------------------------------------------
@@ -198,21 +218,35 @@ export async function bulkImpl<T extends Record<string, unknown>>(
   // -------------------------------------------------------------------------
   await ensureAdapter(self);
 
-  if (self.store) {
-    self.store.getState().setLoading(collection, true);
-    self.store.getState().setError(collection, null);
-  }
-
   // -------------------------------------------------------------------------
-  // 4. Access gate — server-side adapters are required for restricted-visibility
-  //    entities. Check with the create schema (inserts) and update schema
-  //    (updates); either surfaces the same restriction metadata.
+  // 4. CRUD rules (core/schemas crud/, as on the server) on each row: inserts by
+  //    `prepareCreate`, updates by `prepareUpdate` on their stored row (cache,
+  //    else read). Then the access gate with each row's schema.
   // -------------------------------------------------------------------------
-  if (schemas.create) {
-    assertCanAccess(self.adapter, collection, schemas.create);
-  } else if (schemas.update) {
-    assertCanAccess(self.adapter, collection, schemas.update);
-  }
+  const schemas = entitySchemasOf(collection);
+  const touchedIds = [...updates.map((u) => u.id), ...deletes];
+  const previousSnapshot = snapshotPreviousData<T>(
+    self,
+    collection,
+    touchedIds
+  );
+  const updateRows = updates.map(({ id, patch }) => ({
+    id,
+    patch: patch as Record<string, unknown>,
+  }));
+  const storedRows = await storedRowsFor(self, collection, updateRows, schemas.get);
+  const preparedInserts = inserts.map((row) =>
+    prepareCreate(schemas, row as Record<string, unknown>)
+  );
+  const preparedUpdates = updateRows.map(({ id, patch }) =>
+    prepareUpdate(schemas, { id, patch, stored: storedRows.get(id) })
+  );
+  const accessSchemas = new Set<dndevSchema<unknown>>(
+    [...preparedInserts, ...preparedUpdates].map((prepared) => schemas[prepared.schemaKey])
+  );
+  // Deletes only: any schema of the entity carries its visibility metadata.
+  if (accessSchemas.size === 0) accessSchemas.add(schemas.update);
+  for (const schema of accessSchemas) assertCanAccess(self.adapter, collection, schema);
 
   // -------------------------------------------------------------------------
   // 5. Rate limit — ONE check for the whole batch (BULK_CRUD_TODO §5).
@@ -222,49 +256,30 @@ export async function bulkImpl<T extends Record<string, unknown>>(
   }
 
   // -------------------------------------------------------------------------
-  // 6. PII encryption (per-op, matching add/update). Inserts use `create`
-  //    schema's piiFields; updates use `update` schema's.
+  // 6. What is written (the rules' `written`) + PII encryption per row.
   // -------------------------------------------------------------------------
-  const insertPiiFields = getPiiFields(schemas.create ?? schemas.draft);
-  const updatePiiFields = getPiiFields(schemas.update ?? schemas.create);
-
-  const encryptedInserts: CrudCreateInput<T>[] = inserts.map((row) => {
-    const record = row as Record<string, unknown>;
-    const withStatus =
-      record.status === undefined || record.status === null
-        ? { ...record, status: DEFAULT_STATUS_VALUE }
-        : record;
-
-    // Enforce draft contract: respect schemas, but make required fields nullish.
-    // We validate per-row so mixed-status bulk payloads behave correctly.
-    const status = withStatus.status as string | undefined;
-    const isDraft = status === 'draft';
-    const schemaToUse =
-      isDraft && schemas.draft
-        ? schemas.draft
-        : (schemas.create ?? schemas.draft);
-
-    const validated = schemaToUse
-      ? validateWithSchema(schemaToUse, withStatus, 'CrudService.bulk.insert')
-      : withStatus;
-
-    const encrypted =
+  const encryptedInserts: CrudCreateInput<T>[] = preparedInserts.map((prepared, index) => {
+    const written = writtenOf(prepared, collection, 'bulk.insert');
+    // A caller id is a pre-minted id: the rules never write `id`.
+    const clientId = (inserts[index] as Record<string, unknown>).id;
+    const row = typeof clientId === 'string' ? { ...written, id: clientId } : written;
+    const insertPiiFields = getPiiFields(schemas[prepared.schemaKey]);
+    return (
       insertPiiFields.length > 0 && self.security
-        ? (self.security.encryptPii(
-            validated,
-            insertPiiFields
-          ) as CrudCreateInput<T>)
-        : (validated as CrudCreateInput<T>);
-    return encrypted;
+        ? self.security.encryptPii(row, insertPiiFields)
+        : row
+    ) as CrudCreateInput<T>;
   });
 
-  const encryptedUpdates = updates.map(({ id, patch }) => {
-    const patchRecord = patch as Record<string, unknown>;
-    const encrypted =
+  const encryptedUpdates = preparedUpdates.map((prepared, index) => {
+    const patchRecord = writtenOf(prepared, collection, 'bulk.update');
+    const updatePiiFields = getPiiFields(schemas[prepared.schemaKey]);
+    const encrypted = (
       updatePiiFields.length > 0 && self.security
-        ? (self.security.encryptPii(patchRecord, updatePiiFields) as Partial<T>)
-        : patch;
-    return { id, patch: encrypted };
+        ? self.security.encryptPii(patchRecord, updatePiiFields)
+        : patchRecord
+    ) as Partial<T>;
+    return { id: updates[index]!.id, patch: encrypted };
   });
 
   // -------------------------------------------------------------------------
@@ -278,76 +293,70 @@ export async function bulkImpl<T extends Record<string, unknown>>(
     deletes: [],
   };
 
-  // Snapshot previous data once for both updates and deletes.
-  const touchedIds = [...updates.map((u) => u.id), ...deletes];
-  const previousSnapshot = snapshotPreviousData<T>(
-    self,
-    collection,
-    touchedIds
-  );
 
   // Pre-mint temp ids for inserts (parallel array — server returns real ids).
   const insertTempIds = inserts.map(() => `temp_${generateUUID()}`);
 
   // Undo one optimistic op (a row the adapter did not write, or the whole batch on throw).
   const revertInsert = (tempId: string) => {
-    updateListCaches(self, collection, tempId, null, CRUD_OPERATION.DELETE);
-    if (self.store) self.store.getState().rejectOptimistic(collection, tempId);
+    try { updateGetCache(self, collection, tempId, null, CRUD_OPERATION.DELETE); } catch { /* continue cleanup */ }
+    try { self.store?.getState().rejectOptimistic(collection, tempId); } catch { /* continue cleanup */ }
   };
+  let startedWrite: Promise<BulkResult> | undefined;
+  let committedResult: BulkResult | undefined;
+  let acknowledgedReconciled = false;
+  const settledInserts = new Set<string>();
+  const settledUpdates = new Set<string>();
+  const settledDeletes = new Set<string>();
+  const attempt = { settled: false, late: false };
+  const reconcile = createBulkReconciliation(self, 'bulk.lateReconciliation');
+  const onLateSettlement = () => { void reconcile(collection); };
   const revertUpdate = (id: string, prev: T | null) => {
-    if (prev) {
-      updateListCaches(self, collection, id, prev, CRUD_OPERATION.UPDATE);
-    } else {
-      // No snapshot (cold cache) — invalidate to force refetch on next read.
-      void self.invalidateCollection(collection);
-    }
-    if (self.store) self.store.getState().rejectUpdate(collection, id);
+    try { if (prev) updateGetCache(self, collection, id, prev, CRUD_OPERATION.SET); } catch { /* continue cleanup */ }
+    try { self.store?.getState().rejectUpdate(collection, id); } catch { /* continue cleanup */ }
   };
   const revertDelete = (id: string, prev: T | null) => {
-    if (prev) {
-      updateListCaches(self, collection, id, prev, CRUD_OPERATION.ADD);
-    }
-    if (self.store) self.store.getState().rejectDelete(collection, id);
+    try { if (prev) updateGetCache(self, collection, id, prev, CRUD_OPERATION.SET); } catch { /* continue cleanup */ }
+    try { self.store?.getState().rejectDelete(collection, id); } catch { /* continue cleanup */ }
   };
 
   try {
-    // 7a. Inserts — optimistic store + list cache.
+    if (self.store) {
+      self.store.getState().setLoading(collection, true);
+      self.store.getState().setError(collection, null);
+    }
+    // 7a. Inserts — store only; do not invent membership in filtered lists.
     inserts.forEach((row, i) => {
       const tempId = insertTempIds[i]!;
       const tempItem = { ...(row as object), id: tempId } as unknown as T;
-      if (self.store) {
-        self.store.getState().addOptimistic(collection, tempId, tempItem);
-      }
-      updateListCaches(self, collection, tempId, tempItem, CRUD_OPERATION.ADD);
       cacheLog.inserts.push({ tempId, data: tempItem });
+      if (self.store) self.store.getState().addOptimistic(collection, tempId, tempItem);
     });
 
     // 7b. Updates — optimistic store + list cache with merged patch.
+    const stagedUpdates = new Map<string, T>();
     updates.forEach(({ id, patch }) => {
       const prev = previousSnapshot.get(id) ?? null;
-      const merged = (prev ? { ...prev, ...patch } : { ...patch, id }) as T;
-      if (self.store) {
-        self.store
-          .getState()
-          .updateOptimistic(collection, id, merged, prev ?? null);
-      }
-      updateListCaches(self, collection, id, merged, CRUD_OPERATION.UPDATE);
-      cacheLog.updates.push({ id, prev, merged });
+      const base = stagedUpdates.get(id) ?? prev;
+      const merged = (base ? { ...base, ...patch } : { ...patch, id }) as T;
+      stagedUpdates.set(id, merged);
+      const existingLog = cacheLog.updates.find((entry) => entry.id === id);
+      if (existingLog) existingLog.merged = merged;
+      else cacheLog.updates.push({ id, prev, merged });
+      if (self.store) self.store.getState().updateOptimistic(collection, id, merged, prev ?? null);
+      if (prev) updateGetCache(self, collection, id, merged, CRUD_OPERATION.UPDATE);
     });
 
     // 7c. Deletes — optimistic store + list cache.
-    deletes.forEach((id) => {
+    [...new Set(deletes)].forEach((id) => {
       const prev = previousSnapshot.get(id) ?? null;
-      if (self.store && prev) {
-        self.store.getState().deleteOptimistic(collection, id, prev);
-      }
-      updateListCaches(self, collection, id, null, CRUD_OPERATION.DELETE);
       cacheLog.deletes.push({ id, prev });
+      if (self.store && prev) self.store.getState().deleteOptimistic(collection, id, prev);
+      if (prev) updateGetCache(self, collection, id, null, CRUD_OPERATION.DELETE);
     });
 
     // ---------------------------------------------------------------------
-    // 8. Adapter call — single await under withResilience (timeout + retry).
-    //    Uses the create schema if available for server-side validation hints.
+    // 8. Adapter call — timeout without retry: a lost ack may already be committed.
     // ---------------------------------------------------------------------
     if (!self.adapter) {
       throw new Error(
@@ -360,9 +369,23 @@ export async function bulkImpl<T extends Record<string, unknown>>(
       updates: encryptedUpdates,
       deletes,
     };
-    const result = await withResilience(() =>
+    startedWrite = Promise.resolve().then(() =>
       adapter.bulk<T>(collection, payload)
     );
+    const settled = () => {
+      attempt.settled = true;
+      if (attempt.late) onLateSettlement();
+    };
+    void startedWrite.then(settled, settled);
+    let acknowledgement: BulkResult;
+    try {
+      acknowledgement = await withTimeout(startedWrite, DEFAULT_CRUD_TIMEOUT);
+    } finally {
+      if (!attempt.settled) attempt.late = true;
+    }
+    // Validate completeness BEFORE any confirmation, success toast or audit.
+    const result = validateBulkOutcome(payload, acknowledgement);
+    committedResult = result;
 
     // ---------------------------------------------------------------------
     // 9. Partial success — confirm the rows the adapter wrote, revert only
@@ -382,34 +405,55 @@ export async function bulkImpl<T extends Record<string, unknown>>(
 
     // insertedIds lists the inserts that succeeded, in input order
     const realInsertedIds = result.insertedIds;
+    const successfulInsertRows = new Map<string, T>();
     let nextInserted = 0;
     insertTempIds.forEach((tempId, i) => {
       if (failedInserts.has(i)) {
         revertInsert(tempId);
+        settledInserts.add(tempId);
         return;
       }
       const realId = realInsertedIds[nextInserted++];
-      if (!realId) return;
-      // Remove temp row, add real row (matches addImpl's cache swap).
-      const row = inserts[i];
-      updateListCaches(self, collection, tempId, null, CRUD_OPERATION.DELETE);
-      updateListCaches(self, collection, realId, row as T, CRUD_OPERATION.ADD);
+      // Request-aware validation proved this ordered success exists.
+      if (realId === undefined) throw new Error('Validated bulk insert ID missing');
+      // Replace only detail data; list membership/order/count comes from reconciliation.
+      const row = insertedRow<T>(encryptedInserts, i, realId);
+      successfulInsertRows.set(realId, row);
+      updateGetCache(self, collection, tempId, null, CRUD_OPERATION.DELETE);
+      updateGetCache(self, collection, realId, row, CRUD_OPERATION.ADD);
       if (self.store) {
         self.store
           .getState()
           .confirmOptimistic(collection, tempId, realId, row);
       }
+      settledInserts.add(tempId);
     });
 
     for (const { id, prev } of cacheLog.updates) {
       if (failedUpdates.has(id)) revertUpdate(id, prev);
       else if (self.store) self.store.getState().confirmUpdate(collection, id);
+      settledUpdates.add(id);
     }
 
     for (const { id, prev } of cacheLog.deletes) {
-      if (failedDeletes.has(id)) revertDelete(id, prev);
-      else if (self.store) self.store.getState().confirmDelete(collection, id);
+      if (failedDeletes.has(id)) {
+        // A prior successful insert for this ID is the actual final row, not
+        // the pre-write snapshot captured before the insert.
+        const insertedRow = successfulInsertRows.get(id);
+        if (insertedRow) {
+          try { updateGetCache(self, collection, id, insertedRow, CRUD_OPERATION.SET); } catch { /* recovery/refetch below */ }
+          try { self.store?.getState().rejectDelete(collection, id); } catch { /* continue */ }
+        } else revertDelete(id, prev);
+      }
+      else {
+        updateGetCache(self, collection, id, null, CRUD_OPERATION.DELETE);
+        if (self.store) self.store.getState().confirmDelete(collection, id);
+      }
+      settledDeletes.add(id);
     }
+
+    await reconcile(collection);
+    acknowledgedReconciled = true;
 
     // ---------------------------------------------------------------------
     // 10. Audit — ONE entry with counts (BULK_CRUD_TODO §4).
@@ -471,44 +515,110 @@ export async function bulkImpl<T extends Record<string, unknown>>(
       failed: result.failed,
     };
   } catch (error) {
+    if (committedResult) {
+      // A cache or store callback may interrupt confirmation. Settle every
+      // remaining entry independently according to the acknowledged outcome.
+      const failedInsertIndexes = new Set(committedResult.failed.filter((f) => f.op === 'insert').map((f) => f.index));
+      const failedUpdateIds = new Set(committedResult.failed.filter((f) => f.op === 'update').map((f) => f.id));
+      const failedDeleteIds = new Set(committedResult.failed.filter((f) => f.op === 'delete').map((f) => f.id));
+      let successIndex = 0;
+      cacheLog.inserts.forEach(({ tempId }, index) => {
+        const failed = failedInsertIndexes.has(index);
+        const realId = failed ? undefined : committedResult!.insertedIds[successIndex++];
+        if (settledInserts.has(tempId)) return;
+        try {
+          if (failed) self.store?.getState().rejectOptimistic(collection, tempId);
+          else self.store?.getState().confirmOptimistic(collection, tempId, realId!, inserts[index]);
+        } catch { /* continue settling remaining entries */ }
+      });
+      for (const { id } of cacheLog.updates) {
+        if (settledUpdates.has(id)) continue;
+        try { if (failedUpdateIds.has(id)) self.store?.getState().rejectUpdate(collection, id); else self.store?.getState().confirmUpdate(collection, id); } catch { /* continue */ }
+      }
+      for (const { id } of cacheLog.deletes) {
+        if (settledDeletes.has(id)) continue;
+        try { if (failedDeleteIds.has(id)) self.store?.getState().rejectDelete(collection, id); else self.store?.getState().confirmDelete(collection, id); } catch { /* continue */ }
+      }
+      // Re-apply the acknowledged final detail state after an interrupted
+      // confirmation. Lists remain coordinator-owned; unknown server fields
+      // are supplied by active refetch rather than fabricated here.
+      const successfulInsertRows = new Map<string, T>();
+      let insertSuccess = 0;
+      cacheLog.inserts.forEach(({ tempId }, index) => {
+        if (failedInsertIndexes.has(index)) return;
+        const id = committedResult!.insertedIds[insertSuccess++];
+        if (id !== undefined) successfulInsertRows.set(id, insertedRow<T>(encryptedInserts, index, id));
+        try { updateGetCache(self, collection, tempId, null, CRUD_OPERATION.DELETE); } catch { /* continue */ }
+      });
+      for (const { id, prev } of cacheLog.updates) {
+        if (failedUpdateIds.has(id)) try { if (prev) updateGetCache(self, collection, id, prev, CRUD_OPERATION.SET); } catch { /* continue */ }
+      }
+      for (const { id, prev } of cacheLog.deletes) {
+        try {
+          if (!failedDeleteIds.has(id)) updateGetCache(self, collection, id, null, CRUD_OPERATION.DELETE);
+          else if (successfulInsertRows.has(id)) updateGetCache(self, collection, id, successfulInsertRows.get(id)!, CRUD_OPERATION.SET);
+          else if (prev) updateGetCache(self, collection, id, prev, CRUD_OPERATION.SET);
+        } catch { /* continue settling details */ }
+      }
+      for (const [id, row] of successfulInsertRows) {
+        if (!cacheLog.deletes.some((entry) => entry.id === id && !failedDeleteIds.has(id))) {
+          try { updateGetCache(self, collection, id, row, CRUD_OPERATION.SET); } catch { /* continue settling details */ }
+        }
+      }
+      try { handleError(new Error('Bulk post-commit side effect failed'), { context: { operation: 'bulk.postCommit' }, showNotification: false }); } catch { /* diagnostics are best effort */ }
+      if (!acknowledgedReconciled) await reconcile(collection);
+      return committedResult;
+    }
     // ---------------------------------------------------------------------
-    // 12. Rollback — the adapter threw (batch not attempted): undo every
-    //     optimistic op. Reverse order (deletes → updates → inserts) so cache
+    // 12. Unknown outcome — undo local optimistic state, not database writes.
+    //     Reverse order (deletes → updates → inserts) so cache
     //     reconciliation matches the single-row rollback flows.
     // ---------------------------------------------------------------------
-    for (const { id, prev } of cacheLog.deletes) revertDelete(id, prev);
-    for (const { id, prev } of cacheLog.updates) revertUpdate(id, prev);
-    for (const { tempId } of cacheLog.inserts) revertInsert(tempId);
+    for (const { id, prev } of [...cacheLog.deletes].reverse()) {
+      try { revertDelete(id, prev); } catch { /* continue rolling back all operations */ }
+    }
+    for (const { id, prev } of [...cacheLog.updates].reverse()) {
+      try { revertUpdate(id, prev); } catch { /* continue rolling back all operations */ }
+    }
+    for (const { tempId } of [...cacheLog.inserts].reverse()) {
+      try { revertInsert(tempId); } catch { /* continue rolling back all operations */ }
+    }
+
+    if (startedWrite) {
+      // Queue late reconciliation behind this initial refetch. A timeout does
+      // not cancel the raw write; never wait for it or replay it here.
+      await reconcile(collection);
+    }
 
     // BulkCollisionError from the adapter passes through unwrapped so callers
     // can `instanceof` it. Other adapter errors get the standard wrap.
     if (error instanceof BulkCollisionError) {
-      if (self.store) {
-        self.store.getState().setError(collection, error);
-      }
+      try { self.store?.getState().setError(collection, error); } catch { /* subscribers must not replace the original error */ }
       throw error;
     }
 
-    const wrappedError = handleError(error, {
-      userMessage: `Failed to bulk-write ${collection}`,
-      showNotification: true,
-    });
+    let wrappedError: unknown = error;
+    try {
+      wrappedError = handleError(error, {
+        userMessage: `Failed to bulk-write ${collection}`,
+        showNotification: true,
+      });
+    } catch { /* preserve the write error */ }
 
-    const i18n = getI18nInstance();
-    const entityName = getEntityName(collection);
-    toast(
-      'error',
-      i18n.t('messages.updateError', { ns: 'crud', entity: entityName })
-    );
+    try {
+      const i18n = getI18nInstance();
+      const entityName = getEntityName(collection);
+      toast('error', i18n.t('messages.updateError', { ns: 'crud', entity: entityName }));
+    } catch { /* preserve the write error */ }
 
-    if (self.store) {
-      self.store.getState().setError(collection, wrappedError);
-    }
+    try { self.store?.getState().setError(collection, wrappedError as Error); } catch { /* subscribers must not replace the write error */ }
 
     throw wrappedError;
   } finally {
     if (self.store) {
-      self.store.getState().setLoading(collection, false);
+      try { self.store.getState().setLoading(collection, false); } catch {
+        try { handleError(new Error('Bulk loading cleanup failed'), { context: { operation: 'bulk.cleanup' }, showNotification: false }); } catch { /* diagnostics are best effort */ }
+      }
     }
   }
 }

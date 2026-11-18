@@ -33,6 +33,8 @@ export interface ReferenceOption {
 export interface ReferenceFieldComponentProps {
   /** Field label */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Selected reference document ID */
   value?: string;
   /** Change handler - receives selected ID */
@@ -76,6 +78,7 @@ export interface ReferenceFieldComponentProps {
  */
 const ReferenceFieldComponent = ({
   label,
+  info,
   value,
   onChange,
   options,
@@ -118,6 +121,7 @@ const ReferenceFieldComponent = ({
     <Stack gap="tight">
       <Combobox
         label={label}
+        info={info}
         value={value || ''}
         onValueChange={handleValueChange}
         onOpenChange={handleOpenChange}

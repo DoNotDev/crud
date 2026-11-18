@@ -4,8 +4,9 @@
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
 
+import { fromInputValue } from '../../../forms/utils';
 import { TextAreaComponent } from '../../form/fields';
-import { controlledFieldOptions } from '../fieldOptions';
+import { controlledFieldOptions, fieldInfo } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -34,8 +35,9 @@ export function ControlledTextareaField(
         <TextAreaComponent
           {...field}
           label={t(label)}
+          info={fieldInfo(fieldConfig, t)}
           value={field.value ?? ''}
-          onChange={field.onChange}
+          onChange={(e) => field.onChange(fromInputValue(e.target.value))}
           error={fieldState.error?.message}
           helperText={fieldState.error?.message}
           required={required}

@@ -5,7 +5,7 @@ import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
 
 import { AddressFieldComponent } from '../../form/fields';
-import { fieldSpecificOf } from '../fieldOptions';
+import { fieldInfo, fieldSpecificOf } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -35,6 +35,7 @@ export function ControlledAddressField(
       render={({ field, fieldState }) => (
         <AddressFieldComponent
           label={t(label)}
+          info={fieldInfo(fieldConfig, t)}
           value={field.value ?? undefined}
           onChange={(value) => field.onChange(value)}
           error={!!fieldState.error}

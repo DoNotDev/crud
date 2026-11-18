@@ -11,7 +11,14 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import type { Entity } from '@donotdev/core';
+import {
+  addressSearchEntity,
+  filterProductEntity,
+  listItemEntity,
+  numericOnlyEntity,
+  searchAutoEntity,
+  searchFieldsEntity,
+} from '@dndev/test-entities';
 
 import type { FilterState } from '../../types';
 import {
@@ -21,7 +28,7 @@ import {
   getSearchableFields,
 } from '../clientListProcessing';
 
-// Mock fieldTypeRegistry.store — controls getFilterType for matchesFilter and getValueType/isFilterable for clientListProcessing
+// Mock fieldTypeRegistry.store — controls getFilterType for matchesFilter and isFilterable for clientListProcessing
 vi.mock('../../fieldTypeRegistry.store', () => ({
   getFilterType: vi.fn((type: string) => {
     const map: Record<string, string> = {
@@ -33,17 +40,7 @@ vi.mock('../../fieldTypeRegistry.store', () => ({
       price: 'range',
       rating: 'rating',
       address: 'address',
-    };
-    return map[type];
-  }),
-  getValueType: vi.fn((type: string) => {
-    const map: Record<string, string> = {
-      text: 'string',
-      textarea: 'string',
-      email: 'string',
-      number: 'number',
-      date: 'date',
-      select: 'string',
+      reference: 'reference',
     };
     return map[type];
   }),
@@ -51,31 +48,6 @@ vi.mock('../../fieldTypeRegistry.store', () => ({
 }));
 
 // ─── Helpers ────────────────────────────────────────────────────────
-
-/** Minimal Entity stub for testing. Only fields and search are used. */
-function makeEntity(
-  fields: Record<
-    string,
-    { type: string; visibility?: string; name?: string; label?: string }
-  >,
-  search?: { fields?: string[] }
-): Entity {
-  const entityFields: Record<string, any> = {};
-  for (const [key, config] of Object.entries(fields)) {
-    entityFields[key] = {
-      name: config.name ?? key,
-      type: config.type,
-      visibility: config.visibility ?? 'user',
-      label: config.label ?? key,
-    };
-  }
-  return {
-    name: 'TestEntity',
-    collection: 'test',
-    fields: entityFields,
-    search,
-  } as unknown as Entity;
-}
 
 interface TestItem {
   id: string;
@@ -122,11 +94,7 @@ const items: TestItem[] = [
 // ─── applyFilters ───────────────────────────────────────────────────
 
 describe('applyFilters', () => {
-  const entity = makeEntity({
-    name: { type: 'text' },
-    status: { type: 'select' },
-    price: { type: 'number' },
-  });
+  const entity = listItemEntity;
 
   it('returns all items when filters are empty', () => {
     const result = applyFilters(items, {}, entity);
@@ -139,11 +107,72 @@ describe('applyFilters', () => {
     expect(result[0].id).toBe('1');
   });
 
-  it('filters by select field (string contains match)', () => {
-    // Note: select filter uses string contains — 'active' matches both 'active' and 'inactive'
+  it('filters by select field (exact match)', () => {
     const result = applyFilters(items, { status: 'inactive' }, entity);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('2');
+  });
+
+  it('select is exact: "active" does not match "inactive"', () => {
+    const result = applyFilters(items, { status: 'active' }, entity);
+    expect(result.map((i) => i.id)).toEqual(['1', '3']);
+  });
+
+  it('select is exact: toner does not match toner_pad', () => {
+    const rows = [
+      { id: 'a', name: 'A', status: 'toner' },
+      { id: 'b', name: 'B', status: 'toner_pad' },
+    ];
+    expect(
+      applyFilters(rows, { status: 'toner' }, entity).map((i) => i.id)
+    ).toEqual(['a']);
+  });
+
+  it("applies the field's filter.wildcard (multiselect any-of)", () => {
+    const skinEntity = filterProductEntity;
+    const rows = [
+      { id: 'dry', name: 'Dry', skinTypes: ['dry'] },
+      { id: 'all', name: 'All', skinTypes: ['all'] },
+      { id: 'oily', name: 'Oily', skinTypes: ['oily', 'combination'] },
+    ];
+    expect(
+      applyFilters(rows, { skinTypes: ['dry'] }, skinEntity).map((i) => i.id)
+    ).toEqual(['dry', 'all']);
+    expect(
+      applyFilters(rows, { skinTypes: ['combination'] }, skinEntity).map(
+        (i) => i.id
+      )
+    ).toEqual(['all', 'oily']);
+  });
+
+  it('multi-select: OR within a field, AND across fields', () => {
+    const catalogue = filterProductEntity;
+    const rows = [
+      { id: '1', name: '1', type: 'serum', brandId: 'A' },
+      { id: '2', name: '2', type: 'essence', brandId: 'B' },
+      { id: '3', name: '3', type: 'serum', brandId: 'C' },
+      { id: '4', name: '4', type: 'toner', brandId: 'A' },
+      { id: '5', name: '5', type: 'essence_mist', brandId: 'A' },
+    ];
+    const filters: FilterState = {
+      type: ['serum', 'essence'],
+      brandId: ['A', 'B'],
+    };
+    expect(applyFilters(rows, filters, catalogue).map((i) => i.id)).toEqual([
+      '1',
+      '2',
+    ]);
+  });
+
+  it('reference filter matches the id exactly', () => {
+    const refEntity = filterProductEntity;
+    const rows = [
+      { id: '1', name: 'A', brandId: 'b1' },
+      { id: '2', name: 'B', brandId: 'b12' },
+    ];
+    expect(
+      applyFilters(rows, { brandId: 'b1' }, refEntity).map((i) => i.id)
+    ).toEqual(['1']);
   });
 
   it('filters by number range', () => {
@@ -185,61 +214,51 @@ describe('applyFilters', () => {
 
 describe('getSearchableFields', () => {
   it('returns entity.search.fields when defined', () => {
-    const entity = makeEntity(
-      {
-        name: { type: 'text' },
-        code: { type: 'text' },
-        price: { type: 'number' },
-      },
-      { fields: ['name', 'code'] }
-    );
+    const entity = searchFieldsEntity;
     expect(getSearchableFields(entity)).toEqual(['name', 'code']);
   });
 
   it('auto-detects string-valued visible fields when search.fields not set', () => {
-    const entity = makeEntity({
-      name: { type: 'text' },
-      description: { type: 'textarea' },
-      price: { type: 'number' },
-      createdAt: { type: 'date' },
-    });
+    const entity = searchAutoEntity;
     const fields = getSearchableFields(entity);
     expect(fields).toContain('name');
     expect(fields).toContain('description');
     expect(fields).not.toContain('price');
+    expect(fields).not.toContain('releasedOn');
     expect(fields).not.toContain('createdAt');
   });
 
   it('excludes hidden fields from auto-detection', () => {
-    const entity = makeEntity({
-      name: { type: 'text' },
-      secret: { type: 'text', visibility: 'hidden' },
-    });
+    const entity = searchAutoEntity;
     const fields = getSearchableFields(entity);
     expect(fields).toContain('name');
     expect(fields).not.toContain('secret');
   });
 
   it('excludes technical fields from auto-detection', () => {
-    const entity = makeEntity({
-      name: { type: 'text' },
-      internalId: { type: 'text', visibility: 'technical' },
-    });
+    const entity = searchAutoEntity;
     const fields = getSearchableFields(entity);
     expect(fields).not.toContain('internalId');
   });
 
+  // numericOnlyEntity hides the framework status (`visibility: 'technical'`), the only other text field.
   it('returns empty array when no searchable fields exist', () => {
-    const entity = makeEntity({
-      price: { type: 'number' },
-      count: { type: 'number' },
-    });
+    const entity = numericOnlyEntity;
     expect(getSearchableFields(entity)).toEqual([]);
   });
 
+  // Regression: auto-detection reads the descriptor kind (`text`), not a per-type table:
+  // a custom type with a string schema is searched, a reference (an id) is not.
+  it('auto-detects by descriptor kind: custom string schema yes, reference no', () => {
+    const entity = searchAutoEntity;
+    const fields = getSearchableFields(entity);
+    expect(fields).toContain('district');
+    expect(fields).not.toContain('brandId');
+  });
+
   it('returns explicit empty array from search.fields', () => {
-    // search.fields is empty → falls through to auto-detect
-    const entity = makeEntity({ name: { type: 'text' } }, { fields: [] });
+    // search.fields is empty (searchAutoEntity) → falls through to auto-detect
+    const entity = searchAutoEntity;
     // Empty array means length 0 → auto-detect kicks in
     const fields = getSearchableFields(entity);
     expect(fields).toContain('name');
@@ -249,10 +268,7 @@ describe('getSearchableFields', () => {
 // ─── applySearch ────────────────────────────────────────────────────
 
 describe('applySearch', () => {
-  const entity = makeEntity(
-    { name: { type: 'text' }, status: { type: 'select' } },
-    { fields: ['name'] }
-  );
+  const entity = listItemEntity;
 
   it('returns all items when query is empty', () => {
     expect(applySearch(items, '', entity)).toEqual(items);
@@ -299,10 +315,7 @@ describe('applySearch', () => {
   });
 
   it('searches address objects by formatted_address', () => {
-    const addrEntity = makeEntity(
-      { address: { type: 'address' } },
-      { fields: ['address'] }
-    );
+    const addrEntity = addressSearchEntity;
     const addrItems = [
       {
         id: '1',
@@ -322,9 +335,7 @@ describe('applySearch', () => {
 
   it('falls back to all values when no searchable fields detected', () => {
     // Entity with only number fields → no searchable fields → fallback to Object.values
-    const numEntity = makeEntity({
-      count: { type: 'number' },
-    });
+    const numEntity = numericOnlyEntity;
     const numItems = [
       { id: '1', name: 'findme', count: 42 },
       { id: '2', name: 'other', count: 10 },
@@ -446,14 +457,7 @@ describe('applySort', () => {
 // ─── Combined pipeline ─────────────────────────────────────────────
 
 describe('combined pipeline: filter → search → sort', () => {
-  const entity = makeEntity(
-    {
-      name: { type: 'text' },
-      status: { type: 'select' },
-      price: { type: 'number' },
-    },
-    { fields: ['name'] }
-  );
+  const entity = listItemEntity;
 
   it('chains filter, search, and sort', () => {
     // Filter: only pending (exact single match)

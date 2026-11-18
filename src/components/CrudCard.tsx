@@ -11,7 +11,6 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { Card, Stack, Text, ActionButton } from '@donotdev/components';
@@ -228,7 +227,8 @@ export function CrudCard({
     return <Text level="small">{parts.join(' · ')}</Text>;
   }, [item, entity.fields, footerFields, t]);
 
-  const deleteItem = useCrud(entity).delete;
+  // Built-in delete = logical delete (CRUD rule 3, `remove`); `delete` is the hard delete.
+  const removeItem = useCrud(entity).remove;
 
   const actionsNode =
     renderActions || showDelete ? (
@@ -236,7 +236,7 @@ export function CrudCard({
         style={{
           display: 'flex',
           alignItems: 'flex-start',
-          gap: 'var(--gap-xs)',
+          gap: 'var(--gap-sm)',
           // Override inherited pointer-events:none from .dndev-card-overlay
           pointerEvents: 'auto',
         }}
@@ -247,21 +247,14 @@ export function CrudCard({
         {showDelete && (
           <ActionButton
             action={async () => {
-              await deleteItem(item.id);
+              await removeItem(item.id);
             }}
-            confirmText={tCrud('delete.confirm', {
-              defaultValue: 'Are you sure you want to delete this item?',
-            })}
-            confirmTitle={tCrud('delete.title', {
-              defaultValue: 'Delete Item',
-            })}
-            loadingText={tCrud('delete.loading', {
-              defaultValue: 'Deleting...',
-            })}
+            confirmText={tCrud('delete.confirm')}
+            confirmTitle={tCrud('delete.title')}
+            loadingText={tCrud('delete.loading')}
             confirmLabel={tCrud('actions.delete')}
             cancelLabel={tCrud('actions.cancel')}
-            variant="destructive"
-            icon={Trash2}
+            intent="remove"
             aria-label={tCrud('actions.delete')}
           >
             {tCrud('actions.delete')}

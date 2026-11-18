@@ -28,11 +28,22 @@ vi.mock('react-hook-form', () => ({
 }));
 
 // Mock field registry
-vi.mock('../FieldRegistry', () => ({
-  getFieldRegistry: vi.fn(() => ({
-    getComponent: vi.fn(() => () => <div>Mock Field</div>),
-  })),
-}));
+const fieldProps = vi.hoisted(() => [] as Array<Record<string, any>>);
+
+vi.mock('../../FieldRegistry', () => {
+  const MockField = (props: Record<string, any>) => {
+    fieldProps.push(props);
+    return <div>Mock Field</div>;
+  };
+  const lookup = (type: string) =>
+    type === 'unregistered-type' ? undefined : MockField;
+  return {
+    getFieldRegistry: vi.fn(() => ({
+      getControlledComponent: vi.fn(lookup),
+      getUncontrolledComponent: vi.fn(lookup),
+    })),
+  };
+});
 
 describe('FormFieldRenderer', () => {
   const mockConfig = {
@@ -47,6 +58,7 @@ describe('FormFieldRenderer', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    fieldProps.length = 0;
   });
 
   it('renders field with correct props', () => {
@@ -94,5 +106,118 @@ describe('FormFieldRenderer', () => {
     );
 
     expect(container).toBeDefined();
+  });
+
+  it('preserves raw labels and the supplied translator for custom uncontrolled adapters', () => {
+    render(
+      <FormFieldRenderer
+        name="title"
+        config={{ ...mockConfig, label: 'fields.title' }}
+        t={mockT}
+        value=""
+        onChange={vi.fn()}
+      />
+    );
+    expect(fieldProps.at(-1)?.label).toBe('fields.title');
+    expect(fieldProps.at(-1)?.config.label).toBe('fields.title');
+    expect(fieldProps.at(-1)?.t).toBe(mockT);
+  });
+
+  it('throws for a type with no registered component (no text-input fallback)', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() =>
+      render(
+        <FormFieldRenderer
+          name="title"
+          config={{ ...mockConfig, type: 'unregistered-type' as never }}
+          t={mockT}
+          control={{} as any}
+        />
+      )
+    ).toThrow(/no registered component/);
+  });
+
+  describe('onlyOptions', () => {
+    const reasonConfig = {
+      name: 'reason',
+      label: 'Reason',
+      type: 'select' as const,
+      visibility: 'admin' as const,
+      validation: {
+        required: true,
+        options: [
+          { value: 'sale', label: 'Sale' },
+          { value: 'breakage', label: 'Breakage' },
+          { value: 'loss', label: 'Loss' },
+        ],
+      },
+    };
+
+    it('renders only the given declared options, in the given order (controlled)', () => {
+      render(
+        <FormFieldRenderer
+          name="reason"
+          config={reasonConfig}
+          t={mockT}
+          control={{} as any}
+          onlyOptions={['loss', 'breakage']}
+        />
+      );
+      expect(fieldProps.at(-1)?.fieldConfig.validation).toEqual({
+        required: true,
+        options: [
+          { value: 'loss', label: 'Loss' },
+          { value: 'breakage', label: 'Breakage' },
+        ],
+      });
+      // The entity definition itself is untouched
+      expect(reasonConfig.validation.options).toHaveLength(3);
+    });
+
+    it('restricts the options in uncontrolled mode', () => {
+      render(
+        <FormFieldRenderer
+          name="reason"
+          config={reasonConfig}
+          t={mockT}
+          value=""
+          onChange={vi.fn()}
+          onlyOptions={['breakage']}
+        />
+      );
+      expect(fieldProps.at(-1)?.config.validation.options).toEqual([
+        { value: 'breakage', label: 'Breakage' },
+      ]);
+    });
+
+    it('throws on a value the field does not declare', () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      expect(() =>
+        render(
+          <FormFieldRenderer
+            name="reason"
+            config={reasonConfig}
+            t={mockT}
+            control={{} as any}
+            onlyOptions={['theft']}
+          />
+        )
+      ).toThrow(/"theft" is not an option of field "reason"/);
+    });
+
+    it('throws on a field without static options', () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      expect(() =>
+        render(
+          <FormFieldRenderer
+            name="title"
+            config={mockConfig}
+            t={mockT}
+            control={{} as any}
+            onlyOptions={['a']}
+          />
+        )
+      ).toThrow(/declares no static validation.options/);
+    });
   });
 });

@@ -4,9 +4,10 @@
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
 
+import { fromInputValue } from '../../../forms/utils';
 import { TextFieldComponent } from '../../form/fields';
 import type { TextFieldComponentProps } from '../../form/fields';
-import { controlledFieldOptions } from '../fieldOptions';
+import { controlledFieldOptions, fieldInfo } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -43,9 +44,10 @@ export function ControlledTextField(props: ControlledFieldProps): ReactElement {
           ref={field.ref}
           name={field.name}
           value={field.value ?? ''}
-          onChange={field.onChange}
+          onChange={(e) => field.onChange(fromInputValue(e.target.value))}
           onBlur={field.onBlur}
           label={t(label)}
+          info={fieldInfo(fieldConfig, t)}
           error={fieldState.error?.message}
           helperText={fieldState.error?.message}
           type={inputType}

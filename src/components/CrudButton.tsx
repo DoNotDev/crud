@@ -57,11 +57,12 @@ export interface CrudButtonProps<T = unknown> extends Omit<
  *
  * @example
  * ```tsx
- * const { delete: deleteItem } = useCrud(itemEntity);
+ * // `remove` = logical delete (status `deleted`); `delete` = hard delete
+ * const { remove } = useCrud(itemEntity);
  * const user = useAuth('user');
  *
  * <CrudButton
- *   action={() => deleteItem(itemId)}
+ *   action={() => remove(itemId)}
  *   user={user}
  *   loadingText="Deleting..."
  *   confirmText="Delete this item?"

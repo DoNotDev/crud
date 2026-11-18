@@ -18,6 +18,8 @@ import { useTranslation } from '@donotdev/core';
 export interface NumberFieldComponentProps {
   /** Label for the field */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Current numeric value */
   value?: number;
   /** Change handler */
@@ -53,6 +55,7 @@ export interface NumberFieldComponentProps {
  */
 const NumberFieldComponent: ComponentType<NumberFieldComponentProps> = ({
   label,
+  info,
   value,
   onChange,
   error,
@@ -170,6 +173,7 @@ const NumberFieldComponent: ComponentType<NumberFieldComponentProps> = ({
         type={mask === 'number' ? 'number' : 'text'}
         inputMode={mask === 'number' ? undefined : 'decimal'}
         label={label}
+        info={info}
         value={displayValue}
         onChange={handleChange}
         min={min}

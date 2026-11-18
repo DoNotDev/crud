@@ -6,8 +6,9 @@ import type { ReactElement } from 'react';
 import { Controller, useWatch, useFormContext } from 'react-hook-form';
 import type { FieldValues, Path } from 'react-hook-form';
 
-import { translateLabel } from '../../../forms/utils';
+import { fromInputValue, translateLabel } from '../../../forms/utils';
 import { ComboboxComponent } from '../../form/fields';
+import { fieldInfo } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -106,7 +107,7 @@ export function ControlledComboboxField(
           const newValue =
             typeof value === 'string' ? value : value.target.value;
 
-          field.onChange(newValue);
+          field.onChange(fromInputValue(newValue));
 
           if (dependsOn && setValue && fieldSpecific?.setParentOnChange) {
             const parentValue = fieldSpecific.setParentOnChange(
@@ -130,6 +131,7 @@ export function ControlledComboboxField(
           <ComboboxComponent
             {...field}
             label={t(label)}
+            info={fieldInfo(fieldConfig, t)}
             value={field.value ?? ''}
             onChange={handleChange}
             onBlur={field.onBlur}

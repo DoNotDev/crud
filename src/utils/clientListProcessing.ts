@@ -10,10 +10,11 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { describeEntity } from '@donotdev/core';
 import type { AnyEntity } from '@donotdev/core';
 
 import { matchesFilter } from './matchesFilter';
-import { getValueType, isFilterable } from '../fieldTypeRegistry.store';
+import { isFilterable } from '../fieldTypeRegistry.store';
 import type { FilterState } from '../types';
 
 /**
@@ -48,8 +49,9 @@ export type ClientSort<T = Record<string, unknown>> =
   | ((a: T, b: T) => number);
 
 /**
- * Apply filter state to items using entity field type metadata.
- * Typically called automatically by `useCrudList`/`useCrudCardList` via `processed`.
+ * Apply filter state to items using entity field type metadata: every filter must
+ * match ({@link matchesFilter} semantics per field type; the field's `filter.wildcard`
+ * applies). Typically called automatically by `useCrudList`/`useCrudCardList` via `processed`.
  * Export available for advanced use cases (e.g. filtering outside React).
  *
  * @param items - Raw items array
@@ -76,17 +78,27 @@ export function applyFilters<T extends Record<string, any>>(
     filterEntries.every(([fieldName, filterValue]) => {
       const fieldConfig = entity.fields[fieldName];
       const fieldType = fieldConfig?.type || 'text';
-      return matchesFilter(item[fieldName], filterValue, fieldType);
+      return matchesFilter(
+        item[fieldName],
+        filterValue,
+        fieldType,
+        fieldConfig?.filter
+      );
     })
   );
 }
 
 /**
  * Returns the list of searchable field names for an entity.
- * Uses entity.search.fields if defined, otherwise auto-detects text-like visible fields.
+ * Uses entity.search.fields if defined, otherwise auto-detects the visible fields
+ * whose stored value is text (descriptor `value.kind === 'text'`, custom types
+ * with a string `validation.schema` included; references are ids, not searched).
  *
  * @param entity - Entity definition
  * @returns Array of field names to search
+ *
+ * @version 0.2.0
+ * @since 0.0.1
  */
 export function getSearchableFields(entity: AnyEntity): string[] {
   // Explicit config takes priority
@@ -94,22 +106,19 @@ export function getSearchableFields(entity: AnyEntity): string[] {
     return entity.search.fields;
   }
 
-  // Auto-detect: all visible text-like fields
-  const textLikeValueTypes = new Set(['string']);
+  // Auto-detect: all visible text fields
   const result: string[] = [];
+  const { fields } = describeEntity(entity);
 
-  for (const [fieldName, fieldConfig] of Object.entries(entity.fields)) {
+  for (const [fieldName, descriptor] of Object.entries(fields)) {
     // Skip hidden/technical fields
     if (
-      fieldConfig.visibility === 'hidden' ||
-      fieldConfig.visibility === 'technical'
+      descriptor.visibleAt === 'hidden' ||
+      descriptor.visibleAt === 'technical'
     ) {
       continue;
     }
-    const valueType = getValueType(fieldConfig.type);
-    if (valueType && textLikeValueTypes.has(valueType)) {
-      result.push(fieldName);
-    }
+    if (descriptor.value.kind === 'text') result.push(fieldName);
   }
 
   return result;

@@ -31,6 +31,7 @@ const { bulkSpy, fakeService, setHasService, getCrudServiceInstanceMock } =
     }));
     const fakeService = {
       bulk: bulkSpy,
+      bulkAcross: vi.fn(async () => ({ results: {} })),
       initialize: vi.fn(async () => {}),
       attachProvider: vi.fn(() => true),
       setStore: vi.fn(),
@@ -81,6 +82,9 @@ vi.mock('@donotdev/core', () => {
       subscribeToCollection: () => () => {},
       invalidate: async () => {},
       isAvailable: false,
+    },
+    AtomicBulkError: class extends Error {
+      constructor(message: string, public outcome: string) { super(message); this.name = 'AtomicBulkError'; }
     },
     handleError: vi.fn((e) => e),
     isClient: () => true,
@@ -134,31 +138,16 @@ vi.mock('../useCrud', async (importOriginal) => {
 
 import { renderHook } from '@testing-library/react';
 
+import { eventEntity, scopedEntity } from '@dndev/test-entities';
+
 import { useCrud } from '../useCrud';
 
 // -----------------------------------------------------------------------------
 // Fixtures
 // -----------------------------------------------------------------------------
 
-const eventEntity = {
-  name: 'Event',
-  collection: 'events',
-  fields: {},
-} as unknown as Entity;
-
-const scopedEntity = {
-  name: 'Event',
-  collection: 'events',
-  fields: {},
-  scope: { field: 'companyId', provider: 'company-a' },
-} as unknown as Entity;
-
-const scopedEntityB = {
-  name: 'Event',
-  collection: 'events',
-  fields: {},
-  scope: { field: 'companyId', provider: 'company-b' },
-} as unknown as Entity;
+// The same scoped entity under another scope provider (the hook's deps follow it).
+const scopedEntityB = { ...scopedEntity, scope: { ...scopedEntity.scope, provider: 'company-b' } };
 
 // -----------------------------------------------------------------------------
 // Tests
@@ -169,6 +158,17 @@ describe('useCrud().bulk — hook integration', () => {
     bulkSpy.mockClear();
     getCrudServiceInstanceMock.mockClear();
     setHasService(true);
+  });
+
+  it('rejects atomic bulkAcross without a service while retaining legacy empty success', async () => {
+    const { result } = renderHook(() => useCrud(eventEntity));
+    const api = result.current as ReturnType<typeof useCrud>;
+    if (typeof api === 'string') throw new Error('unexpected status');
+    fakeService.attachProvider.mockReturnValue(false);
+    try {
+      await expect(api.bulkAcross([], { execution: 'atomic' })).rejects.toMatchObject({ name: 'AtomicBulkError', outcome: 'not-committed' });
+      await expect(api.bulkAcross([])).resolves.toEqual({ results: {} });
+    } finally { fakeService.attachProvider.mockReturnValue(true); }
   });
 
   it('renders without error and exposes bulk as a function', () => {
@@ -252,11 +252,11 @@ describe('useCrud().bulk — hook integration', () => {
     ];
     expect(ops.inserts[0]).toMatchObject({
       title: 'A',
-      companyId: 'company-a-value',
+      companyId: 'company-value',
     });
     expect(ops.inserts[1]).toMatchObject({
       title: 'B',
-      companyId: 'company-a-value',
+      companyId: 'company-value',
     });
   });
 });

@@ -49,8 +49,8 @@ export function YearFilter({
       label={label}
       min={minYear}
       max={maxYear}
-      minPlaceholder={tCrud('filter.min', { defaultValue: 'Min' })}
-      maxPlaceholder={tCrud('filter.max', { defaultValue: 'Max' })}
+      minPlaceholder={tCrud('filter.min')}
+      maxPlaceholder={tCrud('filter.max')}
       minValue={current.min || ''}
       maxValue={current.max || ''}
       onChange={(min, max) => {

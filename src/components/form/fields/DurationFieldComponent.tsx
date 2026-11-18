@@ -113,27 +113,25 @@ const DurationFieldComponent: ComponentType<DurationFieldComponentProps> = ({
   );
 
   const customLabel = t
-    ? t('crud:duration.custom', { defaultValue: 'Custom' })
+    ? t('crud:duration.custom')
     : 'Custom';
 
   if (readonly) {
     const display =
       numericValue === 0
         ? t
-          ? t('crud:duration.zero', { defaultValue: '—' })
+          ? t('crud:duration.zero')
           : '—'
         : numericValue < 60
           ? t
             ? t('crud:duration.minutes', {
                 count: numericValue,
-                defaultValue: `${numericValue} min`,
               })
             : `${numericValue} min`
           : t
             ? t('crud:duration.hoursMinutes', {
                 hours: Math.floor(numericValue / 60),
                 minutes: numericValue % 60,
-                defaultValue: `${Math.floor(numericValue / 60)}h${numericValue % 60 ? ` ${numericValue % 60}min` : ''}`,
               })
             : `${Math.floor(numericValue / 60)}h${numericValue % 60 ? ` ${numericValue % 60}m` : ''}`;
     return (
@@ -206,7 +204,7 @@ const DurationFieldComponent: ComponentType<DurationFieldComponentProps> = ({
           >
             <Clock
               size={14}
-              style={{ marginRight: 'var(--gap-xs)' }}
+              style={{ marginRight: 'var(--gap-sm)' }}
               aria-hidden
             />
             {chipLabel}

@@ -16,6 +16,8 @@ import DateFieldComponent from './DateFieldComponent';
 export interface TimestampFieldComponentProps {
   /** Field label */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Current Date value or null */
   value?: Date | null;
   /** Change handler - accepts both event and direct value */
@@ -32,6 +34,7 @@ export interface TimestampFieldComponentProps {
 
 const TimestampFieldComponent: ComponentType<TimestampFieldComponentProps> = ({
   label,
+  info,
   value,
   onChange,
   error,
@@ -61,6 +64,7 @@ const TimestampFieldComponent: ComponentType<TimestampFieldComponentProps> = ({
   return (
     <DateFieldComponent
       label={label}
+      info={info}
       value={stringValue}
       onChange={handleChange}
       error={error}

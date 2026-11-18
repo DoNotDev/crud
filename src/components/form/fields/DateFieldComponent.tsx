@@ -23,6 +23,8 @@ import {
 export interface DateFieldComponentProps {
   /** Field label */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Value as an ISO string or null */
   value?: string | null;
   /** Change handler emitting an ISO string or null */
@@ -40,6 +42,12 @@ export interface DateFieldComponentProps {
   required?: boolean;
 }
 
+/** Date → local wall time `YYYY-MM-DDTHH:MM` (the DateTimePicker / datetime-local format). */
+function toLocalDateTime(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 /**
  * DateFieldComponent renders a date (or related) input field
  *
@@ -49,6 +57,7 @@ export interface DateFieldComponentProps {
  */
 const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
   label,
+  info,
   value,
   onChange,
   error,
@@ -68,6 +77,12 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
     onChange(newValue);
   };
 
+  // DateTimePicker speaks local wall time (YYYY-MM-DDTHH:MM); the stored value is an
+  // ISO instant. Convert at this boundary so the admin sees and edits local time.
+  const handleDateTimeChange = (local: string | null) => {
+    onChange(local ? new Date(local).toISOString() : null);
+  };
+
   // Format the incoming ISO string for display in the input
   let displayValue = '';
   if (value) {
@@ -75,8 +90,7 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
     if (mode === 'date') {
       displayValue = date.toISOString().split('T')[0] || '';
     } else if (mode === 'datetime-local') {
-      // Remove seconds and the trailing 'Z' for local display
-      displayValue = date.toISOString().slice(0, 16) || '';
+      displayValue = toLocalDateTime(date);
     } else if (mode === 'month') {
       displayValue = date.toISOString().slice(0, 7);
     } else if (mode === 'time') {
@@ -95,6 +109,7 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
         <DatePicker
           id={id}
           label={label}
+          info={info}
           value={value ?? null}
           onChange={onChange}
           required={required}
@@ -147,8 +162,9 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
         <DateTimePicker
           id={id}
           label={label}
-          value={value ?? null}
-          onChange={onChange}
+          info={info}
+          value={displayValue || null}
+          onChange={handleDateTimeChange}
           required={required}
           aria-describedby={cn(
             hasError && `${id}-error`,
@@ -198,6 +214,7 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
       <Input
         id={id}
         label={label}
+        info={info}
         type={mode}
         value={displayValue}
         onChange={handleChange}

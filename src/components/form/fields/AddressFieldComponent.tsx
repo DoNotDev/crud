@@ -20,6 +20,8 @@ import { useTranslation, getPlatformEnvVar } from '@donotdev/core';
 export interface AddressFieldComponentProps {
   /** Field label */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Address value with formatted address and coordinates */
   value?: {
     formatted_address: string;
@@ -212,6 +214,7 @@ function installBootstrapLoader(key: string) {
  */
 const AddressFieldComponent = ({
   label,
+  info,
   value,
   onChange,
   enableGoogleMaps = false,
@@ -480,6 +483,7 @@ const AddressFieldComponent = ({
       <Stack gap="tight">
         <Combobox
           label={label}
+          info={info}
           value={inputValue}
           onValueChange={handleSelect}
           onSearchChange={handleSearchChange}
@@ -510,6 +514,7 @@ const AddressFieldComponent = ({
     <Stack gap="tight">
       <Combobox
         label={label}
+        info={info}
         value={inputValue}
         onValueChange={handleSelect}
         onSearchChange={handleSearchChange}

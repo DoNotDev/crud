@@ -1,6 +1,7 @@
 /**
  * @fileoverview Unit tests for getFieldsForOperation
- * @description Tests field filtering: visibility, editability, generated/computed exclusion, create vs edit.
+ * @description Tests field filtering: visibility, editability, generated exclusion, computed
+ * read-only and written, create vs edit.
  *
  * @version 0.1.0
  * @since 0.1.0
@@ -10,6 +11,8 @@
 import { describe, it, expect } from 'vitest';
 
 import { EDITABLE, type EntityField, type FieldType } from '@donotdev/core';
+
+import { requiredTitleEntity } from '@dndev/test-entities';
 
 import { getFieldsForOperation } from '../getFieldsForOperation';
 
@@ -56,7 +59,6 @@ describe('getFieldsForOperation', () => {
       expect(names).toContain('title');
       expect(names).toContain('notes');
       expect(names).not.toContain('total');
-      expect(names).not.toContain('derived');
     });
 
     it('excludes generated fields from edit forms', () => {
@@ -68,15 +70,40 @@ describe('getFieldsForOperation', () => {
       expect(names).toContain('title');
       expect(names).toContain('notes');
       expect(names).not.toContain('total');
-      expect(names).not.toContain('derived');
     });
 
-    it('excludes computed fields regardless of viewer role', () => {
-      const result = getFieldsForOperation(fields, {
-        operation: 'create',
-        viewerRole: 'super',
+    // Regression (design 3.4): computed fields were hidden; they are shown
+    // read-only and written by the form.
+    it.each(['create', 'edit'] as const)(
+      'shows computed fields read-only and written on %s, regardless of viewer role',
+      (operation) => {
+        const result = getFieldsForOperation(fields, {
+          operation,
+          viewerRole: 'super',
+        });
+        expect(result.find((f) => f.name === 'derived')).toMatchObject({
+          editable: false,
+          written: true,
+        });
+      }
+    );
+
+    it('marks inputs written and read-only fields not written', () => {
+      const result = getFieldsForOperation(
+        {
+          ...fields,
+          locked: field({ name: 'locked', label: 'Locked', editable: false }),
+        },
+        { operation: 'edit', viewerRole: 'admin' }
+      );
+      expect(result.find((f) => f.name === 'title')).toMatchObject({
+        editable: true,
+        written: true,
       });
-      expect(result.map((f) => f.name)).not.toContain('derived');
+      expect(result.find((f) => f.name === 'locked')).toMatchObject({
+        editable: false,
+        written: false,
+      });
     });
   });
 
@@ -256,13 +283,8 @@ describe('getFieldsForOperation', () => {
 
   describe('accepts Entity object with name and fields', () => {
     it('extracts fields from Entity-shaped input', () => {
-      const entity = {
-        name: 'Product',
-        fields: {
-          title: field({ name: 'title', label: 'Title' }),
-        },
-      };
-      const result = getFieldsForOperation(entity as any, {
+      // requiredTitleEntity: one consumer field (`title`) next to the framework fields.
+      const result = getFieldsForOperation(requiredTitleEntity, {
         operation: 'create',
         viewerRole: 'user',
       });

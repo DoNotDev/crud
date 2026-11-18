@@ -20,6 +20,8 @@ import { useTranslation } from '@donotdev/core';
 export interface ComboboxComponentProps {
   /** Field label */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Current value */
   value?: string;
   /** Available options */
@@ -62,6 +64,7 @@ export interface ComboboxComponentProps {
  */
 const ComboboxComponent: ComponentType<ComboboxComponentProps> = ({
   label,
+  info,
   value,
   options,
   error,
@@ -113,6 +116,7 @@ const ComboboxComponent: ComponentType<ComboboxComponentProps> = ({
     <Stack gap="tight">
       <Combobox
         label={label}
+        info={info}
         value={value || ''}
         onValueChange={handleValueChange}
         onOpenChange={handleOpenChange}

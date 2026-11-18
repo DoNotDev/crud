@@ -34,38 +34,11 @@ vi.mock('@donotdev/core', async (orig) => ({
   useFeatureConsent: () => true,
 }));
 
-import { defineEntity } from '@donotdev/core';
 
 import { useReferenceResolver } from '../useReferenceResolver';
+import { brandEntity, customReferenceEntity, suppliedProductEntity as product, wideReferenceEntity } from '@dndev/test-entities';
 
-defineEntity({
-  name: 'Brand',
-  collection: 'brands',
-  fields: {
-    name: { name: 'name', label: 'n', type: 'text', visibility: 'guest', validation: { required: true } },
-  },
-});
-const product = defineEntity({
-  name: 'Product',
-  collection: 'products',
-  fields: {
-    brandId: {
-      name: 'brandId',
-      label: 'b',
-      type: 'reference',
-      visibility: 'guest',
-      validation: { required: true, reference: 'brands' },
-      options: { fieldSpecific: { displayField: 'name' } },
-    },
-    supplierId: {
-      name: 'supplierId',
-      label: 's',
-      type: 'reference',
-      visibility: 'guest',
-      validation: { reference: 'suppliers' },
-    },
-  },
-});
+// brands: the shared brandEntity (label field `name`), registered by the import.
 
 const wrapper = () => {
   const qc = new QueryClient();
@@ -98,4 +71,24 @@ describe('useReferenceResolver', () => {
     expect(listSpy.mock.calls.map((c) => c[0])).not.toContain('suppliers');
     warn.mockRestore();
   });
+
+  // Regression: references are the descriptor's (`value.kind === 'ref'`), custom types included.
+  it('resolves a custom-type field with validation.reference', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const listing = customReferenceEntity;
+    const { result } = renderHook(() => useReferenceResolver(listing), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current).toEqual({ brands: { b1: 'Acme' } }));
+    warn.mockRestore();
+  });
+
+  // Regression: a fifth referenced collection was silently ignored (raw ids).
+  it('throws beyond 4 referenced collections', () => {
+    const wide = wideReferenceEntity;
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => renderHook(() => useReferenceResolver(wide), { wrapper: wrapper() })).toThrow(
+      /references 5 collections/
+    );
+    error.mockRestore();
+  });
 });
+

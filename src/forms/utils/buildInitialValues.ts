@@ -4,72 +4,86 @@
  * @fileoverview Initial values builders for CRUD forms
  * @description
  * - buildSchemaDefaults: compute create-mode defaults from entity definition only.
- * - buildInitialFromRecord: overlay schema defaults with an existing DB record
- *   and apply type-specific normalizations (switch, price, etc.).
+ * - buildInitialFromRecord: project an existing DB record onto the form values
+ *   (the fields the form writes) and apply type-specific normalizations
+ *   (switch, price, etc.).
  *
  * These helpers provide a single, canonical "initialValues" snapshot that
- * React Hook Form can use as its dirty baseline.
+ * React Hook Form can use as its dirty baseline. Fields the form does not write
+ * (generated, technical, `editable: false`, role-denied) never enter it: the
+ * form reads them from `form.record`.
  */
 
+import { createStatus } from '@donotdev/core';
 import type { AnyEntity } from '@donotdev/core';
 
-import type { InferEntityData } from '../types';
+import { EMPTY_VALUE } from './emptyValue';
 
-/** Try fieldName first, then camelCase variant (handles Supabase fieldMapper output). */
-function resolveValue(
-  record: Record<string, unknown>,
-  fieldName: string
-): unknown {
-  if (fieldName in record) return record[fieldName];
-  // snake_case → camelCase fallback
-  const camel = fieldName.replace(/_([a-z])/g, (_, c: string) =>
-    c.toUpperCase()
-  );
-  if (camel !== fieldName && camel in record) return record[camel];
-  return undefined;
-}
+/** Field types edited through a text input: empty is EMPTY_VALUE, never ''. */
+const TEXT_LIKE_TYPES: ReadonlySet<string> = new Set([
+  'text',
+  'textarea',
+  'email',
+  'url',
+  'tel',
+  'iban',
+  'password',
+  'color',
+]);
 
-function isPresent(
-  record: Record<string, unknown>,
-  fieldName: string
-): boolean {
-  if (fieldName in record) return true;
-  const camel = fieldName.replace(/_([a-z])/g, (_, c: string) =>
-    c.toUpperCase()
-  );
-  return camel !== fieldName && camel in record;
+/** What the form state holds: the fields the form writes (`writableFields`). */
+export interface FormProjection {
+  /** Field names the form writes, i18n companions included (`writableFields`) */
+  fields: ReadonlySet<string>;
+  /** Keep the record's `id` (edit of the record itself, not of an extension row) */
+  keepId?: boolean;
 }
 
 /**
- * Build initial values for an existing DB record.
+ * Build initial values for an existing DB record, projected onto the form values.
  *
- * - Starts from the raw record (already filtered/masked by the backend).
- * - For each field in the entity:
+ * - Keeps only the fields the form writes (`projection.fields`) and, with
+ *   `keepId`, the record id: generated, technical, `editable: false` and
+ *   role-denied values never enter form state, the local draft or the payload.
+ * - For each written field:
  *   - If the record has a non-null, non-undefined value, keep it.
  *   - Otherwise, apply the same type-specific defaults we use in forms.
+ *
+ * @param entity - Entity from `defineEntity()`
+ * @param record - Stored row (or create defaults), already filtered by the backend
+ * @param projection - Fields the form writes (`writableFields(entity, role, op)`)
+ * @returns The form values
+ *
+ * @version 0.2.0
+ * @since 0.0.1
+ * @author AMBROISE PARK Consulting
  */
-export function buildInitialFromRecord<E extends AnyEntity>(
-  entity: E,
-  record: Partial<InferEntityData<E>>
-): Partial<InferEntityData<E>> {
-  const defaultValues = (record ?? {}) as Record<string, unknown>;
-  const normalized = { ...defaultValues } as Record<string, unknown>;
+export function buildInitialFromRecord(
+  entity: AnyEntity,
+  record: Readonly<Record<string, unknown>>,
+  projection: FormProjection
+): Record<string, unknown> {
+  const { fields, keepId = false } = projection;
+  const normalized: Record<string, unknown> = Object.fromEntries(
+    Object.entries(record).filter(
+      ([key]) => fields.has(key) || (keepId && key === 'id')
+    )
+  );
 
   Object.entries(entity.fields).forEach(([fieldName, fieldConfig]) => {
-    // Resolve value with camelCase fallback (Supabase fieldMapper returns camelCase)
-    const value = resolveValue(normalized, fieldName);
-    // Write back under the entity field name so RHF field names match
-    if (value !== undefined && !(fieldName in normalized)) {
-      normalized[fieldName] = value;
-    }
-    const absent = !isPresent(defaultValues, fieldName);
+    if (!fields.has(fieldName)) return;
+    // Adapters return rows keyed by entity field names (Supabase: entity-aware mapper).
+    const value = normalized[fieldName];
+    const absent = !(fieldName in normalized);
     const useDefault = absent || value === null || value === undefined;
 
-    // Status field defaults to 'draft' on create (empty record).
-    // Entities start as drafts — this activates draftResolver in useEntityForm
-    // so partial saves work without hitting required-field validation.
+    // Status: CRUD rule 7 (`createStatus`, core/schemas crud/create): the default
+    // `available`; a draft is opt-in (the caller passes `status: 'draft'`).
     if (fieldName === 'status' && useDefault) {
-      normalized[fieldName] = 'draft';
+      normalized[fieldName] = createStatus(undefined);
+    } else if (TEXT_LIKE_TYPES.has(fieldConfig.type)) {
+      // Not filled in = EMPTY_VALUE, also for a '' stored by older form versions.
+      if (useDefault || value === '') normalized[fieldName] = EMPTY_VALUE;
     } else if (fieldConfig.type === 'switch') {
       if (value === null || value === undefined) {
         const fieldSpecific = fieldConfig.options?.fieldSpecific as
@@ -79,7 +93,6 @@ export function buildInitialFromRecord<E extends AnyEntity>(
       }
     } else if (useDefault) {
       // Schema field missing or null in DB: use type default so field shows in form.
-      // Use same empty values as controlled inputs so RHF does not mark form dirty on load.
       if (fieldConfig.type === 'price') {
         normalized[fieldName] = null;
       } else if (
@@ -87,17 +100,6 @@ export function buildInitialFromRecord<E extends AnyEntity>(
         fieldConfig.type === 'boolean'
       ) {
         normalized[fieldName] = false;
-      } else if (
-        fieldConfig.type === 'text' ||
-        fieldConfig.type === 'textarea' ||
-        fieldConfig.type === 'email' ||
-        fieldConfig.type === 'url' ||
-        fieldConfig.type === 'tel' ||
-        fieldConfig.type === 'iban' ||
-        fieldConfig.type === 'password' ||
-        fieldConfig.type === 'color'
-      ) {
-        normalized[fieldName] = '';
       } else if (
         fieldConfig.type === 'number' ||
         fieldConfig.type === 'range' ||
@@ -111,19 +113,28 @@ export function buildInitialFromRecord<E extends AnyEntity>(
     }
   });
 
-  return normalized as Partial<InferEntityData<E>>;
+  return normalized;
 }
 
 /**
  * Build schema defaults for create-mode forms.
  *
  * - Starts from an empty record and applies the same type-specific defaults as
- *   buildInitialFromRecord.
+ *   buildInitialFromRecord, for the fields the form writes.
  * - This represents "what a brand-new object would look like" before any user edits.
+ *
+ * @param entity - Entity from `defineEntity()`
+ * @param fields - Field names the form writes on create (`writableFields(entity, role, 'create')`)
+ * @returns The create defaults
+ *
+ * @version 0.2.0
+ * @since 0.0.1
+ * @author AMBROISE PARK Consulting
  */
-export function buildSchemaDefaults<E extends AnyEntity>(
-  entity: E
-): Partial<InferEntityData<E>> {
+export function buildSchemaDefaults(
+  entity: AnyEntity,
+  fields: ReadonlySet<string>
+): Record<string, unknown> {
   // Reuse the same normalization logic on an empty record.
-  return buildInitialFromRecord(entity, {} as Partial<InferEntityData<E>>);
+  return buildInitialFromRecord(entity, {}, { fields });
 }

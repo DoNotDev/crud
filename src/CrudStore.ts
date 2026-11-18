@@ -10,6 +10,8 @@
  * - Loading states per collection
  * - Error states per collection
  * - Optimistic operations with rollback data
+ * - UI state (filters, favorites, page size); URL-synced filter states mirror the
+ *   `f_*` search params (CRUD.md "URL sync")
  *
  * **NOT responsible for:**
  * - Query results caching (TanStack Query owns this)
@@ -19,7 +21,12 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { createDoNotDevStore, isClient } from '@donotdev/core';
+import {
+  createDoNotDevStore,
+  getEntityByCollection,
+  isClient,
+} from '@donotdev/core';
+import type { AnyEntity } from '@donotdev/core';
 
 import { OPTIMISTIC_STATUSES, CRUD_OPERATION } from './types';
 import type {
@@ -30,74 +37,56 @@ import type {
   FilterState,
   CollectionUIState,
 } from './types';
+import {
+  encodeFilterParams,
+  readFilterParams,
+  writeFilterParams,
+} from './utils/filterUrl';
 
 // ===================================================================
-// URL ↔ Filter Sync (pure functions, no hooks)
+// URL ↔ Filter Sync
 // ===================================================================
+//
+// Scope: a filter state syncs with the URL only when its key resolves to an entity
+// (`filterUrlEntity`): by default the key of an entity collection (the page list's
+// filter state); `setFilterUrlSync` overrides it per key (opt-out, or opt-in of a
+// custom key). Only that entity's `f_*` params are read and written.
 
-let urlSyncTimer: ReturnType<typeof setTimeout> | null = null;
+/** Explicit URL sync per filter key (`setFilterUrlSync`): decoding entity, or `null` = off. */
+const filterUrlSync = new Map<string, AnyEntity | null>();
 
-const FILTER_PREFIX = 'f_';
+/** Debounced URL writes per key, with the pathname they were scheduled on. */
+const pendingUrlWrites = new Map<
+  string,
+  { timer: ReturnType<typeof setTimeout>; pathname: string }
+>();
 
-/** Serialize FilterState to URL search params */
-function filtersToUrl(filters: FilterState): void {
-  if (!isClient()) return;
-  const current = new URLSearchParams(location.search);
-  // Remove existing filter params
-  [...current.keys()]
-    .filter((k) => k.startsWith(FILTER_PREFIX))
-    .forEach((k) => current.delete(k));
-  // Write new filter params
-  for (const [field, value] of Object.entries(filters)) {
-    if (typeof value === 'string') {
-      current.set(`${FILTER_PREFIX}${field}`, value);
-    } else if (Array.isArray(value)) {
-      current.set(`${FILTER_PREFIX}${field}`, value.join(','));
-    } else {
-      if (value.min) current.set(`${FILTER_PREFIX}${field}_min`, value.min);
-      if (value.max) current.set(`${FILTER_PREFIX}${field}_max`, value.max);
-    }
-  }
-  const search = current.toString();
-  history.replaceState(
-    null,
-    '',
-    `${location.pathname}${search ? `?${search}` : ''}`
-  );
+/** Delay between a filter change and its URL write (typing, slider drags). */
+const URL_WRITE_DELAY_MS = 500;
+
+let urlListenerInstalled = false;
+
+/** URL-synced keys read so far: the keys a URL change re-reads. */
+const urlWatchedKeys = new Set<string>();
+
+/** Entity decoding the URL params of a filter key, or `null` when the key does not sync. */
+function filterUrlEntity(key: string): AnyEntity | null {
+  const explicit = filterUrlSync.get(key);
+  if (explicit !== undefined) return explicit;
+  return getEntityByCollection(key) ?? null;
 }
 
-/** Deserialize URL search params to FilterState */
-function filtersFromUrl(): FilterState {
-  if (!isClient()) return {};
+/** Write the entity's filter params into the current URL (keeps history state, hash). */
+function writeFiltersToUrl(filters: FilterState, entity: AnyEntity): void {
   const params = new URLSearchParams(location.search);
-  const filters: FilterState = {};
-  const ranges = new Map<string, { min?: string; max?: string }>();
-
-  params.forEach((value, key) => {
-    if (!key.startsWith(FILTER_PREFIX)) return;
-    const rest = key.slice(FILTER_PREFIX.length);
-
-    if (rest.endsWith('_min')) {
-      const field = rest.slice(0, -4);
-      const r = ranges.get(field) ?? {};
-      r.min = value;
-      ranges.set(field, r);
-    } else if (rest.endsWith('_max')) {
-      const field = rest.slice(0, -4);
-      const r = ranges.get(field) ?? {};
-      r.max = value;
-      ranges.set(field, r);
-    } else if (value.includes(',')) {
-      filters[rest] = value.split(',');
-    } else {
-      filters[rest] = value;
-    }
-  });
-
-  ranges.forEach((range, field) => {
-    filters[field] = range;
-  });
-  return filters;
+  writeFilterParams(params, filters, entity);
+  const search = params.toString();
+  if (search === location.search.replace(/^\?/, '')) return;
+  history.replaceState(
+    history.state,
+    '',
+    `${location.pathname}${search ? `?${search}` : ''}${location.hash}`
+  );
 }
 
 /** Default UI state for collections */
@@ -209,12 +198,63 @@ export const useCrudStore = createDoNotDevStore<CrudState & CrudActions>({
           },
         };
       });
-      // Side-effect: sync filters to URL (debounced — store updates immediately, URL after 500ms)
-      if (urlSyncTimer) clearTimeout(urlSyncTimer);
-      urlSyncTimer = setTimeout(() => {
-        urlSyncTimer = null;
-        filtersToUrl(filters);
-      }, 500);
+      // Side-effect: URL-synced keys write their params (debounced — store now, URL
+      // after URL_WRITE_DELAY_MS), unless the user has left the page meanwhile.
+      if (!isClient()) return;
+      const entity = filterUrlEntity(collection);
+      if (!entity) return;
+      installUrlListener();
+      urlWatchedKeys.add(collection);
+      const pending = pendingUrlWrites.get(collection);
+      if (pending) clearTimeout(pending.timer);
+      const pathname = location.pathname;
+      pendingUrlWrites.set(collection, {
+        pathname,
+        timer: setTimeout(() => {
+          pendingUrlWrites.delete(collection);
+          if (location.pathname !== pathname) return;
+          writeFiltersToUrl(filters, entity);
+        }, URL_WRITE_DELAY_MS),
+      });
+    },
+
+    setFilterUrlSync: (key: string, entity: AnyEntity | null) => {
+      filterUrlSync.set(key, entity);
+    },
+
+    syncFiltersFromUrl: (key: string) => {
+      if (!isClient()) return;
+      const entity = filterUrlEntity(key);
+      if (!entity) return;
+      installUrlListener();
+      urlWatchedKeys.add(key);
+      const pending = pendingUrlWrites.get(key);
+      if (pending) {
+        // A pending write on this page is newer than the URL
+        if (pending.pathname === location.pathname) return;
+        clearTimeout(pending.timer);
+        pendingUrlWrites.delete(key);
+      }
+      const fromUrl = readFilterParams(location.search, entity);
+      const current = get().collections[key]?.ui?.filters ?? {};
+      if (
+        encodeFilterParams(fromUrl, entity) ===
+        encodeFilterParams(current, entity)
+      )
+        return;
+      set((state) => {
+        const collectionState =
+          state.collections[key] || createDefaultCollectionState();
+        return {
+          collections: {
+            ...state.collections,
+            [key]: {
+              ...collectionState,
+              ui: { ...collectionState.ui, filters: fromUrl },
+            },
+          },
+        };
+      });
     },
 
     setShowFavoritesOnly: (collection: string, show: boolean) => {
@@ -240,8 +280,12 @@ export const useCrudStore = createDoNotDevStore<CrudState & CrudActions>({
     getFilters: (collection: string) => {
       const existing = get().collections[collection]?.ui?.filters;
       if (existing) return existing;
-      // First access: seed from URL if present
-      const urlFilters = filtersFromUrl();
+      // First access of a URL-synced key: seed from the URL
+      const entity = isClient() ? filterUrlEntity(collection) : null;
+      if (!entity) return {};
+      installUrlListener();
+      urlWatchedKeys.add(collection);
+      const urlFilters = readFilterParams(location.search, entity);
       if (Object.keys(urlFilters).length > 0) {
         // Write into store without triggering URL sync (already in URL)
         set((state) => {
@@ -589,3 +633,55 @@ export const useCrudStore = createDoNotDevStore<CrudState & CrudActions>({
     },
   }),
 });
+
+/** Stable empty filter state (render snapshots must keep their reference). */
+const EMPTY_FILTERS: FilterState = {};
+
+/** Last URL read per key by {@link peekFilters} (stable snapshot while the URL is unchanged). */
+const urlPeekCache = new Map<
+  string,
+  { search: string; entity: AnyEntity; filters: FilterState }
+>();
+
+/**
+ * Filter state of a key for render: the stored state, else, for a URL-synced key on
+ * the client that is not seeded yet, the filters its `f_*` params encode. Reads only:
+ * never writes the store, so render can call it without notifying other components
+ * (the store is seeded by `syncFiltersFromUrl`, from an effect). Same reference while
+ * neither the store nor the URL changes (a `useSyncExternalStore` snapshot).
+ * Internal to `useCrudFilters`.
+ */
+export function peekFilters(key: string): FilterState {
+  const stored = useCrudStore.getState().collections[key]?.ui?.filters;
+  if (stored) return stored;
+  if (!isClient()) return EMPTY_FILTERS;
+  const entity = filterUrlEntity(key);
+  if (!entity) return EMPTY_FILTERS;
+  const search = location.search;
+  const cached = urlPeekCache.get(key);
+  if (cached && cached.search === search && cached.entity === entity) {
+    return cached.filters;
+  }
+  const filters = readFilterParams(search, entity);
+  urlPeekCache.set(key, { search, entity, filters });
+  return filters;
+}
+
+/**
+ * Re-read every URL-synced filter state when the URL changes: back/forward, router
+ * navigations (`history.pushState`), links. Uses the Navigation API
+ * (`currententrychange`, fired by every history change); browsers without it get
+ * back/forward only (`popstate`), and pages re-read on mount (`useCrudFilters`).
+ * Client only, installed once on the first URL-synced access.
+ */
+function installUrlListener(): void {
+  if (urlListenerInstalled || !isClient()) return;
+  urlListenerInstalled = true;
+  const onUrlChange = () => {
+    const { syncFiltersFromUrl } = useCrudStore.getState();
+    urlWatchedKeys.forEach((key) => syncFiltersFromUrl(key));
+  };
+  const navigation = (window as { navigation?: EventTarget }).navigation;
+  if (navigation) navigation.addEventListener('currententrychange', onUrlChange);
+  else window.addEventListener('popstate', onUrlChange);
+}

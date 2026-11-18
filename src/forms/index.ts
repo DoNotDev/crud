@@ -34,6 +34,14 @@
 
 // Hooks
 export { useEntityForm } from './hooks/useEntityForm';
+export { FormNavigationProvider, useFormNavigation } from './FormNavigation';
+export { useFormDraftState } from './hooks/useFormDraftState';
+export type {
+  FormDraftSlot,
+  FormDraftStateRegistry,
+  UseFormDraftStateOptions,
+} from './hooks/useFormDraftState';
+export type { FormNavigation } from './FormNavigation';
 export { useEntityField } from './hooks/useEntityField';
 export { useController } from './hooks/useController';
 export type {
@@ -45,6 +53,8 @@ export type {
 
 // Utilities
 export {
+  EMPTY_VALUE,
+  fromInputValue,
   isFieldEditable,
   getFieldsForOperation,
   validateEntity,
@@ -72,6 +82,9 @@ export type {
   InferEntityOutput,
   UseEntityFormOptions,
   EntityFormReturn,
+  EntityFormHandleSubmit,
+  EntityFormState,
+  EntityFormSubmitOptions,
   EntityFieldReturn,
   // Re-exported core types
   Entity,

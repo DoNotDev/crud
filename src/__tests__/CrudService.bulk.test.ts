@@ -25,6 +25,7 @@ const {
   detectBulkCollisionsMock,
   handleErrorMock,
   toastMock,
+  withTimeoutMock,
 } = vi.hoisted(() => {
   class BulkCollisionErrorMock extends Error {
     readonly collidingIds: string[];
@@ -84,6 +85,7 @@ const {
     detectBulkCollisionsMock,
     handleErrorMock,
     toastMock,
+    withTimeoutMock: vi.fn(<T>(p: Promise<T>) => p),
   };
 });
 
@@ -91,11 +93,21 @@ vi.mock('@donotdev/components', () => ({
   toast: toastMock,
 }));
 
-vi.mock('@donotdev/core', () => ({
+vi.mock('@donotdev/core', async () => ({
+  ...await import('../../../../core/schemas/src/common/crud/bulk'),
+  ...await import('../../../../core/schemas/src/common/crud/status'),
+  // The CRUD rules run for real (core/schemas crud/).
+  ...await import('../../../../core/schemas/src/common/crud/create'),
+  ...await import('../../../../core/schemas/src/common/crud/update'),
+  ...await import('../../../../core/schemas/src/common/crud/prepared'),
+  // The entities the rules resolve by collection (shared test entities).
+  ...await import('../../../../core/schemas/src/common/entityRegistry'),
+  createSchemas: (await import('../../../../core/schemas/src/common/createSchema')).createSchemas,
+  DoNotDevError: (await import('../../../../core/types/src/errors/errorClasses')).DoNotDevError,
   BulkCollisionError: BulkCollisionErrorMock,
   BulkNotImplementedError: BulkNotImplementedErrorMock,
   detectBulkCollisions: detectBulkCollisionsMock,
-  DEFAULT_STATUS_VALUE: 'draft',
+  DEFAULT_STATUS_VALUE: 'available',
   generateUUID: (() => {
     let i = 0;
     return () => `uuid-${++i}`;
@@ -105,7 +117,7 @@ vi.mock('@donotdev/core', () => ({
       params ? `${key}:${JSON.stringify(params)}` : key,
   }),
   handleError: handleErrorMock,
-  withTimeout: <T>(p: Promise<T>) => p,
+  withTimeout: withTimeoutMock,
   DEFAULT_CRUD_TIMEOUT: 30_000,
   hasProvider: () => true,
   getProvider: vi.fn(),
@@ -127,9 +139,14 @@ vi.mock('../CrudService.cache.js', () => ({
 // Subject under test — imported after mocks register.
 // -----------------------------------------------------------------------------
 
+import { eventEntity, piiEventEntity } from '@dndev/test-entities';
+
+import { createSchemas } from '../../../../core/schemas/src/common/createSchema';
 import type { CrudService } from '../CrudService';
 import { bulkImpl } from '../CrudService.bulk';
-import { updateListCaches } from '../CrudService.cache';
+import { entitySchemasOf } from '../CrudService.writeRules';
+import { updateGetCache } from '../CrudService.cache';
+import { withTimeout as realWithTimeout } from '../../../../core/utils/src/common/withTimeout';
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -158,7 +175,10 @@ function makeStoreState() {
 
 function makeQueryClient() {
   return {
-    getQueryData: vi.fn(() => null),
+    // A stored row for every `get` key: the CRUD update rules run on it.
+    getQueryData: vi.fn((key?: readonly unknown[]): Record<string, unknown> | null =>
+      key?.[2] === 'get' ? { id: key[3], title: 'stored', status: 'available' } : null
+    ),
     getQueriesData: vi.fn(() => []),
     setQueryData: vi.fn(),
     setQueriesData: vi.fn(),
@@ -223,16 +243,8 @@ function makeService(
   };
 }
 
-const schemas = {
-  create: {
-    metadata: {},
-    security: {},
-  } as unknown as import('@donotdev/core').dndevSchema<Event>,
-  update: {
-    metadata: {},
-    security: {},
-  } as unknown as import('@donotdev/core').dndevSchema<Event>,
-};
+// The entity's schemas (createSchemas), as useCrud passes them.
+const schemas = createSchemas(eventEntity) as unknown as import('../types').EntityWriteSchemas<Event>;
 
 // -----------------------------------------------------------------------------
 // Tests
@@ -240,10 +252,12 @@ const schemas = {
 
 describe('CrudService.bulk()', () => {
   beforeEach(() => {
+    withTimeoutMock.mockReset();
+    withTimeoutMock.mockImplementation(<T>(p: Promise<T>) => p);
     toastMock.mockClear();
     handleErrorMock.mockClear();
     detectBulkCollisionsMock.mockClear();
-    vi.mocked(updateListCaches).mockClear();
+    vi.mocked(updateGetCache).mockClear();
   });
 
   it('happy path: single adapter call, one toast, one audit, store reflects all buckets', async () => {
@@ -399,7 +413,7 @@ describe('CrudService.bulk()', () => {
       'events',
       expect.stringMatching(/^temp_/),
       'real-2',
-      { title: 'B' }
+      { id: 'real-2', status: 'available', title: 'B' }
     );
     expect(state.confirmUpdate).toHaveBeenCalledWith('events', 'e1');
     expect(state.confirmUpdate).not.toHaveBeenCalledWith('events', 'e9');
@@ -409,7 +423,7 @@ describe('CrudService.bulk()', () => {
     expect(toastMock).toHaveBeenCalledWith('error', expect.any(String));
   });
 
-  it('atomicity: adapter rejection reverts all optimistic ops atomically', async () => {
+  it('unknown commit: adapter rejection cleans optimistic state and refetches', async () => {
     const adapterBulk = vi
       .fn()
       .mockRejectedValue(new Error('adapter exploded mid-way'));
@@ -522,6 +536,248 @@ describe('CrudService.bulk()', () => {
     await expect(
       bulkImpl<Event>(service, 'events', { deletes: ['x'] }, schemas)
     ).rejects.toBeInstanceOf(BulkNotImplementedErrorMock);
+  });
+
+  it.each([
+    ['missing insert outcome', { insertedIds: [], updatedIds: ['u'], deletedIds: ['d'], failed: [] }],
+    ['missing update outcome', { insertedIds: ['new'], updatedIds: [], deletedIds: ['d'], failed: [] }],
+    ['missing delete outcome', { insertedIds: ['new'], updatedIds: ['u'], deletedIds: [], failed: [] }],
+    ['missing index', { insertedIds: [], updatedIds: ['u'], deletedIds: ['d'], failed: [{ op: 'insert', error: 'x' }] }],
+    ['missing ID', { insertedIds: ['new'], updatedIds: [], deletedIds: ['d'], failed: [{ op: 'update', error: 'x' }] }],
+    ['duplicate success', { insertedIds: ['new'], updatedIds: ['u', 'u'], deletedIds: ['d'], failed: [] }],
+    ['unknown ID', { insertedIds: ['new'], updatedIds: ['other'], deletedIds: ['d'], failed: [] }],
+    ['contradictory outcome', { insertedIds: ['new'], updatedIds: ['u'], deletedIds: ['d'], failed: [{ op: 'update', id: 'u', error: 'x' }] }],
+  ])('%s never confirms, audits or reports success; cleanup precedes awaited refetch', async (_label, response) => {
+    const audit = vi.fn();
+    const { service, state, adapterBulk } = makeService({
+      adapterBulk: vi.fn().mockResolvedValue(response),
+      security: { audit, checkRateLimit: vi.fn() },
+    });
+    let finishInvalidation!: () => void;
+    const invalidationGate = new Promise<void>((resolve) => { finishInvalidation = resolve; });
+    vi.mocked(service.invalidateCollection).mockImplementation(async () => {
+      expect(state.rejectOptimistic).toHaveBeenCalledTimes(1);
+      expect(state.rejectUpdate).toHaveBeenCalledWith('events', 'u');
+      expect(state.rejectDelete).toHaveBeenCalledWith('events', 'd');
+      expect(state.confirmOptimistic).not.toHaveBeenCalled();
+      expect(state.confirmUpdate).not.toHaveBeenCalled();
+      expect(state.confirmDelete).not.toHaveBeenCalled();
+      await invalidationGate;
+    });
+    let settled = false;
+    const request = bulkImpl(service, 'events', {
+      inserts: [{ title: 'A' }], updates: [{ id: 'u', patch: {} }], deletes: ['d'],
+    }, schemas).finally(() => { settled = true; });
+    const rejection = expect(request).rejects.toThrow();
+    await vi.waitFor(() => expect(service.invalidateCollection).toHaveBeenCalledTimes(1));
+    expect(settled).toBe(false);
+    finishInvalidation();
+    await rejection;
+    expect(adapterBulk).toHaveBeenCalledTimes(1);
+    expect(audit).not.toHaveBeenCalled();
+    expect(toastMock).not.toHaveBeenCalledWith('success', expect.anything());
+    expect(state.setLoading).toHaveBeenLastCalledWith('events', false);
+  });
+
+  it('lost acknowledgement never replays a transient write', async () => {
+    const { service, state, adapterBulk } = makeService({
+      adapterBulk: vi.fn().mockRejectedValue(new Error('Failed to fetch')),
+    });
+    await expect(bulkImpl(service, 'events', { inserts: [{ title: 'A' }] }, schemas)).rejects.toThrow('Failed to fetch');
+    expect(adapterBulk).toHaveBeenCalledTimes(1);
+    expect(service.invalidateCollection).toHaveBeenCalledTimes(1);
+    expect(state.rejectOptimistic.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(service.invalidateCollection).mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('bounds a forever-pending raw write and rolls back before refetch', async () => {
+    vi.useFakeTimers();
+    try {
+      withTimeoutMock.mockImplementation(realWithTimeout);
+      const { service, state, adapterBulk } = makeService({ adapterBulk: vi.fn(() => new Promise(() => {})) });
+      vi.mocked(service.invalidateCollection).mockImplementation(async () => {
+        expect(state.rejectOptimistic).toHaveBeenCalledTimes(1);
+      });
+      const rejection = expect(bulkImpl(service, 'events', { inserts: [{ title: 'A' }] }, schemas)).rejects.toThrow('timed out');
+      await vi.advanceTimersByTimeAsync(30_000);
+      await rejection;
+      expect(adapterBulk).toHaveBeenCalledTimes(1);
+      expect(service.invalidateCollection).toHaveBeenCalledTimes(1);
+      expect(state.setLoading).toHaveBeenLastCalledWith('events', false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('serializes late commit refetch behind initial refetch without stale patches', async () => {
+    vi.useFakeTimers();
+    try {
+      withTimeoutMock.mockImplementation(realWithTimeout);
+      let finishWrite!: (value: unknown) => void;
+      let finishInitial!: () => void;
+      const pending = new Promise((resolve) => { finishWrite = resolve; });
+      const initial = new Promise<void>((resolve) => { finishInitial = resolve; });
+      const { service, state } = makeService({ adapterBulk: vi.fn(() => pending) });
+      let server = 'before';
+      let cache = 'optimistic';
+      vi.mocked(service.invalidateCollection).mockImplementation(async () => {
+        const snapshot = server;
+        if (vi.mocked(service.invalidateCollection).mock.calls.length === 1) await initial;
+        cache = snapshot;
+      });
+      const rejection = expect(bulkImpl(service, 'events', { inserts: [{ title: 'A' }] }, schemas)).rejects.toThrow('timed out');
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(state.rejectOptimistic).toHaveBeenCalledTimes(1);
+      server = 'committed';
+      finishWrite({ insertedIds: ['late'], updatedIds: [], deletedIds: [], failed: [] });
+      await Promise.resolve();
+      expect(service.invalidateCollection).toHaveBeenCalledTimes(1);
+      finishInitial();
+      await rejection;
+      await vi.waitFor(() => expect(cache).toBe('committed'));
+      expect(service.invalidateCollection).toHaveBeenCalledTimes(2);
+      expect(state.confirmOptimistic).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('observes a late rejection and catches late refetch errors', async () => {
+    vi.useFakeTimers();
+    try {
+      withTimeoutMock.mockImplementation(realWithTimeout);
+      let rejectWrite!: (error: Error) => void;
+      const pending = new Promise((_resolve, reject) => { rejectWrite = reject; });
+      const { service } = makeService({ adapterBulk: vi.fn(() => pending) });
+      vi.mocked(service.invalidateCollection)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('late refetch failed'));
+      const rejection = expect(bulkImpl(service, 'events', { deletes: ['x'] }, schemas)).rejects.toThrow('timed out');
+      await vi.advanceTimersByTimeAsync(30_000);
+      await rejection;
+      rejectWrite(new Error('late write failed'));
+      await vi.waitFor(() => expect(handleErrorMock).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'late refetch failed' }),
+        expect.objectContaining({ showNotification: false })
+      ));
+      expect(service.invalidateCollection).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('preserves the original write error when invalidation rejects', async () => {
+    const original = new Error('write failed');
+    const { service } = makeService({ adapterBulk: vi.fn().mockRejectedValue(original) });
+    vi.mocked(service.invalidateCollection).mockRejectedValue(new Error('refetch failed'));
+    await expect(bulkImpl(service, 'events', { deletes: ['x'] }, schemas)).rejects.toBe(original);
+  });
+
+  it('insert successes zip to nonfailed indexes in order, not the original dense index', async () => {
+    const result = { insertedIds: ['first', 'third'], updatedIds: [], deletedIds: [],
+      failed: [{ op: 'insert', index: 1, error: 'denied' }] };
+    const { service, state } = makeService({ adapterBulk: vi.fn().mockResolvedValue(result) });
+    expect(await bulkImpl(service, 'events', { inserts: [{ title: 'A' }, { title: 'B' }, { title: 'C' }] }, schemas)).toEqual(result);
+    expect(state.confirmOptimistic.mock.calls.map((call) => [call[2], call[3]])).toEqual([
+      ['first', { id: 'first', status: 'available', title: 'A' }], ['third', { id: 'third', status: 'available', title: 'C' }],
+    ]);
+    expect(state.rejectOptimistic).toHaveBeenCalledTimes(1);
+  });
+
+  it('rollback replaces snapshots instead of retaining newly introduced patch fields', async () => {
+    const { service, state, queryClient } = makeService({
+      adapterBulk: vi.fn().mockResolvedValue({ insertedIds: [], updatedIds: [], deletedIds: [], failed: [] }),
+    });
+    const previous = { id: 'u', title: 'before' };
+    queryClient.getQueryData.mockReturnValue(previous);
+    vi.mocked(service.invalidateCollection).mockImplementation(async () => {
+      expect(state.rejectUpdate).toHaveBeenCalledWith('events', 'u');
+      expect(updateGetCache).toHaveBeenLastCalledWith(service, 'events', 'u', previous, 'set');
+    });
+    await expect(bulkImpl(service, 'events', {
+      updates: [{ id: 'u', patch: { newField: 'optimistic' } }],
+    }, {})).rejects.toThrow();
+  });
+
+  it('valid cold-cache partial failure removes pending entries before refetch', async () => {
+    const result = { insertedIds: [], updatedIds: [], deletedIds: [],
+      failed: [{ op: 'update', id: 'u', error: 'denied' }] };
+    const { service, state } = makeService({ adapterBulk: vi.fn().mockResolvedValue(result) });
+    vi.mocked(service.invalidateCollection).mockImplementation(async () => {
+      expect(state.rejectUpdate).toHaveBeenCalledWith('events', 'u');
+    });
+    expect(await bulkImpl(service, 'events', { updates: [{ id: 'u', patch: {} }] }, schemas)).toEqual(result);
+    expect(service.invalidateCollection).toHaveBeenCalledTimes(1);
+  });
+
+  it('never patches bulk list membership and reconciles every acknowledged operation', async () => {
+    const { service, queryClient, adapterBulk } = makeService();
+    const previous = { id: 'p', title: 'before' };
+    queryClient.getQueryData.mockReturnValue(previous);
+    const result = await bulkImpl<Event>(service, 'events', {
+      inserts: [{ title: 'new' }],
+      updates: [{ id: 'p', patch: { title: 'after' } }],
+    }, schemas);
+    expect(result.insertedIds).toEqual(['real-1']);
+    expect(queryClient.setQueriesData).not.toHaveBeenCalled();
+    expect(updateGetCache).toHaveBeenCalledWith(service, 'events', 'p', { id: 'p', title: 'after' }, 'update');
+    expect(service.invalidateCollection).toHaveBeenCalledTimes(1);
+    expect(adapterBulk).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers pending rollback before a store callback that mutates then throws', async () => {
+    const { service, state, adapterBulk } = makeService();
+    state.addOptimistic.mockImplementation(() => { throw new Error('staging failed after mutation'); });
+    await expect(bulkImpl<Event>(service, 'events', { inserts: [{ title: 'new' }] }, schemas))
+      .rejects.toThrow('staging failed after mutation');
+    expect(state.rejectOptimistic).toHaveBeenCalledTimes(1);
+    expect(adapterBulk).not.toHaveBeenCalled();
+    expect(service.invalidateCollection).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The schemas the rules resolve for the PII entity (`entitySchemasOf`), their metadata
+   * naming one PII field per schema, so the test sees which schema each row used.
+   */
+  const piiSchemas = () => {
+    const resolved = entitySchemasOf(piiEventEntity.collection);
+    const withPii = (schema: { metadata: object }, piiFields: string[]) => {
+      schema.metadata = { ...schema.metadata, security: { piiFields } };
+    };
+    withPii(resolved.create, ['createSecret']);
+    withPii(resolved.draft, ['draftSecret']);
+    withPii(resolved.update, ['updateSecret']);
+    return resolved as never;
+  };
+
+  it('selects PII fields from each insert row effective draft schema', async () => {
+    const encryptPii = vi.fn((row: Record<string, unknown>) => row);
+    const { service, adapterBulk } = makeService({ security: { encryptPii, checkRateLimit: vi.fn() } });
+    await bulkImpl(service, piiEventEntity.collection, {
+      inserts: [{ status: 'draft', draftSecret: 'x' }, { status: 'available', title: 'T', createSecret: 'y' }],
+    }, piiSchemas());
+    expect(encryptPii.mock.calls.map(([, fields]) => fields)).toEqual([['draftSecret'], ['createSecret']]);
+    expect(adapterBulk).toHaveBeenCalledTimes(1);
+  });
+
+  // An update of a cached stored draft (no status in the patch) is a draft write.
+  it('selects PII fields of an update from the resulting status (cached stored draft)', async () => {
+    const encryptPii = vi.fn((row: Record<string, unknown>) => row);
+    const { service, queryClient } = makeService({ security: { encryptPii, checkRateLimit: vi.fn() } });
+    queryClient.getQueryData.mockReturnValue({ id: 'e1', status: 'draft', title: 'old' });
+    await bulkImpl(service, piiEventEntity.collection, { updates: [{ id: 'e1', patch: { draftSecret: 'x' } }] }, piiSchemas());
+    expect(encryptPii.mock.calls.map(([, fields]) => fields)).toEqual([['draftSecret']]);
+  });
+
+  it('keeps acknowledged result when post-commit error reporting throws without retry', async () => {
+    const audit = vi.fn(() => { throw new Error('reporting callback failed'); });
+    const { service, adapterBulk } = makeService({ security: { audit, checkRateLimit: vi.fn() } });
+    handleErrorMock.mockImplementation(() => { throw new Error('reporter failed'); });
+    const result = await bulkImpl<Event>(service, 'events', { inserts: [{ title: 'new' }] }, schemas);
+    expect(result.insertedIds).toEqual(['real-1']);
+    expect(adapterBulk).toHaveBeenCalledTimes(1);
+    expect(service.invalidateCollection).toHaveBeenCalledTimes(1);
   });
 
   it('BulkCollisionError from adapter passes through unwrapped', async () => {

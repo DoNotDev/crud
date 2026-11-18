@@ -353,7 +353,7 @@ const FileFieldComponent = forwardRef<
                       <Progress
                         value={fileData.progress || 0}
                         max={100}
-                        style={{ marginTop: 'var(--gap-xs)' }}
+                        style={{ marginTop: 'var(--gap-sm)' }}
                       />
                     )}
                   </Stack>
@@ -382,7 +382,7 @@ const FileFieldComponent = forwardRef<
           <Text
             level="caption"
             variant={error ? 'destructive' : 'muted'}
-            style={{ marginTop: 'var(--gap-xs)' }}
+            style={{ marginTop: 'var(--gap-sm)' }}
           >
             {helperText}
           </Text>

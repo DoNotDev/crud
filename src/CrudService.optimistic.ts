@@ -16,7 +16,13 @@
 
 import { toast } from '@donotdev/components';
 import type { dndevSchema } from '@donotdev/core';
-import { generateUUID, getI18nInstance, handleError } from '@donotdev/core';
+import {
+  generateUUID,
+  getI18nInstance,
+  handleError,
+  prepareCreate,
+  prepareUpdate,
+} from '@donotdev/core';
 
 import {
   checkUniquenessFromCache,
@@ -25,6 +31,7 @@ import {
 } from './CrudService.cache';
 import {
   auditCrud,
+  decryptPiiRow,
   ensureAdapter,
   getEntityName,
   rateLimitKey,
@@ -33,15 +40,23 @@ import {
   withResilience,
 } from './CrudService.internal';
 import { CRUD_OPERATION } from './types';
+import { entitySchemasOf, storedRowsFor, writtenOf } from './CrudService.writeRules';
 import type { CrudServiceInternal, MutationOptions } from './types';
 
 export async function addOptimisticImpl<T extends { id?: string }>(
   self: CrudServiceInternal,
   collection: string,
-  data: T,
-  schema: dndevSchema<T>,
+  input: T,
+  _schema: dndevSchema<T>,
   options?: MutationOptions
 ): Promise<T & { id: string }> {
+  // CRUD create rules (core/schemas crud/create) on the entity's schemas, as every writer.
+  const schemas = entitySchemasOf(collection);
+  const prepared = prepareCreate(schemas, input as Record<string, unknown>);
+  // why: the entity's schemas are built at runtime (dndevSchema<unknown>); the adapter API carries the caller's row type T
+  const schema = schemas[prepared.schemaKey] as dndevSchema<T>;
+  const data = writtenOf(prepared, collection, 'addOptimistic') as T;
+
   // Auto-initialize with Firestore if not already initialized
   await ensureAdapter(self);
 
@@ -80,7 +95,7 @@ export async function addOptimisticImpl<T extends { id?: string }>(
     // 2. Server call
     const adapter = self.adapter;
     const addResult = await withResilience(() =>
-      adapter.add<T>(collection, data, schema)
+      adapter.add<T>(collection, data, schema, { readSchema: options?.readSchema })
     );
     const realId = addResult.id;
     // Use server-returned data (correct for findOrCreate)
@@ -144,12 +159,22 @@ export async function updateOptimisticImpl<T>(
   self: CrudServiceInternal,
   collection: string,
   id: string,
-  data: Partial<T>,
-  schema: dndevSchema<T>,
+  patch: Partial<T>,
+  _schema: dndevSchema<T>,
   options?: MutationOptions
 ): Promise<T> {
   // Auto-initialize with Firestore if not already initialized
   await ensureAdapter(self);
+
+  // CRUD update rules (core/schemas crud/update) on the entity's schemas and the stored
+  // row (cache, else read).
+  const schemas = entitySchemasOf(collection);
+  const patchRecord = patch as Record<string, unknown>;
+  const storedRows = await storedRowsFor(self, collection, [{ id, patch: patchRecord }], schemas.get);
+  const prepared = prepareUpdate(schemas, { id, patch: patchRecord, stored: storedRows.get(id) });
+  // why: the entity's schemas are built at runtime (dndevSchema<unknown>); the adapter API carries the caller's row type T
+  const schema = schemas[prepared.schemaKey] as dndevSchema<T>;
+  const data = writtenOf(prepared, collection, 'updateOptimistic') as Partial<T>;
 
   // SOC2: rate limit before optimistic mutation
   if (self.security) {
@@ -180,17 +205,22 @@ export async function updateOptimisticImpl<T>(
 
     // 3. Server call with concurrent mutation protection
     const adapter = self.adapter;
-    await runSerializedMutation(self, collection, id, async () => {
-      await withResilience(() => adapter.update<T>(collection, id, data));
-    });
+    const written = await runSerializedMutation(self, collection, id, () =>
+      withResilience(() =>
+        adapter.update<T>(collection, id, data, { readSchema: options?.readSchema })
+      )
+    );
+    const stored = decryptPiiRow(self, schema, written);
 
-    // 4. Update TanStack Query caches FIRST (without _optimistic flag)
+    // 4. Update TanStack Query caches FIRST (without _optimistic flag), the stored
+    // values over the optimistic merge.
     // Use destructuring to fully remove the key — spreading undefined keeps the key present
     // and 'in' checks on cached objects would incorrectly read it as set.
-    const { _optimistic: _removed, ...cleanData } = mergedData as Record<
+    const { _optimistic: _removed, ...merged } = mergedData as Record<
       string,
       unknown
     >;
+    const cleanData = { ...merged, ...stored };
     updateListCaches(
       self,
       collection,

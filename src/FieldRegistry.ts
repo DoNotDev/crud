@@ -61,7 +61,8 @@ export type CustomFilterType =
   | 'select'
   | 'none'
   | 'address'
-  | 'multiselect';
+  | 'multiselect'
+  | 'reference';
 
 /**
  * Registration for custom field types (UI components only)

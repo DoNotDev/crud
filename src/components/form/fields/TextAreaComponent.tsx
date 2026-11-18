@@ -27,6 +27,8 @@ export interface TextAreaComponentProps extends Omit<
 > {
   /** Field label */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Current value */
   value?: string;
   /** Change handler */
@@ -72,6 +74,7 @@ export interface TextAreaComponentProps extends Omit<
  */
 const TextAreaComponent: ComponentType<TextAreaComponentProps> = ({
   label,
+  info,
   value = '',
   onChange,
   error,
@@ -113,6 +116,7 @@ const TextAreaComponent: ComponentType<TextAreaComponentProps> = ({
       <FloatingLabel
         htmlFor={id}
         label={label}
+        info={info}
         disabled={disabled || loading}
         required={required}
       >

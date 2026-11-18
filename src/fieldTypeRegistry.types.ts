@@ -16,7 +16,12 @@ import type {
 } from './FieldRegistry';
 
 /**
- * Filter type metadata for EntityFilters component
+ * Filter type metadata for EntityFilters component. Matching (`matchesFilter`):
+ * - `text`, `address`: case-insensitive substring
+ * - `select`, `multiselect`, `reference`: exact value; an array value matches when any
+ *   of its items is selected (any-of); `reference` options are the referenced
+ *   documents' labels, matched by id
+ * - `range`: min/max; `rating`: minimum
  */
 export type FilterType =
   | 'text'
@@ -25,18 +30,8 @@ export type FilterType =
   | 'none'
   | 'address'
   | 'multiselect'
-  | 'rating';
-
-/**
- * Value type for type checking
- */
-export type ValueType =
-  | 'string'
-  | 'number'
-  | 'boolean'
-  | 'date'
-  | 'object'
-  | 'array';
+  | 'rating'
+  | 'reference';
 
 /**
  * Display formatter function
@@ -73,7 +68,7 @@ export interface ComponentRegistration {
 /**
  * Complete metadata for a built-in field type
  *
- * NOTE: Schemas are registered separately in @donotdev/core/schemas/getSchemaType.ts
+ * NOTE: Values (schema + storage kind) live in BUILTIN_VALUES (@donotdev/core, core/schemas/src/common/fieldSemantics.ts)
  * This registry only handles UI components + filter/display metadata
  */
 export interface FieldTypeMetadata {
@@ -85,8 +80,6 @@ export interface FieldTypeMetadata {
   filterType?: FilterType;
   /** Display formatter function */
   displayFormatter?: DisplayFormatter;
-  /** Runtime value type */
-  valueType?: ValueType;
   /** UI components */
   components?: ComponentRegistration;
 }

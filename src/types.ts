@@ -15,7 +15,9 @@
  */
 
 import type {
+  AnyEntity,
   BulkAcrossBatch,
+  BulkAcrossOptions,
   BulkAcrossResult,
   BulkOperations,
   BulkResult,
@@ -148,6 +150,20 @@ export interface CrudActions {
   setShowFavoritesOnly: (collection: string, show: boolean) => void;
   setPageSize: (collection: string, pageSize: number) => void;
   getFilters: (collection: string) => FilterState;
+  /**
+   * URL sync of a filter state (`f_*` params, see CRUD.md "URL sync"). Default: a key
+   * that is an entity collection (defineEntity) syncs with that entity's fields; any
+   * other key (an `EntityFilters` `filterKey`) does not. `entity` opts a key in
+   * (its fields decode the params), `null` opts it out.
+   * @since 0.3.0
+   */
+  setFilterUrlSync: (key: string, entity: AnyEntity | null) => void;
+  /**
+   * Re-read a URL-synced filter state from the current URL (no-op for other keys, on
+   * the server, or while this page's own URL write is pending).
+   * @since 0.3.0
+   */
+  syncFiltersFromUrl: (key: string) => void;
   getShowFavoritesOnly: (collection: string) => boolean;
   getPageSize: (collection: string) => number | undefined;
 
@@ -230,6 +246,12 @@ export interface MutationOptions {
    * - undefined: use global setting (hideSuccessToasts)
    */
   showSuccessToast?: boolean;
+  /**
+   * The collection's read schema (`useCrud` passes it): the stored row a write
+   * returns is filtered with it for the requester's role before it is cached.
+   * @since 0.3.0
+   */
+  readSchema?: dndevSchema<unknown>;
 }
 
 /**
@@ -288,14 +310,16 @@ export interface CrudServiceInterface {
     data: T,
     schema: dndevSchema<T>,
     options?: MutationOptions
-  ): Promise<void>;
+  ): Promise<Record<string, unknown>>;
   update<T>(
     collection: string,
     id: string,
     data: Partial<T>,
     schema?: dndevSchema<T>,
     options?: MutationOptions
-  ): Promise<void>;
+  ): Promise<Record<string, unknown>>;
+  /** Logical delete (CRUD rule 3): the update `{ status: 'deleted' }`; `delete` is the hard delete. */
+  remove(collection: string, id: string): Promise<void>;
   delete(
     collection: string,
     id: string,
@@ -333,15 +357,15 @@ export interface CrudServiceInterface {
   ): Promise<BulkResult>;
 
   /**
-   * Cross-collection atomic bulk write. One optimistic pass, writes in
-   * topological order, one toast, coordinated rollback.
+   * Cross-collection bulk write. Legacy execution is ordered but not atomic.
+   * Atomic execution requires an adapter capability and rejects without writing when unsupported.
    *
    * @throws {BulkCollisionError} Id collision within a single batch.
    * @throws {BulkAcrossCycleError} `dependsOn` contains a cycle.
    */
   bulkAcross(
     batches: BulkAcrossBatch[],
-    options?: MutationOptions
+    options?: BulkAcrossOptions
   ): Promise<BulkAcrossResult>;
 
   // Subscriptions (with cache sync)
@@ -384,6 +408,14 @@ export interface CrudServiceInterface {
   // Cache control
   /** Invalidate all cached queries for a collection */
   invalidateCollection(collection: string): Promise<void>;
+  /**
+   * Cache a row stored by a write that did not go through this service (an app
+   * RPC, a server function): the document cache and every cached list holding it
+   * take the row as stored, without a refetch.
+   * @param row - The full row as the backend returned it, read-filtered for the requester
+   * @since 0.3.0
+   */
+  cacheStored<T extends { id: string }>(collection: string, row: T): void;
   /** Get the shared QueryClient instance from @donotdev/core */
   getQueryClient(): QueryClient;
 }

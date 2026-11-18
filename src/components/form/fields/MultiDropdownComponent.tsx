@@ -24,6 +24,8 @@ const COLLAPSE_VISIBLE = 3;
 export interface MultiDropdownComponentProps {
   /** Label for the dropdown */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Current selected values */
   value?: string[];
   /** Options for selection */
@@ -53,6 +55,7 @@ export interface MultiDropdownComponentProps {
  */
 const MultiDropdownComponent: ComponentType<MultiDropdownComponentProps> = ({
   label,
+  info,
   value = [],
   options,
   error,
@@ -127,6 +130,7 @@ const MultiDropdownComponent: ComponentType<MultiDropdownComponentProps> = ({
       {/* Multi-select combobox with inline chips */}
       <Combobox
         label={label}
+        info={info}
         value={value}
         onValueChange={handleValueChange}
         onOpenChange={handleOpenChange}

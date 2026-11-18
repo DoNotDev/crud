@@ -266,7 +266,7 @@ function SortableImageItem({
               }}
             >
               <Text variant="muted" level="small" style={{ color: 'white' }}>
-                {t('image.upload.pending', { defaultValue: 'Pending' })}
+                {t('image.upload.pending')}
               </Text>
             </div>
           )}
@@ -475,12 +475,8 @@ const ImageFieldComponent = forwardRef<
               <Upload style={{ color: 'var(--muted-foreground)' }} />
               <Text variant="muted" level="small">
                 {multiple
-                  ? t('image.upload.dropzoneMultiple', {
-                      defaultValue: 'Drop images here or click to upload',
-                    })
-                  : t('image.upload.dropzoneSingle', {
-                      defaultValue: 'Drop image here or click to upload',
-                    })}
+                  ? t('image.upload.dropzoneMultiple')
+                  : t('image.upload.dropzoneSingle')}
               </Text>
             </Stack>
           </div>

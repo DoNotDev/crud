@@ -5,10 +5,11 @@ import { useMemo } from 'react';
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
 
+import { fromInputValue } from '../../../forms/utils';
 import { useCrudList } from '../../../useCrudList';
 import { resolveReferenceEntity } from '../../../utils/referenceEntity';
 import ReferenceFieldComponent from '../../form/fields/ReferenceFieldComponent';
-import { fieldSpecificOf } from '../fieldOptions';
+import { fieldInfo, fieldSpecificOf } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /** Auto-detect fields to use as label from an item's keys */
@@ -97,8 +98,9 @@ export function ControlledReferenceField(
       render={({ field, fieldState }) => (
         <ReferenceFieldComponent
           label={t(label)}
+          info={fieldInfo(fieldConfig, t)}
           value={field.value ?? ''}
-          onChange={(value) => field.onChange(value)}
+          onChange={(value) => field.onChange(fromInputValue(value))}
           onBlur={field.onBlur}
           options={referenceOptions}
           isLoading={loading}

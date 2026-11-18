@@ -10,13 +10,47 @@
  * @author AMBROISE PARK Consulting
  */
 
+import type { FieldFilterConfig } from '@donotdev/core';
+
 import { getFilterType } from '../fieldTypeRegistry.store';
+
+/** Filter types whose values are option codes or ids: matched exactly, any-of. */
+const OPTION_FILTER_TYPES = new Set(['select', 'multiselect', 'reference']);
+
+/**
+ * Whether a select / multiselect / reference value matches the selected options:
+ * exact (case-sensitive) equality; an array value matches when any of its items is
+ * selected; a value holding `wildcard` matches any selection.
+ */
+function matchesOptions(
+  itemValue: unknown,
+  selected: readonly unknown[],
+  wildcard: string | undefined
+): boolean {
+  if (itemValue === null || itemValue === undefined) return false;
+  const values = (Array.isArray(itemValue) ? itemValue : [itemValue]).map(
+    String
+  );
+  if (wildcard !== undefined && values.includes(wildcard)) return true;
+  const wanted = new Set(selected.map(String));
+  return values.some((value) => wanted.has(value));
+}
 
 /**
  * Pure filter matching utility — checks if an item value matches a filter value.
  *
- * Supports all built-in field types: text (contains), number/price (range),
- * date/datetime (range), select (exact), multiselect (contains), address (formatted_address).
+ * Matching by the field type's filter type (`getFilterType`):
+ * - `text`: case-insensitive substring; `address`: substring of `formatted_address`
+ * - `select`, `multiselect`, `reference` (option codes, ids): exact, case-sensitive
+ *   equality. An array item value (multiselect) matches when any of its items is
+ *   selected; an array filter value selects any of its values (any-of). A value
+ *   holding `filter.wildcard` matches any selection.
+ * - `range` (number, price amount, date): min/max; `rating`: minimum
+ *
+ * Null/undefined handling for range filters:
+ * - MIN only → exclude null/undefined
+ * - MAX only → include null/undefined
+ * - MIN + MAX → exclude null/undefined
  *
  * Null/undefined handling for range filters:
  * - MIN only → exclude null/undefined
@@ -26,6 +60,7 @@ import { getFilterType } from '../fieldTypeRegistry.store';
  * @param itemValue - The item's field value to test
  * @param filterValue - The filter criterion (string, range, date, array)
  * @param fieldType - Entity field type (e.g. 'text', 'number', 'date', 'price')
+ * @param filterConfig - The field's `filter` config (`wildcard`); `applyFilters` passes it
  * @returns true if item passes the filter
  *
  * @example
@@ -35,6 +70,9 @@ import { getFilterType } from '../fieldTypeRegistry.store';
  * matchesFilter('hello world', 'hello', 'text'); // true (contains)
  * matchesFilter(42, { min: '10', max: '50' }, 'number'); // true (in range)
  * matchesFilter(null, { min: '10' }, 'number'); // false (null excluded)
+ * matchesFilter('toner_pad', 'toner', 'select'); // false (exact)
+ * matchesFilter(['dry', 'oily'], ['oily', 'normal'], 'multiselect'); // true (any-of)
+ * matchesFilter(['all'], 'dry', 'multiselect', { wildcard: 'all' }); // true
  * ```
  */
 export function matchesFilter(
@@ -52,9 +90,13 @@ export function matchesFilter(
       }
     | { date: string; time?: string }[],
 
-  fieldType: string
+  fieldType: string,
+
+  filterConfig?: FieldFilterConfig
 ): boolean {
   if (!filterValue) return true;
+
+  const wildcard = filterConfig?.wildcard;
 
   // Handle multiple date filter (array of dates)
   if (Array.isArray(filterValue)) {
@@ -68,7 +110,11 @@ export function matchesFilter(
         fieldType === 'timestamp');
 
     if (!isDate) {
-      // For non-date arrays, check if itemValue is in the array
+      // Option fields: any of the selected values (array item values: any item)
+      if (filterType && OPTION_FILTER_TYPES.has(filterType)) {
+        return matchesOptions(itemValue, filterValue, wildcard);
+      }
+      // Other non-date arrays: itemValue equals one of the values
       return filterValue.some((fv) => {
         if (typeof fv === 'object' && 'date' in fv) {
           const dateStr = fv.date;
@@ -377,21 +423,12 @@ export function matchesFilter(
     return false;
   }
 
-  if (filterType === 'multiselect') {
-    // Multiselect is stored as string array
-
-    if (!Array.isArray(itemValue) || itemValue.length === 0) return false;
-
-    const filterLower = String(filterValue).toLowerCase();
-
-    return itemValue.some((val) =>
-      String(val).toLowerCase().includes(filterLower)
-    );
+  if (OPTION_FILTER_TYPES.has(filterType)) {
+    // Option codes / ids: exact match (array item values: any item)
+    return matchesOptions(itemValue, [filterValue], wildcard);
   }
 
-  // Handle string filters (exact match or contains)
-
-  // For string filters, null/undefined values are excluded
+  // Free text: case-insensitive substring. Null/undefined values are excluded.
 
   if (itemValue === null || itemValue === undefined) return false;
 

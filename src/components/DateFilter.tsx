@@ -187,7 +187,7 @@ export function DateFilter({
             style={{
               display: 'flex',
               flexWrap: 'wrap',
-              gap: 'var(--gap-tight)',
+              gap: 'var(--gap-sm)',
             }}
           >
             {(isMin
@@ -255,7 +255,7 @@ export function DateFilter({
               setOpen(false);
             }}
           >
-            {tCrud('filter.clear', { defaultValue: 'Clear' })}
+            {tCrud('filter.clear')}
           </Button>
         </div>
       </div>
@@ -286,12 +286,12 @@ export function DateFilter({
               formatDisplayDate(current.min)
             ) : (
               <Text as="span" level="small" variant="muted">
-                {tCrud('filter.min', { defaultValue: 'Min' })}
+                {tCrud('filter.min')}
               </Text>
             )}
           </Button>
         }
-        title={`${label} - ${tCrud('filter.min', { defaultValue: 'Min' })}`}
+        title={`${label} - ${tCrud('filter.min')}`}
         open={open && activeRange === 'start'}
         onOpenChange={(isOpen) => {
           setOpen(isOpen);
@@ -328,12 +328,12 @@ export function DateFilter({
               formatDisplayDate(current.max)
             ) : (
               <Text as="span" level="small" variant="muted">
-                {tCrud('filter.max', { defaultValue: 'Max' })}
+                {tCrud('filter.max')}
               </Text>
             )}
           </Button>
         }
-        title={`${label} - ${tCrud('filter.max', { defaultValue: 'Max' })}`}
+        title={`${label} - ${tCrud('filter.max')}`}
         open={open && activeRange === 'end'}
         onOpenChange={(isOpen) => {
           setOpen(isOpen);
@@ -349,7 +349,7 @@ export function DateFilter({
           onChange(undefined);
         }}
         disabled={!hasValue}
-        aria-label={tCrud('filter.clear', { defaultValue: 'Clear' })}
+        aria-label={tCrud('filter.clear')}
       >
         <X />
       </button>

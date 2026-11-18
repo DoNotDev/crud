@@ -5,6 +5,7 @@ import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
 
 import { MultiInputTextFieldComponent } from '../../form/fields';
+import { fieldInfo } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -49,6 +50,7 @@ export function ControlledMultiInputField(
         return (
           <MultiInputTextFieldComponent
             label={t(label)}
+            info={fieldInfo(fieldConfig, t)}
             value={Array.isArray(field.value) ? field.value : []}
             onChange={handleChange}
             required={required}

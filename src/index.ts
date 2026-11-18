@@ -73,11 +73,9 @@ export {
   getFilterType,
   getDisplayFormatter,
   isFilterable,
-  getValueType,
   clearFieldTypeRegistry,
   type FieldTypeMetadata,
   type FilterType,
-  type ValueType,
   type DisplayFormatter,
   type ComponentRegistration,
 } from './fieldTypeRegistry';
@@ -88,7 +86,12 @@ export {
   useEntityForm,
   useEntityField,
   useController,
+  FormNavigationProvider,
+  useFormNavigation,
+  useFormDraftState,
   // Utilities
+  EMPTY_VALUE,
+  fromInputValue,
   isFieldEditable,
   getFieldsForOperation,
   validateEntity,
@@ -112,6 +115,13 @@ export type {
   UseEntityFormOptions,
   EntityFormReturn,
   EntityFieldReturn,
+  FormNavigation,
+  FormDraftSlot,
+  FormDraftStateRegistry,
+  UseFormDraftStateOptions,
+  EntityFormHandleSubmit,
+  EntityFormState,
+  EntityFormSubmitOptions,
   UseControllerProps,
   UseControllerReturn,
   ControllerRenderProps,
@@ -129,6 +139,8 @@ export {
   useCrudPageSize,
   useFieldConditions,
   useReferenceResolver,
+  useChildRows,
+  useJoinedForm,
 } from './hooks';
 export type {
   FileMetadata,
@@ -143,7 +155,11 @@ export type {
   UseCrudPageSizeOptions,
   UseCrudPageSizeReturn,
   ReferenceData,
+  ChildRowsParent,
+  UseChildRowsOptions,
+  UseChildRowsReturn,
 } from './hooks';
+export type { ChildRowsAccess } from './forms/childRows';
 
 // Upload validation utilities - for secure blob URL detection
 export {

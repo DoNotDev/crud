@@ -4,6 +4,7 @@
 /**
  * @fileoverview Phone Number Component
  * @description Single phone number input with country code selector and flag. Form field component for phone number inputs in CRUD forms.
+ * Value: `<dial code> <number>` (`+33 6 12 34 56 78`), `''` when no number is typed.
  *
  * @version 0.1.0
  * @since 0.0.1
@@ -11,7 +12,7 @@
  */
 
 import { useState, useMemo, useEffect, useId } from 'react';
-import type { ChangeEvent, ComponentType } from 'react';
+import type { ChangeEvent, ComponentProps, ComponentType } from 'react';
 
 import {
   Input,
@@ -26,9 +27,18 @@ import type { DropdownMenuItemData } from '@donotdev/components';
 import { Flag, COUNTRIES } from '@donotdev/core';
 import type { CountryData } from '@donotdev/core';
 
+/** Props for the phone input, including native form identity, blur, and ref wiring. */
 export interface PhoneNumberComponentProps {
+  /** Name of the telephone input in the form */
+  name?: ComponentProps<typeof Input>['name'];
+  /** Blur handler for the telephone input */
+  onBlur?: ComponentProps<typeof Input>['onBlur'];
+  /** React 19 native ref targeting the telephone input */
+  ref?: ComponentProps<typeof Input>['ref'];
   /** Field label */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Current phone number value (full number with country code) */
   value?: string;
   /** Change handler */
@@ -60,8 +70,12 @@ export interface PhoneNumberComponentProps {
  */
 const PhoneNumberComponent: ComponentType<PhoneNumberComponentProps> = ({
   label,
+  info,
   value = '',
   onChange,
+  name,
+  onBlur,
+  ref,
   error,
   helperText,
   required = false,
@@ -145,11 +159,12 @@ const PhoneNumberComponent: ComponentType<PhoneNumberComponentProps> = ({
   const [selectedCountry, setSelectedCountry] =
     useState<CountryData>(defaultCountryData);
 
+  // An empty value carries no country: keep the one picked until a number is typed.
   useEffect(() => {
-    if (detectedCountry.code !== selectedCountry.code) {
+    if (value && detectedCountry.code !== selectedCountry.code) {
       setSelectedCountry(detectedCountry);
     }
-  }, [detectedCountry, selectedCountry.code]);
+  }, [value, detectedCountry, selectedCountry.code]);
 
   const phoneNumber = extractedNumber;
 
@@ -164,8 +179,8 @@ const PhoneNumberComponent: ComponentType<PhoneNumberComponentProps> = ({
     // Clean up spaces
     cleanedNumber = cleanedNumber.replace(/\s+/g, ' ').trim();
 
-    const newValue =
-      country.dialCode + (cleanedNumber ? ' ' + cleanedNumber : '');
+    // No number: empty value (a bare dial code is not a phone number)
+    const newValue = cleanedNumber ? `${country.dialCode} ${cleanedNumber}` : '';
     const syntheticEvent = {
       target: { value: newValue },
     } as ChangeEvent<HTMLInputElement>;
@@ -184,8 +199,8 @@ const PhoneNumberComponent: ComponentType<PhoneNumberComponentProps> = ({
     // Clean up the phone number: remove extra spaces, keep single spaces for readability
     phoneValue = phoneValue.replace(/\s+/g, ' ').trim();
 
-    const fullValue =
-      selectedCountry.dialCode + (phoneValue ? ' ' + phoneValue : '');
+    // Emptied input: empty value (the controlled field stores it as null)
+    const fullValue = phoneValue ? `${selectedCountry.dialCode} ${phoneValue}` : '';
     const syntheticEvent = {
       target: { value: fullValue },
     } as ChangeEvent<HTMLInputElement>;
@@ -225,6 +240,7 @@ const PhoneNumberComponent: ComponentType<PhoneNumberComponentProps> = ({
       <FloatingLabel
         htmlFor={id}
         label={label}
+        info={info}
         disabled={disabled}
         required={required}
       >
@@ -256,6 +272,9 @@ const PhoneNumberComponent: ComponentType<PhoneNumberComponentProps> = ({
             contentWidth="16rem"
           />
           <Input
+            ref={ref}
+            name={name}
+            onBlur={onBlur}
             id={id}
             type="tel"
             inputMode="tel"

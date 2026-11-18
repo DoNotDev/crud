@@ -32,6 +32,21 @@ export function controlledFieldOptions(
 }
 
 /**
+ * Translated help text of a field (`hint` in the entity), shown by an (i) after the
+ * label. Opt-in: `undefined` when the field declares no hint, and nothing is rendered.
+ *
+ * @param fieldConfig - Entity field passed to the controlled component
+ * @param t - The form's translator (entity namespace + crud)
+ * @returns The translated hint, or `undefined`
+ */
+export function fieldInfo(
+  fieldConfig: EntityField,
+  t: (key: string) => string
+): string | undefined {
+  return fieldConfig.hint ? t(fieldConfig.hint) : undefined;
+}
+
+/**
  * Upload fields' `options.fieldSpecific` (`maxSize`, `storagePath`, plus `image` processing
  * options for image fields).
  *

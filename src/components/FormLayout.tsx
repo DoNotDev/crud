@@ -18,7 +18,6 @@ import type { UseFormReturn, FieldValues } from 'react-hook-form';
 import {
   Button,
   BUTTON_VARIANT,
-  Spinner,
   cn,
   Stack,
   Grid,
@@ -156,6 +155,7 @@ const FormLayout = <T extends FieldValues>({
             {showCancel && (
               <Button
                 type="button"
+                intent="cancel"
                 variant={BUTTON_VARIANT.OUTLINE}
                 onClick={onCancel}
                 disabled={loading || isSubmitting}
@@ -165,19 +165,16 @@ const FormLayout = <T extends FieldValues>({
             )}
             <Button
               type="submit"
-              disabled={loading || isSubmitting}
+              intent="save"
+              loading={loading || isSubmitting}
+              loadingText={
+                isSubmitting
+                  ? t('form.submitting', 'Submitting...')
+                  : t('form.loading', 'Loading...')
+              }
               style={{ minWidth: '120px' }}
             >
-              {loading || isSubmitting ? (
-                <>
-                  <Spinner className="me-component-gap" />
-                  {isSubmitting
-                    ? t('form.submitting', 'Submitting...')
-                    : t('form.loading', 'Loading...')}
-                </>
-              ) : (
-                defaultSubmitText
-              )}
+              {defaultSubmitText}
             </Button>
           </Stack>
         </Stack>

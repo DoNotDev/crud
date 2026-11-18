@@ -9,6 +9,7 @@
  * @author AMBROISE PARK Consulting
  */
 
+export { EMPTY_VALUE, fromInputValue } from './emptyValue';
 export { isFieldEditable } from './isFieldEditable';
 export type { ViewerRole } from './isFieldEditable';
 export { getFieldsForOperation } from './getFieldsForOperation';

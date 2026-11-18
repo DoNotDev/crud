@@ -25,3 +25,5 @@ export type { YearFilterValue, YearFilterProps } from './YearFilter';
 export * from './fields/display';
 export { DisplayThumbnail } from './DisplayThumbnail';
 export { CrudCard } from './CrudCard';
+export { SortableCardList } from './SortableCardList';
+export type { SortableCardListProps } from './SortableCardList';

@@ -10,7 +10,6 @@
  * @since 0.5.0
  */
 
-import { Plus, Trash2 } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useFieldArray, Controller } from 'react-hook-form';
 
@@ -34,6 +33,11 @@ export interface SubFieldDef {
 interface FieldArrayFieldSpecific {
   fields: SubFieldDef[];
   direction?: 'row' | 'column';
+  /**
+   * Render exactly the rows of the form value: no add / remove buttons. For a form that
+   * edits rows it set itself (e.g. one new row in `defaultValues`). Default: false.
+   */
+  fixedRows?: boolean;
 }
 
 /** Return a type-appropriate empty value for a field type. */
@@ -51,6 +55,7 @@ function getEmptyValue(type: FieldType): unknown {
 /**
  * ControlledFieldArrayField — nested object array with per-row sub-fields.
  * Each sub-field is rendered via the field type registry so custom types work automatically.
+ * Uses the supplied translator for child fields and CRUD field-array control/diagnostic text.
  */
 export function ControlledFieldArrayField(
   props: ControlledFieldProps
@@ -63,6 +68,7 @@ export function ControlledFieldArrayField(
     {}) as FieldArrayFieldSpecific;
   const subFields = fieldSpecific.fields ?? [];
   const direction = fieldSpecific.direction ?? 'row';
+  const fixedRows = fieldSpecific.fixedRows === true;
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -88,7 +94,7 @@ export function ControlledFieldArrayField(
           color: 'var(--muted-foreground)',
         }}
       >
-        {t(label)}: no sub-fields configured
+        {t('crud:fieldArray.noSubFields', { field: t(label) })}
       </div>
     );
   }
@@ -112,21 +118,23 @@ export function ControlledFieldArrayField(
             <span
               style={{
                 color: 'var(--destructive)',
-                marginInlineStart: 'var(--gap-tight)',
+                marginInlineStart: 'var(--gap-sm)',
               }}
             >
               *
             </span>
           )}
         </span>
-        <Button
-          type="button"
-          variant="ghost"
-          display="compact"
-          icon={Plus}
-          onClick={handleAdd}
-          aria-label={t(label) + ' — add'}
-        />
+        {!fixedRows && (
+          <Button
+            type="button"
+            variant="ghost"
+            display="compact"
+            intent="add"
+            onClick={handleAdd}
+            aria-label={t('crud:fieldArray.addRow', { field: t(label) })}
+          />
+        )}
       </div>
 
       {/* Rows */}
@@ -192,7 +200,7 @@ export function ControlledFieldArrayField(
                       style={{
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: 'var(--gap-tight)',
+                        gap: 'var(--gap-sm)',
                       }}
                     >
                       <span style={{ fontSize: 'var(--font-size-xs)' }}>
@@ -212,15 +220,17 @@ export function ControlledFieldArrayField(
           })}
 
           {/* Remove row button */}
-          <Button
-            type="button"
-            variant="ghost"
-            display="compact"
-            icon={Trash2}
-            onClick={() => remove(rowIndex)}
-            aria-label={`Remove row ${rowIndex + 1}`}
-            style={{ alignSelf: direction === 'row' ? 'center' : 'flex-end' }}
-          />
+          {!fixedRows && (
+            <Button
+              type="button"
+              variant="ghost"
+              display="compact"
+              intent="delete"
+              onClick={() => remove(rowIndex)}
+              aria-label={t('crud:fieldArray.removeRow', { field: t(label), index: rowIndex + 1 })}
+              style={{ alignSelf: direction === 'row' ? 'center' : 'flex-end' }}
+            />
+          )}
         </div>
       ))}
     </div>

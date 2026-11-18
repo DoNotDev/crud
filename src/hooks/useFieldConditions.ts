@@ -35,7 +35,7 @@ const EMPTY_CONDITIONS: Record<string, ConditionResult> = {};
  * Evaluate field conditions against live form values.
  *
  * @param fields - Array of renderable fields (from useEntityForm or getFieldsForOperation)
- * @param control - React Hook Form control object
+ * @param control - React Hook Form control object (`form.control`)
  * @returns Record mapping field names to their computed condition states.
  *         Fields without conditions are not included — treat missing entries as defaults.
  *
@@ -55,9 +55,10 @@ const EMPTY_CONDITIONS: Record<string, ConditionResult> = {};
  */
 export function useFieldConditions<
   TFieldValues extends FieldValues = FieldValues,
+  TTransformedValues = TFieldValues,
 >(
   fields: readonly RenderableField[],
-  control: Control<TFieldValues>
+  control: Control<TFieldValues, unknown, TTransformedValues>
 ): Record<string, ConditionResult> {
   // Only the fields that actually declare conditions — the rest never affect the result
   const conditionFields = useMemo(
@@ -80,9 +81,15 @@ export function useFieldConditions<
 
       const results: Record<string, ConditionResult> = {};
       for (const field of conditionFields) {
+        // Extension fields (`scope`) read their extension's values.
+        const scoped = field.scope
+          ? (values as Record<string, unknown>)[field.scope]
+          : values;
         results[field.name] = evaluateFieldConditions(
           field.config.conditions!,
-          values as Record<string, unknown>
+          typeof scoped === 'object' && scoped !== null
+            ? (scoped as Record<string, unknown>)
+            : {}
         );
       }
       return results;

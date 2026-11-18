@@ -6,6 +6,7 @@ import { Controller } from 'react-hook-form';
 
 import { PriceFieldComponent } from '../../form/fields';
 import type { PriceValue } from '../../form/fields';
+import { fieldInfo } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -45,6 +46,7 @@ export function ControlledPriceField(
         return (
           <PriceFieldComponent
             label={t(label)}
+            info={fieldInfo(fieldConfig, t)}
             value={value ?? undefined}
             onChange={handleChange}
             error={!!fieldState.error}

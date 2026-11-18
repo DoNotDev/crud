@@ -14,8 +14,8 @@
  * @author AMBROISE PARK Consulting
  */
 
-// NOTE: Schema generators are NOT imported here - they're already registered
-// in @donotdev/core/schemas/getSchemaType.ts on module load.
+// NOTE: Value schemas are NOT defined here - they live in BUILTIN_VALUES
+// (@donotdev/core, core/schemas/src/common/fieldSemantics.ts).
 // This registry only handles UI components + filter/display metadata.
 
 import { lazy } from 'react';
@@ -74,6 +74,7 @@ import type {
   FieldTypeMetadata,
   DisplayFormatter,
 } from './fieldTypeRegistry.types';
+import { translateLabel } from './forms/utils/translateFieldLabel';
 import { sanitizeHtml } from './utils/sanitizeHtml';
 
 // Heavy editors load on first render in a form, not with the module: importing any
@@ -283,7 +284,7 @@ const displayFormatters: Record<string, DisplayFormatter> = {
     const currencyCode = normalized.currency || 'EUR';
     const vatLabel =
       (normalized.vatIncluded ?? true)
-        ? ` ${t('crud:price.vatIncluded', { defaultValue: 'VAT Incl.' })}`
+        ? ` ${t('crud:price.vatIncluded')}`
         : '';
     return (
       <Stack direction="column" gap="tight" align="end">
@@ -380,7 +381,7 @@ const displayFormatters: Record<string, DisplayFormatter> = {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 'var(--gap-xs)',
+            gap: 'var(--gap-sm)',
           }}
         >
           <img
@@ -598,12 +599,8 @@ const displayFormatters: Record<string, DisplayFormatter> = {
         </a>
         <CopyToClipboard
           text={value}
-          tooltipText={t('crud:copyToClipboard', {
-            defaultValue: 'Copy to clipboard',
-          })}
-          ariaLabel={t('crud:actions.copyEmail', {
-            defaultValue: 'Copy email',
-          })}
+          tooltipText={t('crud:copyToClipboard')}
+          ariaLabel={t('crud:actions.copyEmail')}
           onClick={(e) => e.stopPropagation()}
         />
       </Stack>
@@ -621,12 +618,8 @@ const displayFormatters: Record<string, DisplayFormatter> = {
         </a>
         <CopyToClipboard
           text={value}
-          tooltipText={t('crud:copyToClipboard', {
-            defaultValue: 'Copy to clipboard',
-          })}
-          ariaLabel={t('crud:actions.copyPhone', {
-            defaultValue: 'Copy phone',
-          })}
+          tooltipText={t('crud:copyToClipboard')}
+          ariaLabel={t('crud:actions.copyPhone')}
           onClick={(e) => e.stopPropagation()}
         />
       </Stack>
@@ -642,10 +635,8 @@ const displayFormatters: Record<string, DisplayFormatter> = {
         <Text style={{ flex: 1 }}>{value}</Text>
         <CopyToClipboard
           text={value}
-          tooltipText={t('crud:copyToClipboard', {
-            defaultValue: 'Copy to clipboard',
-          })}
-          ariaLabel={t('crud:actions.copyIban', { defaultValue: 'Copy IBAN' })}
+          tooltipText={t('crud:copyToClipboard')}
+          ariaLabel={t('crud:actions.copyIban')}
         />
       </Stack>
     );
@@ -682,6 +673,10 @@ const displayFormatters: Record<string, DisplayFormatter> = {
   },
   textarea: text('textarea'),
   text: text('text'),
+  // String values of the special types, shown as text
+  hidden: text('text'),
+  avatar: text('text'),
+  badge: text('text'),
   richtext: (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: field value type is erased at registry dispatch (FieldType)
     value: any,
@@ -742,6 +737,8 @@ let registered = false;
 /**
  * Register all built-in field types with unified registry.
  * This is the single source of truth for framework built-ins.
+ * Built-in uncontrolled adapters translate label keys with the supplied `t`
+ * before rendering visual components; custom adapter props remain unchanged.
  *
  * Receives both registries as parameters to avoid circular imports
  * (fieldTypeRegistry.ts ↔ registerBuiltinFieldTypes.tsx), which caused
@@ -778,7 +775,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'text',
     filterable: true,
     filterType: 'text',
-    valueType: 'string',
     displayFormatter: displayFormatters.text,
     components: {
       controlled: ControlledTextField,
@@ -787,7 +783,7 @@ export function registerAllBuiltinFieldTypes(
         const stringValue = typeof value === 'string' ? value : '';
         return (
           <TextFieldComponent
-            label={label || ''}
+            label={translateLabel(label || '', props.t)}
             value={stringValue}
             onChange={(
               e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -808,7 +804,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'email',
     filterable: true,
     filterType: 'text',
-    valueType: 'string',
     displayFormatter: displayFormatters.email,
     components: {
       controlled: ControlledTextField,
@@ -817,7 +812,7 @@ export function registerAllBuiltinFieldTypes(
         const stringValue = typeof value === 'string' ? value : '';
         return (
           <TextFieldComponent
-            label={label || ''}
+            label={translateLabel(label || '', props.t)}
             value={stringValue}
             onChange={(
               e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -839,7 +834,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'url',
     filterable: true,
     filterType: 'text',
-    valueType: 'string',
     displayFormatter: displayFormatters.url,
     components: {
       controlled: ControlledTextField,
@@ -848,7 +842,7 @@ export function registerAllBuiltinFieldTypes(
         const stringValue = typeof value === 'string' ? value : '';
         return (
           <TextFieldComponent
-            label={label || ''}
+            label={translateLabel(label || '', props.t)}
             value={stringValue}
             onChange={(
               e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -870,7 +864,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'color',
     filterable: true,
     filterType: 'text',
-    valueType: 'string',
     displayFormatter: displayFormatters.color,
     components: {
       controlled: ControlledTextField,
@@ -879,7 +872,7 @@ export function registerAllBuiltinFieldTypes(
         const stringValue = typeof value === 'string' ? value : '';
         return (
           <TextFieldComponent
-            label={label || ''}
+            label={translateLabel(label || '', props.t)}
             value={stringValue}
             onChange={(
               e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -901,7 +894,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'textarea',
     filterable: true,
     filterType: 'text',
-    valueType: 'string',
     displayFormatter: displayFormatters.textarea,
     components: {
       controlled: ControlledTextareaField,
@@ -910,7 +902,7 @@ export function registerAllBuiltinFieldTypes(
         const stringValue = typeof value === 'string' ? value : '';
         return (
           <TextAreaComponent
-            label={label || ''}
+            label={translateLabel(label || '', props.t)}
             value={stringValue}
             onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
               // For textarea fields, value is always string
@@ -929,7 +921,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'richtext',
     filterable: true,
     filterType: 'text',
-    valueType: 'string',
     displayFormatter: displayFormatters.richtext,
     components: {
       controlled: ControlledRichTextField,
@@ -938,7 +929,7 @@ export function registerAllBuiltinFieldTypes(
         const stringValue = typeof value === 'string' ? value : '';
         return (
           <RichTextComponent
-            label={label || ''}
+            label={translateLabel(label || '', props.t)}
             value={stringValue}
             onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
               // For richtext fields, value is always string
@@ -957,7 +948,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'password',
     filterable: false,
     filterType: 'none',
-    valueType: 'string',
     displayFormatter: displayFormatters.password,
     components: {
       controlled: ControlledPasswordField,
@@ -968,7 +958,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'tel',
     filterable: true,
     filterType: 'text',
-    valueType: 'string',
     displayFormatter: displayFormatters.tel,
     components: {
       controlled: ControlledPhoneField,
@@ -979,7 +968,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'iban',
     filterable: true,
     filterType: 'text',
-    valueType: 'string',
     displayFormatter: displayFormatters.iban,
     components: {
       controlled: ControlledTextField,
@@ -988,7 +976,7 @@ export function registerAllBuiltinFieldTypes(
         const stringValue = typeof value === 'string' ? value : '';
         return (
           <TextFieldComponent
-            label={label || ''}
+            label={translateLabel(label || '', props.t)}
             value={stringValue}
             onChange={(
               e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -1011,7 +999,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'number',
     filterable: true,
     filterType: 'range',
-    valueType: 'number',
     displayFormatter: displayFormatters.number,
     components: {
       controlled: ControlledNumberField,
@@ -1022,7 +1009,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'currency',
     filterable: true,
     filterType: 'range',
-    valueType: 'number',
     displayFormatter: displayFormatters.currency,
     components: {
       controlled: ControlledCurrencyField,
@@ -1033,7 +1019,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'price',
     filterable: true,
     filterType: 'range',
-    valueType: 'object',
     displayFormatter: displayFormatters.price,
     components: {
       controlled: ControlledPriceField,
@@ -1044,7 +1029,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'range',
     filterable: true,
     filterType: 'range',
-    valueType: 'number',
     displayFormatter: displayFormatters.range,
     components: {
       controlled: ControlledRangeField,
@@ -1055,7 +1039,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'year',
     filterable: true,
     filterType: 'range',
-    valueType: 'number',
     displayFormatter: displayFormatters.year,
     components: {
       controlled: ControlledYearField,
@@ -1066,7 +1049,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'rating',
     filterable: true,
     filterType: 'rating',
-    valueType: 'number',
     displayFormatter: displayFormatters.rating,
     components: {
       controlled: ControlledRatingField,
@@ -1077,7 +1059,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'duration',
     filterable: true,
     filterType: 'range',
-    valueType: 'number',
     displayFormatter: displayFormatters.duration,
     components: {
       controlled: ControlledDurationField,
@@ -1089,7 +1070,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'boolean',
     filterable: true,
     filterType: 'select',
-    valueType: 'boolean',
     displayFormatter: displayFormatters.boolean,
     components: {
       controlled: ControlledCheckboxField,
@@ -1100,7 +1080,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'checkbox',
     filterable: true,
     filterType: 'select',
-    valueType: 'boolean',
     displayFormatter: displayFormatters.checkbox,
     components: {
       controlled: ControlledCheckboxField,
@@ -1111,7 +1090,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'gdprConsent',
     filterable: true,
     filterType: 'select',
-    valueType: 'object',
     displayFormatter: displayFormatters.gdprConsent,
     components: {
       controlled: ControlledGdprConsentField,
@@ -1122,7 +1100,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'switch',
     filterable: true,
     filterType: 'select',
-    valueType: 'boolean',
     displayFormatter: displayFormatters.switch,
     components: {
       controlled: ControlledSwitchField,
@@ -1134,7 +1111,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'date',
     filterable: true,
     filterType: 'range',
-    valueType: 'date',
     displayFormatter: displayFormatters.date,
     components: {
       controlled: ControlledDateField,
@@ -1145,7 +1121,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'datetime-local',
     filterable: true,
     filterType: 'range',
-    valueType: 'date',
     displayFormatter: displayFormatters['datetime-local'],
     components: {
       controlled: ControlledDateField,
@@ -1156,7 +1131,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'time',
     filterable: true,
     filterType: 'range',
-    valueType: 'date',
     displayFormatter: displayFormatters.time,
     components: {
       controlled: ControlledDateField,
@@ -1167,7 +1141,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'week',
     filterable: true,
     filterType: 'range',
-    valueType: 'date',
     displayFormatter: displayFormatters.week,
     components: {
       controlled: ControlledDateField,
@@ -1178,7 +1151,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'month',
     filterable: true,
     filterType: 'range',
-    valueType: 'date',
     displayFormatter: displayFormatters.month,
     components: {
       controlled: ControlledDateField,
@@ -1189,7 +1161,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'timestamp',
     filterable: true,
     filterType: 'range',
-    valueType: 'date',
     displayFormatter: displayFormatters.timestamp,
     components: {
       controlled: ControlledTimestampField,
@@ -1201,7 +1172,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'file',
     filterable: false,
     filterType: 'none',
-    valueType: 'object',
     displayFormatter: displayFormatters.file,
     components: {
       controlled: ControlledFileField,
@@ -1212,7 +1182,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'files',
     filterable: false,
     filterType: 'none',
-    valueType: 'array',
     displayFormatter: displayFormatters.files,
     components: {
       controlled: ControlledMultiFileField,
@@ -1223,7 +1192,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'document',
     filterable: false,
     filterType: 'none',
-    valueType: 'object',
     displayFormatter: displayFormatters.document,
     components: {
       controlled: ControlledDocumentField,
@@ -1234,7 +1202,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'documents',
     filterable: false,
     filterType: 'none',
-    valueType: 'array',
     displayFormatter: displayFormatters.documents,
     components: {
       controlled: ControlledMultiDocumentField,
@@ -1245,7 +1212,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'image',
     filterable: false,
     filterType: 'none',
-    valueType: 'object',
     displayFormatter: displayFormatters.image,
     components: {
       controlled: ControlledImageField,
@@ -1256,7 +1222,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'images',
     filterable: false,
     filterType: 'none',
-    valueType: 'array',
     displayFormatter: displayFormatters.images,
     components: {
       controlled: ControlledMultiImageField,
@@ -1268,7 +1233,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'geopoint',
     filterable: false,
     filterType: 'none',
-    valueType: 'object',
     displayFormatter: displayFormatters.geopoint,
     components: {
       controlled: ControlledGeoPointField,
@@ -1279,7 +1243,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'address',
     filterable: true,
     filterType: 'address',
-    valueType: 'object',
     displayFormatter: displayFormatters.address,
     components: {
       controlled: ControlledAddressField,
@@ -1290,7 +1253,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'map',
     filterable: false,
     filterType: 'none',
-    valueType: 'object',
     displayFormatter: displayFormatters.map,
     components: {
       controlled: ControlledMapField,
@@ -1301,7 +1263,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'array',
     filterable: false,
     filterType: 'none',
-    valueType: 'array',
     displayFormatter: displayFormatters.array,
     components: {
       controlled: ControlledMultiInputField,
@@ -1312,7 +1273,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'field-array',
     filterable: false,
     filterType: 'none',
-    valueType: 'array',
     displayFormatter: displayFormatters['field-array'],
     components: {
       controlled: ControlledFieldArrayField,
@@ -1324,7 +1284,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'select',
     filterable: true,
     filterType: 'select',
-    valueType: 'string',
     displayFormatter: displayFormatters.select,
     components: {
       controlled: ControlledComboboxField,
@@ -1335,7 +1294,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'combobox',
     filterable: true,
     filterType: 'select',
-    valueType: 'string',
     displayFormatter: displayFormatters.combobox,
     components: {
       controlled: ControlledComboboxField,
@@ -1346,7 +1304,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'multiselect',
     filterable: true,
     filterType: 'multiselect',
-    valueType: 'array',
     displayFormatter: displayFormatters.multiselect,
     components: {
       controlled: ControlledMultiDropdownField,
@@ -1357,7 +1314,6 @@ export function registerAllBuiltinFieldTypes(
     type: 'radio',
     filterable: true,
     filterType: 'select',
-    valueType: 'string',
     displayFormatter: displayFormatters.radio,
     components: {
       controlled: ControlledRadioField,
@@ -1368,8 +1324,7 @@ export function registerAllBuiltinFieldTypes(
   registerBuiltinFieldType({
     type: 'reference',
     filterable: true,
-    filterType: 'text',
-    valueType: 'string',
+    filterType: 'reference',
     displayFormatter: displayFormatters.reference,
     components: {
       controlled: ControlledReferenceField,
@@ -1381,7 +1336,7 @@ export function registerAllBuiltinFieldTypes(
     type: 'hidden',
     filterable: false,
     filterType: 'none',
-    valueType: 'string',
+    displayFormatter: displayFormatters.hidden,
     components: {
       controlled: ControlledTextField,
       uncontrolled: (props: UncontrolledFieldProps) => {
@@ -1400,7 +1355,7 @@ export function registerAllBuiltinFieldTypes(
     type: 'avatar',
     filterable: false,
     filterType: 'none',
-    valueType: 'string',
+    displayFormatter: displayFormatters.avatar,
     components: {
       controlled: ControlledTextField,
       uncontrolled: (props: UncontrolledFieldProps) => {
@@ -1431,7 +1386,7 @@ export function registerAllBuiltinFieldTypes(
     type: 'badge',
     filterable: false,
     filterType: 'none',
-    valueType: 'string',
+    displayFormatter: displayFormatters.badge,
     components: {
       controlled: ControlledTextField,
       uncontrolled: (props: UncontrolledFieldProps) => {
@@ -1462,14 +1417,13 @@ export function registerAllBuiltinFieldTypes(
     type: 'submit',
     filterable: false,
     filterType: 'none',
-    valueType: 'string',
     components: {
       controlled: ControlledTextField,
       uncontrolled: (props: UncontrolledFieldProps) => {
         const { name, label, config } = props;
         return (
           <ButtonFieldComponent
-            label={label || name}
+            label={translateLabel(label || name, props.t)}
             type="submit"
             onClick={() => {}}
             {...config.options}
@@ -1483,14 +1437,13 @@ export function registerAllBuiltinFieldTypes(
     type: 'reset',
     filterable: false,
     filterType: 'none',
-    valueType: 'string',
     components: {
       controlled: ControlledTextField,
       uncontrolled: (props: UncontrolledFieldProps) => {
         const { name, label, config } = props;
         return (
           <ButtonFieldComponent
-            label={label || name}
+            label={translateLabel(label || name, props.t)}
             type="reset"
             onClick={() => {}}
             {...config.options}

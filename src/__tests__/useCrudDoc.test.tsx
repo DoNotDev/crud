@@ -19,7 +19,7 @@ import { Suspense } from 'react';
 import type { ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import type { AnyEntity } from '@donotdev/core';
+import { carEntity } from '@dndev/test-entities';
 
 // -----------------------------------------------------------------------------
 // Hoisted state — fake backend, fake service, minimal CrudStore.
@@ -448,11 +448,6 @@ describe('useCrudDoc', () => {
 
 describe('useCrudDoc translated fields', () => {
   // `model` is translated (i18n: true); passed as options.entity like the reference resolver does.
-  const carEntity = {
-    name: 'Car',
-    collection: 'cars',
-    fields: { model: { name: 'model', type: 'text', i18n: true } },
-  } as unknown as AnyEntity;
 
   function renderTranslated(options?: { translate?: boolean }) {
     return renderHook(

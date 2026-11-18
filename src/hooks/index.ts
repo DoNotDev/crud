@@ -33,3 +33,10 @@ export { useFieldConditions } from './useFieldConditions';
 
 export { useReferenceResolver } from './useReferenceResolver';
 export type { ReferenceData } from './useReferenceResolver';
+
+export { useChildRows, useJoinedForm } from './useChildRows';
+export type {
+  ChildRowsParent,
+  UseChildRowsOptions,
+  UseChildRowsReturn,
+} from './useChildRows';

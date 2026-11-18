@@ -36,6 +36,8 @@ export interface PriceValue {
 export interface PriceFieldComponentProps {
   /** Field label (for amount) */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Current value */
   value?: PriceValue | null;
   /** Change handler */
@@ -70,6 +72,7 @@ const DEFAULT_CURRENCY_OPTIONS = [
 
 const PriceFieldComponent: ComponentType<PriceFieldComponentProps> = ({
   label,
+  info,
   value,
   onChange,
   error,
@@ -164,6 +167,7 @@ const PriceFieldComponent: ComponentType<PriceFieldComponentProps> = ({
             type="number"
             inputMode="decimal"
             label={amountLabel}
+            info={info}
             value={
               value?.amount !== undefined && value?.amount !== null
                 ? value.amount
@@ -226,12 +230,12 @@ const PriceFieldComponent: ComponentType<PriceFieldComponentProps> = ({
                 placeholder={defaultCurrency}
                 options={currencyOptions.map((c) => ({ value: c, label: c }))}
                 disabled={disabled}
-                label={t('price.currency', { defaultValue: 'Currency' })}
+                label={t('price.currency')}
               />
             )}
             <Checkbox
               id={`${amountId}-vat`}
-              label={t('price.vatIncluded', { defaultValue: 'VAT Incl.' })}
+              label={t('price.vatIncluded')}
               checked={vatIncluded}
               onCheckedChange={(checked) =>
                 update({ vatIncluded: checked === true })
@@ -249,7 +253,7 @@ const PriceFieldComponent: ComponentType<PriceFieldComponentProps> = ({
               onChange={handleDiscountChange}
               disabled={disabled}
               placeholder="0"
-              label={t('price.discountLabel', { defaultValue: 'Discount (%)' })}
+              label={t('price.discountLabel')}
             />
           </div>
         </CollapsibleContent>

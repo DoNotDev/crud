@@ -21,6 +21,8 @@ export interface PasswordFieldComponentProps extends Omit<
 > {
   /** Field label */
   label: string;
+  /** Help text (entity field `hint`): an (i) after the label shows it */
+  info?: string;
   /** Current value */
   value?: string;
   /** Change handler */
@@ -44,6 +46,7 @@ export interface PasswordFieldComponentProps extends Omit<
  */
 const PasswordFieldComponent: ComponentType<PasswordFieldComponentProps> = ({
   label,
+  info,
   value,
   onChange,
   error,
@@ -60,6 +63,7 @@ const PasswordFieldComponent: ComponentType<PasswordFieldComponentProps> = ({
         value={value ?? ''}
         onChange={onChange}
         label={label}
+        info={info}
         className="dndev-w-full"
         required={props.required}
         {...props}

@@ -156,11 +156,11 @@ export function updateListCaches<T>(
             (item: DocumentWithId) =>
               item != null && typeof item === 'object' && item.id !== id
           );
+          if (updatedItems.length === paginated.items.length) return old;
           return {
             ...paginated,
             items: updatedItems,
-            // Floor at 0 — total can't go negative if deletes race or cache is stale.
-            total: Math.max(0, (paginated.total ?? updatedItems.length) - 1),
+            ...(paginated.total === undefined ? {} : { total: Math.max(0, paginated.total - 1) }),
           };
         }
 
@@ -332,7 +332,7 @@ export function checkUniquenessFromCache<T>(
  * Used to get previous data for optimistic operations when individual GET cache is empty.
  */
 export function getItemFromListCache<T>(
-  self: CrudServiceInternal,
+  self: Pick<CrudServiceInternal, 'getQueryClient'>,
   collection: string,
   id: string
 ): T | null {

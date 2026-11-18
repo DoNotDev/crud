@@ -8,6 +8,7 @@ import type { FieldValues, Path } from 'react-hook-form';
 
 import { translateLabel } from '../../../forms/utils';
 import { DropdownComponent } from '../../form/fields';
+import { fieldInfo } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -116,6 +117,7 @@ export function ControlledDropdownField(
         return (
           <DropdownComponent
             label={t(label)}
+            info={fieldInfo(fieldConfig, t)}
             value={
               field.value !== undefined && field.value !== null
                 ? String(field.value)

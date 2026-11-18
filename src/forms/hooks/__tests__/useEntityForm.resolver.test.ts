@@ -13,68 +13,13 @@ import type { FieldValues, ResolverOptions } from 'react-hook-form';
 import type * as v from 'valibot';
 import { describe, it, expect } from 'vitest';
 
-import { createSchemas, defineEntity, EDITABLE } from '@donotdev/core';
+import { createSchemas } from '@donotdev/core';
+import { editableResolverEntity as testEntity } from '@dndev/test-entities';
 
 // ---------------------------------------------------------------------------
 // Test Entity: mimics apartment with required fields + computed field
 // ---------------------------------------------------------------------------
 
-const testEntity = defineEntity({
-  name: 'TestApartment',
-  collection: 'test_apartments',
-  fields: {
-    status: {
-      name: 'status',
-      label: 'Status',
-      type: 'select',
-      visibility: 'admin',
-      validation: {
-        options: [
-          { value: 'available', label: 'Available' },
-          { value: 'reserved', label: 'Reserved' },
-        ],
-      },
-    },
-    reference: {
-      name: 'reference',
-      label: 'Reference',
-      type: 'text',
-      visibility: 'guest',
-      validation: { required: true, minLength: 1 },
-    },
-    rent: {
-      name: 'rent',
-      label: 'Rent',
-      type: 'currency',
-      visibility: 'guest',
-      editable: 'admin',
-      validation: { required: true, min: 0 },
-    },
-    district_code: {
-      name: 'district_code',
-      label: 'District',
-      type: 'number',
-      visibility: 'guest',
-      editable: EDITABLE.COMPUTED,
-      validation: { required: true },
-    },
-    rent_cc: {
-      name: 'rent_cc',
-      label: 'Rent CC',
-      type: 'currency',
-      visibility: 'guest',
-      editable: EDITABLE.GENERATED,
-      validation: { required: false },
-    },
-    notes: {
-      name: 'notes',
-      label: 'Notes',
-      type: 'textarea',
-      visibility: 'admin',
-      validation: { required: false },
-    },
-  },
-});
 
 // ---------------------------------------------------------------------------
 // Helper: run resolver and return { values, errors }

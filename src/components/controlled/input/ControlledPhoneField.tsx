@@ -4,7 +4,9 @@
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
 
+import { fromInputValue } from '../../../forms/utils';
 import { PhoneNumberComponent } from '../../form/fields';
+import { fieldInfo } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -29,9 +31,13 @@ export function ControlledPhoneField(
       rules={validation ? convertValidationRules(validation) : undefined}
       render={({ field, fieldState }) => (
         <PhoneNumberComponent
+          ref={field.ref}
+          name={field.name}
+          onBlur={field.onBlur}
           label={t(label)}
+          info={fieldInfo(fieldConfig, t)}
           value={typeof field.value === 'string' ? field.value : ''}
-          onChange={(e) => field.onChange(e.target.value || '')}
+          onChange={(e) => field.onChange(fromInputValue(e.target.value))}
           error={fieldState.error?.message}
           helperText={fieldState.error?.message}
           required={required}

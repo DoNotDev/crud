@@ -11,9 +11,14 @@
  */
 
 import { useMemo, useCallback } from 'react';
-import type { FieldPath } from 'react-hook-form';
+import type { Control, FieldPath } from 'react-hook-form';
 
-import type { AnyEntity, EntityField } from '@donotdev/core';
+import type {
+  AnyEntity,
+  EntityExtensions,
+  EntityField,
+  FieldOperation,
+} from '@donotdev/core';
 
 import { useController } from './useController';
 import { formatValue } from '../../components/DisplayFieldRenderer';
@@ -22,7 +27,6 @@ import type {
   InferEntityData,
   EntityFieldReturn,
 } from '../types';
-import { isFieldEditable } from '../utils';
 
 /**
  * Granular hook for single field control within an entity form.
@@ -31,11 +35,16 @@ import { isFieldEditable } from '../utils';
  * such as custom components, conditional logic, or complex layouts.
  *
  * Returns `{ field, meta, config, isEditable, isVisible, display }`.
- * - `display(options?)` formats the current value using the registered field type formatter.
+ * - `isEditable` / `isVisible`: as `form.fields` (entity descriptor, viewer role, operation).
+ * - `display(options?)` formats the value using the registered field type formatter:
+ *   the form value for fields the form writes, `form.record` for the others
+ *   (technical, `editable: false`, role-denied: not in form state).
  *
  * @template E - Entity type from defineEntity()
  * @template K - Field key from entity
- * @param form - Form instance from useEntityForm
+ * @template Op - The form's operation (inferred from `form`)
+ * @template X - The form's 1:1 extensions (inferred from `form`)
+ * @param form - Form instance from useEntityForm (any operation, any extensions)
  * @param fieldName - Name of the field to control
  * @returns Field state, config, editability info, and display formatter
  *
@@ -74,66 +83,51 @@ import { isFieldEditable } from '../utils';
  * @see {@link useEntityForm} for creating the form instance
  * @see {@link EntityFieldReturn} for return type
  *
- * @version 0.1.0
+ * @version 0.2.0
  * @since 0.0.1
  * @author AMBROISE PARK Consulting
  */
 export function useEntityField<
   E extends AnyEntity,
-  K extends keyof InferEntityData<E>,
->(form: EntityFormReturn<E>, fieldName: K): EntityFieldReturn<E, K> {
-  const { entity, operation, viewerRole, fields } = form;
+  K extends string & keyof InferEntityData<E> & FieldPath<InferEntityData<E>>,
+  Op extends FieldOperation = FieldOperation,
+  X extends EntityExtensions = Record<never, never>,
+>(form: EntityFormReturn<E, Op, X>, fieldName: K): EntityFieldReturn<E, K> {
+  const { entity, fields } = form;
 
   // Get the field definition from entity
-  const fieldDef = entity.fields[fieldName as string];
+  const fieldDef = entity.fields[fieldName];
 
   // Get field config (defineEntity ensures name/label are set)
   const config: EntityField = useMemo(() => {
+    // Typed callers cannot reach this (K is keyof the entity); only an erased entity type can.
     if (!fieldDef) {
-      // Fallback for missing field
-      return {
-        name: fieldName as string,
-        type: 'text',
-        label: fieldName as string,
-        visibility: 'user',
-      } as EntityField;
+      throw new Error(
+        `useEntityField: entity "${entity.name}" has no field "${fieldName}".`
+      );
     }
     // defineEntity ensures name/label are set, but we ensure type safety
     return {
       ...fieldDef,
-      name: fieldDef.name || (fieldName as string),
-      label: fieldDef.label || (fieldName as string),
+      name: fieldDef.name || fieldName,
+      label: fieldDef.label || fieldName,
     } as EntityField;
   }, [fieldName, fieldDef]);
 
-  // Check if field is in the filtered list (visible)
-  const isVisible = useMemo(
-    () => fields.some((f) => f.name === fieldName),
+  // The field as the form renders it (visible, editable, written), from the descriptor
+  const renderable = useMemo(
+    () => fields.find((f) => f.name === fieldName),
     [fields, fieldName]
   );
-
-  // Compute editability
-  const isEditable = useMemo(() => {
-    // If not visible, not editable
-    if (!isVisible) return false;
-
-    // Technical fields default to read-only in edit mode, unless explicitly overridden
-    if (
-      operation === 'edit' &&
-      config.visibility === 'technical' &&
-      config.editable === undefined
-    ) {
-      return false;
-    }
-
-    return isFieldEditable(config.editable, viewerRole, operation);
-  }, [isVisible, operation, config.visibility, config.editable, viewerRole]);
+  const isVisible = renderable !== undefined;
+  const isEditable = renderable?.editable ?? false;
 
   // Use React Hook Form's useController for field state
-  // why: K is a top-level key of the form data, hence a FieldPath, but TS cannot relate `keyof` to FieldPath for a generic entity
   const { field, fieldState } = useController({
-    name: fieldName as unknown as FieldPath<InferEntityData<E>>,
-    control: form.control,
+    name: fieldName,
+    // why: form state is FormValues (the fields the form writes); useEntityField takes any
+    // row field: one the form does not write reads undefined here and displays form.record
+    control: form.control as unknown as Control<InferEntityData<E>>,
   });
 
   // Build meta object
@@ -146,11 +140,15 @@ export function useEntityField<
     [fieldState.error?.message, fieldState.isTouched, fieldState.isDirty]
   );
 
-  // Display formatter using registered field type formatter
+  // Display formatter: form state for written fields, the stored record for the others
+  // (technical, `editable: false`, role-denied: never in form state)
+  const displayed = renderable?.written
+    ? field.value
+    : (form.record as Record<string, unknown> | undefined)?.[fieldName];
   const display = useCallback(
     (options?: { compact?: boolean; asString?: boolean }) =>
-      formatValue(field.value, config, form.t, options),
-    [field.value, config, form.t]
+      formatValue(displayed, config, form.t, options),
+    [displayed, config, form.t]
   );
 
   return {

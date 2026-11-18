@@ -97,7 +97,8 @@ export async function appendToCollection<T extends Record<string, unknown>>(
   const crud = getCrudService();
   if (config.idFrom) {
     const id = config.idFrom(item);
-    return crud.set<T>(config.path(userId), id, item as T, config.schema);
+    await crud.set<T>(config.path(userId), id, item as T, config.schema);
+    return;
   }
   return crud.add<T>(config.path(userId), item, config.schema);
 }

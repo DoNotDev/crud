@@ -6,9 +6,16 @@
 
 - `useCrudDoc(entity, id)`: one document, reactive to the shared cache. Every edit, delete (optimistic or confirmed) or subscription write re-renders it. `EntityDisplayRenderer` (ui, expo) uses it: detail views no longer go stale after an edit.
 - Removed `useCrud().data` (always `null` since 0.1.x). Read documents with `useCrudDoc` or `get()`.
+- Filters: `select` / `radio` / `multiselect` / `reference` filters match exactly (was substring: `toner` matched `toner_pad`), any-of on arrays (OR within a field, AND across fields). `EntityFilters` offers them as multi-selects (state: arrays; a string state still matches). Reference fields (`filterType: 'reference'`, was `'text'`) filter by id with the referenced documents' labels. Option counts/availability are per array item; chips show option / reference labels.
+- `field.filter.wildcard` (`FieldFilterConfig`, `@donotdev/core`): a stored value meaning "every option" (e.g. `skinTypes: ['all']`), never offered as a choice, matches any selection. `matchesFilter` takes the field's `filter` as 4th argument (`applyFilters` passes it).
+- URL sync of filters: only entity-collection keys (custom `filterKey` states never touch the URL; `useCrudFilters` / `EntityFilters` `urlSync` opt in/out, store `setFilterUrlSync`); re-read on back/forward, navigations and mount (`syncFiltersFromUrl`); option fields as repeated params read back as arrays, values percent-encoded (commas safe); only the entity's own `f_*` params rewritten; router history state and hash kept; a pending write is dropped when the page changed.
+- `EntityList` / `EntityCardList` (ui) pass the viewer's role to `EntityFilters`: admin-visibility fields were filtered as `guest`, so admin lists showed an empty filter panel.
 
 ### Patch Changes
 
+- `useCrudFilters`: render no longer writes the store (a page loaded with `f_*` params updated other components during render: React "Cannot update a component while rendering"). The first client render reads the URL, the mount effect seeds the store; server render and hydration show no filters.
+- `EntityFilters`: chip remove and combobox clear buttons are translated (`form.remove`, `filter.clear`; were English "Remove" / "Clear").
+- `EntityFilters`: a multi-select with values shows them (one value's label, `filters.selected` for several; was the placeholder). `filters.selected_other` added (fr, es, it, pt).
 - One read path per shape: `get()` / `getDocQueryOptions` and `query()` / `getListQueryOptions` now share the access check, PII decryption and the server-render request adapter. Lists read through `useCrudList` / `useCrudCardList` previously returned PII ciphertext and skipped the access check. Subscriptions decrypt PII before writing the cache.
 - `assertCanAccess` checks the adapter that performs the read (request-scoped on the server).
 - Delete: a displayed document shows not-found (cache entry set to `null`, stale); an undisplayed entry is dropped. Previously `removeQueries` left it on screen.

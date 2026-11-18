@@ -79,21 +79,71 @@ describe('matchesFilter', () => {
     });
   });
 
-  // ─── Select filter (falls through to string contains) ────────────
+  // ─── Select filter (exact option code) ───────────────────────────
 
   describe('select filter', () => {
     beforeEach(() => setFilterType('select'));
 
-    it('matches exact value via string contains', () => {
+    it('matches the exact value', () => {
       expect(matchesFilter('active', 'active', 'select')).toBe(true);
     });
 
-    it('is case-insensitive', () => {
-      expect(matchesFilter('Active', 'active', 'select')).toBe(true);
+    it('is exact: toner does not match toner_pad', () => {
+      expect(matchesFilter('toner_pad', 'toner', 'select')).toBe(false);
+      expect(matchesFilter('toner', 'toner', 'select')).toBe(true);
+    });
+
+    it('is exact: scrub does not match body_scrub', () => {
+      expect(matchesFilter('body_scrub', 'scrub', 'select')).toBe(false);
+    });
+
+    it('is case-sensitive (option codes)', () => {
+      expect(matchesFilter('Active', 'active', 'select')).toBe(false);
+    });
+
+    it('matches booleans by their string form', () => {
+      expect(matchesFilter(true, 'true', 'switch')).toBe(true);
+      expect(matchesFilter(false, 'true', 'switch')).toBe(false);
     });
 
     it('returns false for null itemValue', () => {
       expect(matchesFilter(null, 'active', 'select')).toBe(false);
+    });
+
+    it('wildcard value matches any selection', () => {
+      expect(matchesFilter('all', 'dry', 'select', { wildcard: 'all' })).toBe(
+        true
+      );
+      expect(matchesFilter('oily', 'dry', 'select', { wildcard: 'all' })).toBe(
+        false
+      );
+    });
+
+    it('without wildcard config, a stored "all" is an ordinary value', () => {
+      expect(matchesFilter('all', 'dry', 'select')).toBe(false);
+    });
+  });
+
+  // ─── Reference filter (exact id) ─────────────────────────────────
+
+  describe('reference filter', () => {
+    beforeEach(() => setFilterType('reference'));
+
+    it('matches the exact id', () => {
+      expect(matchesFilter('brand-1', 'brand-1', 'reference')).toBe(true);
+    });
+
+    it('does not match an id containing the selected id', () => {
+      expect(matchesFilter('brand-12', 'brand-1', 'reference')).toBe(false);
+    });
+
+    it('any-of on several selected ids', () => {
+      expect(
+        matchesFilter('brand-2', ['brand-1', 'brand-2'], 'reference')
+      ).toBe(true);
+      expect(
+        matchesFilter('brand-3', ['brand-1', 'brand-2'], 'reference')
+      ).toBe(false);
     });
   });
 
@@ -580,25 +630,58 @@ describe('matchesFilter', () => {
     });
   });
 
-  // ─── Multiselect filter ───────────────────────────────────────────
+  // ─── Multiselect filter (any-of, exact items) ─────────────────────
 
   describe('multiselect filter', () => {
     beforeEach(() => setFilterType('multiselect'));
 
-    it('matches when any array item contains filter string', () => {
+    it('matches when an array item equals the selected value', () => {
       expect(
         matchesFilter(['red', 'blue', 'green'], 'blue', 'multiselect')
       ).toBe(true);
     });
 
-    it('is case-insensitive', () => {
-      expect(matchesFilter(['Red', 'Blue'], 'blue', 'multiselect')).toBe(true);
-    });
-
-    it('matches partial substring within item', () => {
+    it('is exact: an item containing the value does not match', () => {
       expect(
         matchesFilter(['blueberry', 'cherry'], 'blue', 'multiselect')
+      ).toBe(false);
+      expect(matchesFilter(['body_scrub'], 'scrub', 'multiselect')).toBe(false);
+    });
+
+    it('is case-sensitive (option codes)', () => {
+      expect(matchesFilter(['Red', 'Blue'], 'blue', 'multiselect')).toBe(false);
+    });
+
+    it('array filter value: any of the item values selected', () => {
+      expect(
+        matchesFilter(['dry', 'oily'], ['oily', 'normal'], 'multiselect')
       ).toBe(true);
+      expect(
+        matchesFilter(['dry', 'oily'], ['normal', 'sensitive'], 'multiselect')
+      ).toBe(false);
+    });
+
+    it('array filter value does not compare the stringified array', () => {
+      // was: String(['dry','oily']) === 'dry,oily'
+      expect(matchesFilter(['dry', 'oily'], ['dry,oily'], 'multiselect')).toBe(
+        false
+      );
+      expect(matchesFilter(['dry', 'oily'], ['dry'], 'multiselect')).toBe(true);
+    });
+
+    it('scalar item value: matches when selected', () => {
+      expect(matchesFilter('blue', 'blue', 'multiselect')).toBe(true);
+      expect(matchesFilter('blue', ['red', 'blue'], 'multiselect')).toBe(true);
+      expect(matchesFilter('blue', ['red'], 'multiselect')).toBe(false);
+    });
+
+    it('wildcard item matches any selected value', () => {
+      const config = { wildcard: 'all' };
+      expect(matchesFilter(['all'], 'dry', 'multiselect', config)).toBe(true);
+      expect(
+        matchesFilter(['all'], ['dry', 'oily'], 'multiselect', config)
+      ).toBe(true);
+      expect(matchesFilter(['oily'], 'dry', 'multiselect', config)).toBe(false);
     });
 
     it('returns false when no item matches', () => {
@@ -609,14 +692,27 @@ describe('matchesFilter', () => {
 
     it('returns false for empty array itemValue', () => {
       expect(matchesFilter([], 'blue', 'multiselect')).toBe(false);
-    });
-
-    it('returns false for non-array itemValue', () => {
-      expect(matchesFilter('blue', 'blue', 'multiselect')).toBe(false);
+      expect(matchesFilter([], ['blue'], 'multiselect')).toBe(false);
     });
 
     it('returns false for null itemValue', () => {
       expect(matchesFilter(null, 'blue', 'multiselect')).toBe(false);
+    });
+  });
+
+  // ─── Text filter keeps substring semantics ────────────────────────
+
+  describe('text filter with wildcard config', () => {
+    beforeEach(() => setFilterType('text'));
+
+    it('free text stays a case-insensitive substring', () => {
+      expect(matchesFilter('Toner pad', 'toner', 'text')).toBe(true);
+    });
+
+    it('wildcard does not apply to free text', () => {
+      expect(matchesFilter('all', 'dry', 'text', { wildcard: 'all' })).toBe(
+        false
+      );
     });
   });
 

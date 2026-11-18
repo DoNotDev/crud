@@ -10,14 +10,14 @@
  */
 
 import {
-  EDITABLE,
+  describeEntity,
+  describeField,
   isFieldVisible,
   type AnyEntity,
   type EntityField,
+  type FieldDescriptor,
   type FieldType,
 } from '@donotdev/core';
-
-import { isFieldEditable } from './isFieldEditable';
 
 /** Entity fields input - supports Entity, Entity['fields'], or plain Record */
 export type EntityFieldsInput =
@@ -33,6 +33,20 @@ export interface RenderableField<T extends FieldType = FieldType> {
   config: EntityField<T>;
   /** Whether field is editable (input vs read-only) */
   editable: boolean;
+  /**
+   * Whether the form writes the field: an input (`editable`) or a derived
+   * (`editable: 'computed'`) field. Its value lives in form state; a field the form
+   * does not write (technical, `editable: false`, role-denied) is read from
+   * `form.record`.
+   * @since 0.2.5
+   */
+  written: boolean;
+  /**
+   * Values the field's `conditions` read: the key of a 1:1 extension (`offer`)
+   * for its prefixed fields (`offer.priceExclVat`); omitted for the entity's own.
+   * @since 0.2.5
+   */
+  scope?: string;
 }
 
 /** Options for field filtering */
@@ -49,43 +63,72 @@ export interface GetFieldsForOperationOptions {
   availableFields?: string[];
 }
 
+/** Descriptors of a plain field map, built once per map (no entity name: errors name `<fields>`). */
+const fieldMapCache = new WeakMap<object, Readonly<Record<string, FieldDescriptor>>>();
+
 /**
- * Filters entity fields based on operation type and viewer role.
+ * Field descriptors of an entity (`describeEntity`, memoized) or of a plain field map.
+ *
+ * @param entity - Entity, `entity.fields` or a plain field map
+ * @returns Field configurations and their descriptors, keyed by field name
+ */
+function describeInput(entity: EntityFieldsInput): {
+  fields: Record<string, EntityField<FieldType>>;
+  descriptors: Readonly<Record<string, FieldDescriptor>>;
+} {
+  if ('fields' in entity && 'name' in entity && typeof entity.name === 'string') {
+    // why: the guard above identifies an entity (fields + name); a field map has field configs as values
+    const whole = entity as AnyEntity;
+    return { fields: whole.fields, descriptors: describeEntity(whole).fields };
+  }
+  const fields = entity as Record<string, EntityField<FieldType>>;
+  let descriptors = fieldMapCache.get(fields);
+  if (!descriptors) {
+    descriptors = Object.fromEntries(
+      Object.entries(fields).map(([name, field]) => [
+        name,
+        describeField(name, field, '<fields>'),
+      ])
+    );
+    fieldMapCache.set(fields, descriptors);
+  }
+  return { fields, descriptors };
+}
+
+/**
+ * Filters entity fields based on operation type and viewer role, from the entity
+ * descriptor (`describeEntity`: write class, `editableFor`, visibility).
  *
  * Pure function, no React dependencies. Use for building custom form layouts.
  *
- * **Create operation:**
- * - Excludes `visibility: 'technical'` fields (auto-added by backend)
- * - Excludes `visibility: 'hidden'` fields (never shown)
+ * Per write class (design 3.4):
+ * - `never` (hidden, `editable: 'generated'`, backend names): not shown, except
+ *   technical fields on edit, shown read-only (`id`, `createdAt`, ...)
+ * - `program` (`editable: false`): shown read-only
+ * - `derived` (`editable: 'computed'`): shown read-only, written by the form
+ * - `user`: an input when `editableFor(viewerRole, operation)`, else read-only
  *
- * **Edit operation:**
- * - Excludes `visibility: 'hidden'` fields (never shown)
- * - Technical fields are marked as `editable: false` (read-only)
- * - If `availableFields` provided, only returns fields in that list (backend-filtered)
+ * **Create operation:** excludes `visibility: 'technical'` fields.
+ * **Edit operation:** if `availableFields` is provided, only returns those fields.
+ * Fields the viewer cannot see (`visibility` above the role, `hidden`) are left out.
  *
- * @param entity - Entity definition from defineEntity()
+ * @param entity - Entity definition from defineEntity(), or a field map
  * @param options - Filtering options
  * @returns Array of renderable fields with computed editability
+ * @throws When a field has a custom type and no value shape (`describeEntity`)
  *
  * @example
  * ```typescript
  * import { getFieldsForOperation } from '@donotdev/crud/forms';
  * import { productEntity } from './entities/product';
  *
- * // Create form - excludes technical and hidden
- * const createFields = getFieldsForOperation(productEntity, {
- *   operation: 'create',
- *   viewerRole: 'user'
- * });
- *
- * // Edit form - uses backend-filtered fields
  * const editFields = getFieldsForOperation(productEntity, {
  *   operation: 'edit',
  *   viewerRole: 'admin',
- *   availableFields: Object.keys(existingData)
  * });
  *
- * // Render custom form
+ * // Inputs for written editable fields; read-only display for the others
+ * // (`written`: from form state, else from form.record)
  * editFields.map(({ name, config, editable }) => (
  *   editable
  *     ? <Input key={name} {...config} />
@@ -96,7 +139,7 @@ export interface GetFieldsForOperationOptions {
  * @see {@link AnyEntity} for entity definition structure
  * @see {@link RenderableField} for return type
  *
- * @version 0.1.0
+ * @version 0.2.0
  * @since 0.0.1
  * @author AMBROISE PARK Consulting
  */
@@ -106,40 +149,22 @@ export function getFieldsForOperation(
 ): RenderableField[] {
   const { operation, viewerRole: viewerRoleProp, availableFields } = options;
   const viewerRole = viewerRoleProp ?? 'guest';
-
-  // Handle Entity, Entity['fields'], or plain Record
-  const fields: Record<string, EntityField<FieldType>> = entity &&
-  typeof entity === 'object' &&
-  'fields' in entity &&
-  'name' in entity
-    ? (entity as AnyEntity).fields
-    : (entity as Record<string, EntityField<FieldType>>);
-
-  const entries = Object.entries(fields);
+  const { fields, descriptors } = describeInput(entity);
 
   const result: RenderableField[] = [];
 
-  for (const [fieldName, fieldDef] of entries) {
-    const config = fieldDef;
-    const visibility = config.visibility || 'guest';
+  for (const [fieldName, config] of Object.entries(fields)) {
+    const descriptor = descriptors[fieldName]!;
+    const visibility = descriptor.visibleAt;
 
     // Use unified visibility check (same as EntityDisplayRenderer)
-    if (!isFieldVisible(visibility, viewerRole)) {
-      continue;
-    }
+    if (!isFieldVisible(visibility, viewerRole)) continue;
 
-    // Generated/computed fields are never shown in forms
-    if (
-      config.editable === EDITABLE.GENERATED ||
-      config.editable === EDITABLE.COMPUTED
-    ) {
-      continue;
-    }
+    // Create mode: technical fields are set by the backend
+    if (operation === 'create' && visibility === 'technical') continue;
 
-    // Create mode: also exclude technical fields (backend generates them)
-    if (operation === 'create' && visibility === 'technical') {
-      continue;
-    }
+    // Never written: only technical fields are shown (read-only, edit mode)
+    if (descriptor.write === 'never' && visibility !== 'technical') continue;
 
     // Edit mode: only show fields that exist in availableFields (backend filtered)
     if (
@@ -150,19 +175,13 @@ export function getFieldsForOperation(
       continue;
     }
 
-    // Determine editability
-    let editable = isFieldEditable(config.editable, viewerRole, operation);
-
-    // Technical fields default to read-only in edit mode, unless explicitly overridden
-    if (
-      operation === 'edit' &&
-      visibility === 'technical' &&
-      config.editable === undefined
-    ) {
-      editable = false;
-    }
-
-    result.push({ name: fieldName, config, editable });
+    const editable = descriptor.editableFor(viewerRole, operation);
+    result.push({
+      name: fieldName,
+      config,
+      editable,
+      written: editable || descriptor.write === 'derived',
+    });
   }
 
   return result;

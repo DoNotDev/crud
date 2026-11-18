@@ -86,16 +86,10 @@ const GdprConsentFieldComponent: ComponentType<
     }
   };
 
-  const consentText = t('gdprConsent.consent', {
-    defaultValue: 'I agree to the',
-  });
-  const privacyPolicyText = t('gdprConsent.privacyPolicy', {
-    defaultValue: 'privacy policy',
-  });
-  const termsText = t('gdprConsent.terms', { defaultValue: 'terms of use' });
-  const andText = t('gdprConsent.and', {
-    defaultValue: 'and consent to the processing of my personal data.',
-  });
+  const consentText = t('gdprConsent.consent');
+  const privacyPolicyText = t('gdprConsent.privacyPolicy');
+  const termsText = t('gdprConsent.terms');
+  const andText = t('gdprConsent.and');
 
   return (
     <>

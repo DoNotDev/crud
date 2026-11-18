@@ -5,6 +5,7 @@ import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
 
 import { DateFieldComponent } from '../../form/fields';
+import { fieldInfo } from '../fieldOptions';
 import { convertValidationRules, type ControlledFieldProps } from '../types';
 
 /**
@@ -48,6 +49,7 @@ export function ControlledDateField(props: ControlledFieldProps): ReactElement {
         <DateFieldComponent
           {...field}
           label={t(label)}
+          info={fieldInfo(fieldConfig, t)}
           value={field.value ?? null}
           onChange={(value) => field.onChange(value)}
           error={fieldState.error?.message}
