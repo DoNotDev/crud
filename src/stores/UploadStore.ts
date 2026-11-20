@@ -14,6 +14,8 @@
 import { createDoNotDevStore } from '@donotdev/core';
 import type { FileAsset, Picture } from '@donotdev/core';
 
+import { setLoadedUploadStore } from './uploadStoreRef';
+
 /**
  * Upload status for a single field
  */
@@ -938,6 +940,10 @@ export const useUploadStore = createDoNotDevStore<
     },
   }),
 });
+
+// Forms reach the store through this reference (uploadStoreRef): loaded with the
+// file fields, never by a form without them
+setLoadedUploadStore(useUploadStore);
 
 // ===================================================================
 // Selector Hooks (for convenience)

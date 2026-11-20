@@ -19,6 +19,7 @@ import {
   cn,
   Stack,
 } from '@donotdev/components';
+import { useTranslation } from '@donotdev/core';
 
 export interface DateFieldComponentProps {
   /** Field label */
@@ -68,6 +69,7 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
 }) => {
   const id = useId();
   const hasError = !!error;
+  const { t } = useTranslation('crud');
 
   // Handle input change: convert the native value to an ISO string (or null)
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -108,6 +110,7 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
       <Stack gap="tight">
         <DatePicker
           id={id}
+          calendarErrorLabel={t('date.calendarLoadError')}
           label={label}
           info={info}
           value={value ?? null}
@@ -161,6 +164,7 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
       <Stack gap="tight">
         <DateTimePicker
           id={id}
+          calendarErrorLabel={t('date.calendarLoadError')}
           label={label}
           info={info}
           value={displayValue || null}

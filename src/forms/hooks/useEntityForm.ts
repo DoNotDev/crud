@@ -80,7 +80,7 @@ import {
 import type { ResolvedExtension } from '../extend';
 import { useFormNavigation } from '../FormNavigation';
 import type { FormDraftSlot, FormDraftStateRegistry } from './useFormDraftState';
-import { useUploadStore } from '../../stores/UploadStore';
+import { getLoadedUploadStore } from '../../stores/uploadStoreRef';
 import { checkForBlobUrls, isStorageUrl } from '../../utils/uploadValidation';
 import type {
   UseEntityFormOptions,
@@ -942,6 +942,10 @@ export function useEntityForm<
   ): Promise<Record<string, unknown> | null> => {
     if (!formId) return {};
 
+    // Not loaded: no file field ever mounted, so nothing to upload
+    const useUploadStore = getLoadedUploadStore();
+    if (!useUploadStore) return {};
+
     const uploadStore = useUploadStore.getState();
     const formStore = useFormStore.getState();
 
@@ -1542,7 +1546,7 @@ export function useEntityForm<
     submitControllerRef.current?.abort();
     if (formId) {
       useFormStore.getState().cleanup(formId);
-      useUploadStore.getState().cleanup(formId);
+      getLoadedUploadStore()?.getState().cleanup(formId);
     }
   };
 
@@ -1555,7 +1559,7 @@ export function useEntityForm<
   const cancel = () => {
     submitControllerRef.current?.abort();
     if (formId) {
-      useUploadStore.getState().abortAll(formId);
+      getLoadedUploadStore()?.getState().abortAll(formId);
       useFormStore.getState().reset(formId);
     }
     isSubmittingMutex.current = false;
