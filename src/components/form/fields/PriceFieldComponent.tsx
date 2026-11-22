@@ -263,7 +263,7 @@ const PriceFieldComponent: ComponentType<PriceFieldComponentProps> = ({
           style={{
             fontSize: 'var(--font-size-xs)',
             color: error
-              ? 'var(--destructive-foreground)'
+              ? 'var(--destructive)'
               : 'var(--muted-foreground)',
           }}
         >

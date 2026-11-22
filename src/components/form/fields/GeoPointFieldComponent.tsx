@@ -118,7 +118,7 @@ const GeoPointFieldComponent: ComponentType<GeoPointFieldComponentProps> = ({
           style={{
             fontSize: 'var(--font-size-xs)',
             color: error
-              ? 'var(--destructive-foreground)'
+              ? 'var(--destructive)'
               : 'var(--muted-foreground)',
             marginTop: 'var(--gap-sm)',
           }}

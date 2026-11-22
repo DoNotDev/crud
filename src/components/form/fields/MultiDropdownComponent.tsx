@@ -151,7 +151,7 @@ const MultiDropdownComponent: ComponentType<MultiDropdownComponentProps> = ({
           gap="tight"
           style={{
             fontSize: 'var(--font-size-xs)',
-            color: 'var(--destructive-foreground)',
+            color: 'var(--destructive)',
           }}
           role="alert"
         >

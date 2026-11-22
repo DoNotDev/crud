@@ -4,7 +4,8 @@
 /**
  * @fileoverview Phone Number Component
  * @description Single phone number input with country code selector and flag. Form field component for phone number inputs in CRUD forms.
- * Value: `<dial code> <number>` (`+33 6 12 34 56 78`), `''` when no number is typed.
+ * Value: `<dial code> <number>`, separators stripped (`+33 612345678`), `''` when no
+ * number is typed (see {@link toPhoneValue}).
  *
  * @version 0.1.0
  * @since 0.0.1
@@ -26,6 +27,36 @@ import {
 import type { DropdownMenuItemData } from '@donotdev/components';
 import { Flag, COUNTRIES } from '@donotdev/core';
 import type { CountryData } from '@donotdev/core';
+
+/** Separators allowed between digits: spaces, dots, dashes. */
+const PHONE_SEPARATORS = /[\s.-]/g;
+
+/**
+ * Stored value of a typed number with the selected dial code: `<dial code> <number>`,
+ * separators stripped, national trunk `0` dropped. The dial code is never added twice:
+ * a number typed with it (`+33…`, `0033…`) keeps one, a number typed with another
+ * `+` code is kept as typed (`+447911123456`). Nothing after the dial code (`+33`, `''`):
+ * `''` (the controlled field stores `null`: the field is empty, not invalid).
+ *
+ * @param typed - What the input holds
+ * @param dialCode - Selected country's dial code (`+33`)
+ * @returns `+33 612345678`, or `''` when no number is typed
+ *
+ * @example
+ * ```ts
+ * toPhoneValue('06.12.34.56.78', '+33'); // '+33 612345678'
+ * toPhoneValue('+33 6 12 34 56 78', '+33'); // '+33 612345678'
+ * toPhoneValue('+33', '+33'); // ''
+ * ```
+ */
+export function toPhoneValue(typed: string, dialCode: string): string {
+  let number = typed.replace(PHONE_SEPARATORS, '');
+  if (number.startsWith('00')) number = `+${number.slice(2)}`;
+  if (number.startsWith(dialCode)) number = number.slice(dialCode.length);
+  else if (number.startsWith('+')) return number;
+  if (number.startsWith('0')) number = number.slice(1);
+  return number ? `${dialCode} ${number}` : '';
+}
 
 /** Props for the phone input, including native form identity, blur, and ref wiring. */
 export interface PhoneNumberComponentProps {
@@ -171,38 +202,17 @@ const PhoneNumberComponent: ComponentType<PhoneNumberComponentProps> = ({
   const handleCountryChange = (country: CountryData) => {
     setSelectedCountry(country);
 
-    // Clean up phone number when country changes: remove leading 0 if present
-    let cleanedNumber = phoneNumber;
-    if (cleanedNumber.startsWith('0')) {
-      cleanedNumber = cleanedNumber.slice(1).trim();
-    }
-    // Clean up spaces
-    cleanedNumber = cleanedNumber.replace(/\s+/g, ' ').trim();
-
     // No number: empty value (a bare dial code is not a phone number)
-    const newValue = cleanedNumber ? `${country.dialCode} ${cleanedNumber}` : '';
     const syntheticEvent = {
-      target: { value: newValue },
+      target: { value: toPhoneValue(phoneNumber, country.dialCode) },
     } as ChangeEvent<HTMLInputElement>;
     onChange(syntheticEvent);
   };
 
   const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
-    let phoneValue = event.target.value;
-
-    // Remove leading "0" when country code is selected (common in European countries)
-    // This handles cases like France: "06 37 37 54 37" -> "6 37 37 54 37" -> "+33 6 37 37 54 37"
-    if (phoneValue.startsWith('0')) {
-      phoneValue = phoneValue.slice(1).trim();
-    }
-
-    // Clean up the phone number: remove extra spaces, keep single spaces for readability
-    phoneValue = phoneValue.replace(/\s+/g, ' ').trim();
-
-    // Emptied input: empty value (the controlled field stores it as null)
-    const fullValue = phoneValue ? `${selectedCountry.dialCode} ${phoneValue}` : '';
+    // Emptied input or dial code only: empty value (the controlled field stores it as null)
     const syntheticEvent = {
-      target: { value: fullValue },
+      target: { value: toPhoneValue(event.target.value, selectedCountry.dialCode) },
     } as ChangeEvent<HTMLInputElement>;
     onChange(syntheticEvent);
   };
@@ -308,7 +318,7 @@ const PhoneNumberComponent: ComponentType<PhoneNumberComponentProps> = ({
           gap="tight"
           style={{
             fontSize: 'var(--font-size-xs)',
-            color: 'var(--destructive-foreground)',
+            color: 'var(--destructive)',
           }}
           role="alert"
         >

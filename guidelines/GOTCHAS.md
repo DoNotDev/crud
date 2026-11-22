@@ -31,6 +31,8 @@ status: { visibility: 'technical' }
 
 **Empty is `null`, never `''`.** Entity forms store an empty text input as `null` (form state, validated data, adapter payload); `''` exists only in the DOM. An optional field left empty passes its format rules; a `required` field left empty fails.
 
+**Custom schema messages are i18n keys.** A `validation.schema` message (`v.regex(SIRET, 'siretFormat')`) is shown as `t('siretFormat')` in the entity namespace; add the key to the entity locales, or the form shows `crud:text.invalid`. A sentence as message is never shown. See CRUD → Validation rules (error messages).
+
 **Field `type` is a closed union.** Built-ins plus the custom types declared in `CustomFieldOptionsMap` (module augmentation of `@donotdev/core`). A typo or an undeclared custom type fails typecheck; a declared type with no `registerFieldType()` throws at render. No text-input fallback.
 
 **`datetime-local` stores an ISO instant, displays local time.** The form shows the viewer's local wall time and saves `toISOString()` (UTC). Do not convert in the app.

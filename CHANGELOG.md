@@ -14,6 +14,10 @@
 
 ### Patch Changes
 
+- Field errors are visible: every form field coloured its error text and invalid border with `--destructive-foreground` (the text colour on a destructive background: white on the page). They use `--destructive`, like the auth fields.
+- Entity form errors are translated: an emptied required field shows `crud:text.required` (was valibot's `Invalid type: Expected string but received null`), an invalid phone `crud:text.phone` (was English `Invalid phone number`), lengths, email, URL and dates their `crud:` messages, and a `validation.schema` message is a key of the entity namespace (`crud:text.invalid` when it has no translation). New keys `crud:text.phone`, `crud:text.invalid` (13 locales).
+- Phone field: the dial code is never stored twice (`+33612345678`, `+33 6 12 34 56 78`, `0033612345678` → `+33 612345678`, were `+33 +33612345678` / `+33 33612345678`); separators are stripped (`06.12.34.56.78` → `+33 612345678`); the dial code alone (`+33`) stores `null`.
+
 - `useCrudDoc` on Vite: while the record the URL names is not found, the document head carries `<meta name="robots" content="noindex">` (removed when the record shows up or the component unmounts), so crawlers do not index a client-rendered not-found state served with HTTP 200. The record the URL names: the current route (`matchRoute` from `@donotdev/core`, the AutoMetaTags matcher) declares the entity in its PageMeta (`meta.entity` = the collection read) and its `:param` value is the `id` read; a secondary read on the page (a missing brand on a valid product page) never noindexes it. Next adds nothing (entity pages answer a missing record with a real 404).
 - `DateFilter` loads its calendar on demand (`LazyCalendar`, preloaded when the browser is idle and on trigger pointer-enter / focus): `react-day-picker` no longer ships up front with every list that has a date filter.
 - `useCrudList` / `useCrudCardList` pass `translate` through: `translate: false` is honored (it was ignored, rows were translated anyway).

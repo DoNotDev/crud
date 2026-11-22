@@ -107,7 +107,7 @@ const TiptapEditorInner: ComponentType<
         style={{
           fontSize: 'var(--font-size-sm)',
           fontWeight: 500,
-          color: error ? 'var(--destructive-foreground)' : 'var(--foreground)',
+          color: error ? 'var(--destructive)' : 'var(--foreground)',
         }}
       >
         {label}
@@ -133,7 +133,7 @@ const TiptapEditorInner: ComponentType<
           style={{
             fontSize: 'var(--font-size-xs)',
             color: error
-              ? 'var(--destructive-foreground)'
+              ? 'var(--destructive)'
               : 'var(--muted-foreground)',
           }}
         >

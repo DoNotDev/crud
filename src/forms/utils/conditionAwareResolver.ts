@@ -1,5 +1,5 @@
 import { valibotResolver } from '@hookform/resolvers/valibot';
-import type { FieldValues, Resolver } from 'react-hook-form';
+import type { FieldErrors, FieldValues, Resolver } from 'react-hook-form';
 
 import {
   createSchemas,
@@ -10,6 +10,8 @@ import {
   updateCheck,
 } from '@donotdev/core';
 import type { AnyEntity } from '@donotdev/core';
+
+import { translateFieldErrors, type ErrorTranslate } from './fieldErrorMessages';
 
 /** Evaluate only validation-relevant conditions against the complete retained form. */
 export function getFormConditionStates(entity: AnyEntity, values: Record<string, unknown>) {
@@ -36,17 +38,20 @@ export function getFormConditionStates(entity: AnyEntity, values: Record<string,
  * (`updateCheck` on the base row): a draft, or leaving draft for a visible status,
  * checks the whole form; any other edit checks only the fields that differ from the
  * base row (rule 2: an update validates what changes).
+ * Error messages are translated (`translateFieldErrors`: required, format, the
+ * entity's own message keys), never the schemas' English or valibot's raw text.
  *
  * @template T - Form state the resolver reads
  * @template TOutput - Values it outputs (`onValid`'s), `T` by default
  * @param entity - Entity from `defineEntity()`
  * @param operation - Form operation
  * @param written - Field names the form writes (companions included)
+ * @param t - Form translation function (entity namespace + `crud`) for error messages
  * @param base - The row the form starts from: the stored row on edit, the caller's
  *   defaults on create (its status is read when form state has none)
  * @returns React Hook Form resolver
  *
- * @version 0.4.0
+ * @version 0.5.0
  * @since 0.2.4
  * @author AMBROISE PARK Consulting
  */
@@ -57,6 +62,7 @@ export function createConditionAwareResolver<
   entity: AnyEntity,
   operation: 'create' | 'edit',
   written: ReadonlySet<string>,
+  t: ErrorTranslate,
   base?: Readonly<Record<string, unknown>> | null
 ): Resolver<T, unknown, TOutput> {
   // The entity reduced to the fields the form writes (the update schema keeps `id`).
@@ -131,7 +137,10 @@ export function createConditionAwareResolver<
       .filter((name) => Object.hasOwn(values, name))
       .map((name) => [name, values[name]]));
     const result = await resolver(values, context, options);
-    if (Object.keys(result.errors).length > 0) return result;
+    if (Object.keys(result.errors).length > 0) {
+      const errors: FieldErrors<T> = translateFieldErrors(result.errors, values, formEntity, t);
+      return { values: {}, errors };
+    }
     // The projection plus eligible inactive fields has the output's TOutput shape;
     // RHF's error union does not narrow from the empty-errors check above.
     // Unchanged fields of a plain edit pass through as they are (stored values).

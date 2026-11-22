@@ -283,6 +283,7 @@ export function useEntityForm<
     t: tProp,
     loading: loadingProp = false,
     successPath,
+    toasts = true,
     extend,
   } = options;
   const navigation = useFormNavigation();
@@ -344,11 +345,16 @@ export function useEntityForm<
     [entity, viewerRole, operation]
   );
 
+  // Error messages read the latest translator; the resolver stays stable across renders.
+  const tRef = useRef(t);
+  tRef.current = t;
   const dynamicResolver = useMemo((): Resolver<State, unknown, Values> => {
+    const errorT = (key: string, options?: Record<string, unknown>) => tRef.current(key, options);
     const resolver = createConditionAwareResolver<State, Values>(
       entity,
       operation,
       ownWritten,
+      errorT,
       recordDefaults
     );
     const own: Resolver<State, unknown, Values> = (values, context, resolverOptions) => resolver(
@@ -364,7 +370,8 @@ export function useEntityForm<
       resolve: createConditionAwareResolver<Record<string, unknown>>(
         withoutLinkField(ext),
         extensionOperation(ext.key),
-        extensionStateFields(ext, viewerRole, extensionOperation(ext.key))
+        extensionStateFields(ext, viewerRole, extensionOperation(ext.key)),
+        errorT
       ),
     }));
     return async (values, context, resolverOptions) => {
@@ -773,7 +780,7 @@ export function useEntityForm<
     }
     // Based on an older version of the stored record: a conflict, never a silent
     // edit base. The warning stays until the owner keeps or discards the draft.
-    toast({
+    if (toasts) toast({
       toastType: conflict ? 'warning' : 'info',
       title: t(conflict ? 'crud:draft.conflict' : 'crud:draft.restored'),
       description: t(conflict ? 'crud:draft.conflictDescription' : 'crud:draft.restoredDescription'),
@@ -1490,7 +1497,7 @@ export function useEntityForm<
           }
         },
         (validationErrors) => {
-          // Validation failed — NEVER silent. Log, toast, scroll.
+          // Validation failed — NEVER silent. Log, toast (unless opted out), scroll.
           // RHF keeps only the fields that have an error (cleared ones are unset)
           const errorFields = Object.keys(validationErrors).filter(
             (k) => k !== 'root'
@@ -1502,7 +1509,7 @@ export function useEntityForm<
             validationErrors
           );
 
-          toast({
+          if (toasts) toast({
             toastType: 'error',
             title: t('crud:form.validationFailed'),
             description: t('crud:form.fixFields', {

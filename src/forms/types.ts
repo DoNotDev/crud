@@ -212,6 +212,16 @@ export interface UseEntityFormOptions<
   successPath?: string | null;
 
   /**
+   * The form's own toasts: "fields to correct" when a submit fails validation,
+   * and "draft restored" (default `true`). `false`: neither; the field messages,
+   * the scroll to the first one and the draft restoring itself remain (a form in
+   * a sheet or dialog). Success toasts have their own opt-outs:
+   * `showSuccessToast` per mutation, `setHideSuccessToasts` on the CRUD store.
+   * @default true
+   */
+  toasts?: boolean;
+
+  /**
    * 1:1 extensions edited with the record (a record split across two tables,
    * e.g. `{ offer: { entity: productOfferEntity, field: 'productId' } }`): their
    * fields join `form.fields` prefixed `key.` (`offer.priceExclVat`; values under

@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { useForm } from 'react-hook-form';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import PhoneNumberComponent from '../../../form/fields/PhoneNumberComponent';
+import PhoneNumberComponent, { toPhoneValue } from '../../../form/fields/PhoneNumberComponent';
 import { ControlledPhoneField } from '../ControlledPhoneField';
 
 // Keep the actual phone component and Input: mocking Input would hide lost DOM events.
@@ -104,8 +104,8 @@ describe('phone controller plumbing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Focus phone' }));
     await waitFor(() => expect(document.activeElement).toBe(input));
     fireEvent.change(input, { target: { value: '6 98 76 54 32' } });
-    expect(input).toHaveProperty('value', '6 98 76 54 32');
-    expect(screen.getByTestId('value').textContent).toBe('+33 6 98 76 54 32');
+    expect(input).toHaveProperty('value', '698765432');
+    expect(screen.getByTestId('value').textContent).toBe('+33 698765432');
   });
 
   it('validates on blur, marks touched and clears errors after correction', async () => {
@@ -117,7 +117,7 @@ describe('phone controller plumbing', () => {
     await waitFor(() => expect(document.activeElement).toBe(input));
 
     fireEvent.change(input, { target: { value: '1 23' } });
-    expect(screen.getByTestId('value').textContent).toBe('+33 1 23');
+    expect(screen.getByTestId('value').textContent).toBe('+33 123');
     expect(screen.queryByRole('alert')).toBeNull();
     fireEvent.blur(input);
     await waitFor(() => expect(screen.getByTestId('touched').textContent).toBe('true'));
@@ -128,7 +128,66 @@ describe('phone controller plumbing', () => {
     fireEvent.change(input, { target: { value: '6 98 76 54 32' } });
     fireEvent.blur(input);
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
-    expect(screen.getByTestId('value').textContent).toBe('+33 6 98 76 54 32');
+    expect(screen.getByTestId('value').textContent).toBe('+33 698765432');
     expect(input.getAttribute('aria-invalid')).toBe('false');
+  });
+});
+
+describe('toPhoneValue (stored value of a typed number)', () => {
+  it.each([
+    ['06 12 34 56 78'],
+    ['0612345678'],
+    ['06.12.34.56.78'],
+    ['06-12-34-56-78'],
+    ['6 12 34 56 78'],
+    ['+33 6 12 34 56 78'],
+    ['+33612345678'],
+    ['0033612345678'],
+    ['+33 06 12 34 56 78'],
+  ])('%s with +33 stores one dial code, no trunk 0, no separators', (typed) => {
+    expect(toPhoneValue(typed, '+33')).toBe('+33 612345678');
+  });
+
+  it.each([[''], ['+33'], ['+33 '], ['0033'], ['0'], ['  ']])(
+    '%j (no number after the dial code) stores nothing',
+    (typed) => {
+      expect(toPhoneValue(typed, '+33')).toBe('');
+    }
+  );
+
+  it('keeps a number typed with another dial code as typed, never prefixed', () => {
+    expect(toPhoneValue('+44 7911 123456', '+33')).toBe('+447911123456');
+    expect(toPhoneValue('0044 7911 123456', '+33')).toBe('+447911123456');
+  });
+});
+
+describe('phone field stored value', () => {
+  function Optional() {
+    const { control, watch } = useForm<{ phone: string | null }>({ defaultValues: { phone: null } });
+    return (
+      <>
+        <ControlledPhoneField
+          control={control}
+          fieldConfig={{ name: 'phone', label: 'fields.phone', type: 'tel', visibility: 'guest', editable: 'admin' }}
+          t={(key) => key}
+        />
+        <output data-testid="value">{String(watch('phone'))}</output>
+      </>
+    );
+  }
+
+  it.each([
+    ['+33 6 12 34 56 78', '+33 612345678'],
+    ['+33612345678', '+33 612345678'],
+    ['0033612345678', '+33 612345678'],
+    ['06.12.34.56.78', '+33 612345678'],
+    ['+33', 'null'],
+    ['', 'null'],
+  ])('typed %j stores %s', (typed, stored) => {
+    render(<Optional />);
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '612' } });
+    fireEvent.change(input, { target: { value: typed } });
+    expect(screen.getByTestId('value').textContent).toBe(stored);
   });
 });

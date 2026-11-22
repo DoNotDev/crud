@@ -499,7 +499,7 @@ const AddressFieldComponent = ({
             style={{
               fontSize: 'var(--font-size-xs)',
               color: error
-                ? 'var(--destructive-foreground)'
+                ? 'var(--destructive)'
                 : 'var(--muted-foreground)',
             }}
           >
@@ -550,7 +550,7 @@ const AddressFieldComponent = ({
           style={{
             fontSize: 'var(--font-size-xs)',
             color: error
-              ? 'var(--destructive-foreground)'
+              ? 'var(--destructive)'
               : 'var(--muted-foreground)',
           }}
         >
