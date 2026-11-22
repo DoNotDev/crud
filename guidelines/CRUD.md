@@ -87,7 +87,7 @@ fields: {
 
 ### SEO (`seo`, since 0.2.3)
 
-`<Seo entity data>` and llms.txt title/describe a record with the card's text (`listCardFields`, formatted like the card: same `formatFieldText` from `@donotdev/core`). Override per entity:
+The Next entity page metadata (generated for a public single-param page declaring `entity: productEntity` in its PageMeta, see ui `SEO.md`) and llms.txt title/describe a record with the card's text (`listCardFields`, formatted like the card: same `formatFieldText` from `@donotdev/core`). Override per entity:
 
 ```typescript
 seo: {
@@ -400,6 +400,8 @@ const { data: product, loading, notFound } = useCrudDoc(productEntity, id);
 const { get } = useCrud(productEntity);
 useEffect(() => { get(id).then(setProduct); }, [id, get]);
 ```
+
+**Missing record on Vite.** While `notFound` is true for the record the URL names, `useCrudDoc` adds `<meta name="robots" content="noindex">` to the document head (removed when the record shows up or the component unmounts): a client-rendered app answers every URL with HTTP 200, so crawlers must not index the not-found state. The record the URL names: the current route (route manifest, language prefix stripped, matched by `matchRoute` from `@donotdev/core`, the AutoMetaTags matcher: a static route of the same path wins) declares the entity in its PageMeta (`entity: productEntity` → `meta.entity`, the collection read) and one of its `:param` values is the `id` read (`/produits/:id`, `useCrudDoc(productEntity, id)`). A secondary read on the page (a missing brand on a valid product page, any read on a route without `entity`) never adds it. Next adds nothing: its entity pages answer a missing record with a real 404 (`notFound()`, see ui `SEO.md`).
 
 **Next: who the server read is for.** The generated per-request layout (visitors with an auth cookie) passes the request's cookies to
 `NextJsAppProviders` (CLI template), so server reads run as the visitor (their access token) and

@@ -107,7 +107,7 @@ Card grid for entity collection.
 <EntityCardList entity={productEntity} renderCardOverlay={(item) => item.featured ? <Badge>…</Badge> : null} />
 ```
 
-Cards are `CrudCard`s laid out by the entity's `listCardFields` (title / subtitle / content / footer slots); there is no `renderCard` prop. A fully custom card: `useCrudCardList` (+ `EntityFilters`) and your own grid.
+Cards are `CrudCard`s laid out by the entity's `listCardFields` (title / subtitle / content / footer slots); there is no `renderCard` prop. Opt-in feed: `pageSize={12}` renders the first 12 cards (server HTML included), then 12 more each time the end of the grid nears the viewport, until every card is shown. Without `pageSize`, every card renders at once. Data is still fetched in one go, so this only trims rendering and hydration, and cards past the first page are not in the server HTML. A fully custom card: `useCrudCardList` (+ `EntityFilters`) and your own grid.
 
 ### SortableCardList
 Cards in a grid the user re-orders before saving (routine steps, ranked selections). Drag the whole card (mouse; touch after a 200 ms hold); the card's own buttons and links stay clicks. With `handleOnly` (cards that are links or buttons), only the grip drags. Keyboard: Space/Enter on the grip, arrows, Space/Enter (Escape cancels). Each card's bar: grip, move-before / move-after, and a remove (X) button at the end with `onRemove`. Screen readers get translated instructions and pick-up / move / drop announcements. Stateless: the caller owns `items` (unique ids) and saves the order received in `onReorder`. Labels come from the `crud` namespace (`sortable.*`); `itemLabel` names each item for them.

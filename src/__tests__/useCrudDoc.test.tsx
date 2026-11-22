@@ -59,6 +59,7 @@ const { db, readSpy, fakeService, store, env } = vi.hoisted(() => {
     scope: undefined as object | undefined,
     authProvider: false,
     language: 'fr',
+    next: false,
   };
 
   return { db, readSpy, fakeService, store, env };
@@ -69,7 +70,24 @@ vi.mock('@donotdev/core', async () => {
   const translations = await import(
     '../../../../core/utils/src/common/entityTranslations'
   );
+  const languagePath = await import(
+    '../../../../core/utils/src/common/languagePath'
+  );
+  const routeMatch = await import('../../../../core/utils/src/common/routeMatch');
   return {
+    // Route manifest: the record page of cars, a static route beside it, brand pages
+    getDndevConfig: () => ({
+      routes: {
+        mapping: [
+          { path: '/voitures/:id', meta: { entity: 'cars' } },
+          { path: '/voitures/nouveau', meta: {} },
+          { path: '/marques/:id', meta: { entity: 'brands' } },
+        ],
+      },
+    }),
+    getLanguageRouting: () => ({ languages: ['fr', 'en'], defaultLanguage: 'fr' }),
+    splitLanguagePath: languagePath.splitLanguagePath,
+    matchRoute: routeMatch.matchRoute,
     useTranslation: () => ({ language: env.language }),
     getTranslatedFieldNames: translations.getTranslatedFieldNames,
     translateRow: translations.translateRow,
@@ -80,6 +98,7 @@ vi.mock('@donotdev/core', async () => {
       ERROR: 'error',
     },
     isClient: () => env.client,
+    isNextJs: () => env.next,
     hasProvider: () => env.authProvider,
     useAuthSessionSnapshot: () => null,
     useQuery: rq.useQuery,
@@ -157,6 +176,10 @@ beforeEach(() => {
   env.scope = undefined;
   env.authProvider = false;
   env.language = 'fr';
+  env.next = false;
+  document.head
+    .querySelectorAll('meta[name="robots"]')
+    .forEach((tag) => tag.remove());
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -256,6 +279,64 @@ describe('useCrudDoc', () => {
     await waitFor(() => expect(result.current.notFound).toBe(true));
     expect(result.current.data).toBeNull();
     expect(result.current.error).toBeNull();
+  });
+
+  const robots = () =>
+    [...document.head.querySelectorAll('meta[name="robots"]')].map((tag) =>
+      tag.getAttribute('content')
+    );
+  /** The browser URL (route of the page under test). */
+  const visit = (path: string) => window.history.replaceState(null, '', path);
+
+  it('Vite: the missing record of the URL marks the page noindex until it shows up or unmounts', async () => {
+    visit('/voitures/nope');
+    const { result, rerender, unmount } = renderDoc('nope');
+    await waitFor(() => expect(result.current.notFound).toBe(true));
+    expect(robots()).toEqual(['noindex']);
+
+    rerender({ docId: 'c1' });
+    await waitFor(() => expect(result.current.data?.model).toBe('A'));
+    expect(robots()).toEqual([]);
+
+    rerender({ docId: 'nope' });
+    await waitFor(() => expect(robots()).toEqual(['noindex']));
+    unmount();
+    expect(robots()).toEqual([]);
+  });
+
+  it('Vite: same on a language-prefixed URL', async () => {
+    visit('/en/voitures/nope');
+    const { result } = renderDoc('nope');
+    await waitFor(() => expect(result.current.notFound).toBe(true));
+    expect(robots()).toEqual(['noindex']);
+  });
+
+  it('Vite: REGRESSION: a secondary read on a valid page never marks it noindex', async () => {
+    // Record page of car c1; the page also reads a document the URL does not name
+    visit('/voitures/c1');
+    const secondary = renderDoc('nope');
+    await waitFor(() => expect(secondary.result.current.notFound).toBe(true));
+    expect(robots()).toEqual([]);
+
+    // A route of another entity holding the same value
+    visit('/marques/nope');
+    const otherEntity = renderDoc('nope');
+    await waitFor(() => expect(otherEntity.result.current.notFound).toBe(true));
+    expect(robots()).toEqual([]);
+
+    // A static route beside the record route (the router renders it)
+    visit('/voitures/nouveau');
+    const staticRoute = renderDoc('nouveau');
+    await waitFor(() => expect(staticRoute.result.current.notFound).toBe(true));
+    expect(robots()).toEqual([]);
+  });
+
+  it('Next: no robots tag (a missing entity record is a real 404 there)', async () => {
+    visit('/voitures/nope');
+    env.next = true;
+    const { result } = renderDoc('nope');
+    await waitFor(() => expect(result.current.notFound).toBe(true));
+    expect(document.head.querySelector('meta[name="robots"]')).toBeNull();
   });
 
   it('surfaces read errors', async () => {

@@ -410,8 +410,10 @@ export interface CrudServiceInterface {
   invalidateCollection(collection: string): Promise<void>;
   /**
    * Cache a row stored by a write that did not go through this service (an app
-   * RPC, a server function): the document cache and every cached list holding it
-   * take the row as stored, without a refetch.
+   * RPC, a server function), without a refetch. A row already in a cache of the
+   * collection (document cache non-null, or a cached list) replaces it there; a row
+   * no cache knows is an insert: document cache set, row appended to every cached
+   * list of the collection (`total` bumped), as `add` does.
    * @param row - The full row as the backend returned it, read-filtered for the requester
    * @since 0.3.0
    */

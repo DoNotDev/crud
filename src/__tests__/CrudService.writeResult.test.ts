@@ -6,7 +6,8 @@
  * adapter returns over the client payload: values the backend sets (timestamps,
  * revisions, triggers) reach the cache without a refetch. The read schema given
  * as `readSchema` reaches the adapter. `cacheStored` caches a row written outside
- * the service (app RPC) in the document cache and every cached list holding it.
+ * the service (app RPC): a row a cache knows replaces it there; a row no cache
+ * knows is inserted (document cache, appended to every cached list).
  *
  * @version 0.1.0
  * @since 0.3.0
@@ -36,6 +37,7 @@ vi.mock('@donotdev/core', async () => ({
 
 import { createSchemas } from '@donotdev/core';
 
+import { CrudService } from '../CrudService';
 import { updateListCaches } from '../CrudService.cache';
 import { setImpl, updateImpl } from '../CrudService.mutations';
 import { updateOptimisticImpl } from '../CrudService.optimistic';
@@ -119,5 +121,62 @@ describe('writes cache the stored row', () => {
 
     expect(queryClient.getQueryData(GET_KEY)).toEqual(written);
     expect(queryClient.getQueryData<{ items: Row[] }>(LIST_KEY)?.items[0]).toEqual(written);
+  });
+});
+
+describe('cacheStored', () => {
+  const ARRAY_KEY = ['crud', 'cars', 'extend', 'ownerId', ['o1']];
+  const cacheStored = (row: Row) =>
+    CrudService.prototype.cacheStored.call(makeService({}), 'cars', row);
+  const fresh = (id: string, name: string): Row => ({ id, name, revision: 'r1', updatedAt: '2026-01-06T00:00:00.000Z' });
+
+  it('replaces a row a list holds, without appending', () => {
+    const written = fresh('c1', 'From RPC');
+    queryClient.removeQueries({ queryKey: GET_KEY, exact: true });
+    queryClient.setQueryData(ARRAY_KEY, [stored]);
+
+    cacheStored(written);
+
+    expect(queryClient.getQueryData(GET_KEY)).toEqual(written);
+    expect(queryClient.getQueryData(LIST_KEY)).toEqual({ items: [written] });
+    expect(queryClient.getQueryData(ARRAY_KEY)).toEqual([written]);
+  });
+
+  it('inserts a row no cache knows: document cache set, appended to every list, total bumped', () => {
+    const OTHER_LIST_KEY = ['crud', 'cars', 'query', JSON.stringify({ limit: 5 })];
+    queryClient.setQueryData(OTHER_LIST_KEY, { items: [stored], total: 7 });
+    queryClient.setQueryData(ARRAY_KEY, [stored]);
+    const created = fresh('c2', 'Created by RPC');
+
+    cacheStored(created);
+
+    expect(queryClient.getQueryData(['crud', 'cars', 'get', 'c2'])).toEqual(created);
+    expect(queryClient.getQueryData(LIST_KEY)).toEqual({ items: [stored, created], total: 2 });
+    expect(queryClient.getQueryData(OTHER_LIST_KEY)).toEqual({ items: [stored, created], total: 8 });
+    expect(queryClient.getQueryData(ARRAY_KEY)).toEqual([stored, created]);
+    // Other documents' caches are untouched.
+    expect(queryClient.getQueryData(GET_KEY)).toEqual(stored);
+  });
+
+  it('inserts a row whose document cache says it does not exist (null)', () => {
+    const DOC_KEY = ['crud', 'cars', 'get', 'c3'];
+    queryClient.setQueryData(DOC_KEY, null);
+    const created = fresh('c3', 'Recreated');
+
+    cacheStored(created);
+
+    expect(queryClient.getQueryData(DOC_KEY)).toEqual(created);
+    expect(queryClient.getQueryData(LIST_KEY)).toEqual({ items: [stored, created], total: 2 });
+  });
+
+  it('a row known only to its document cache is updated there, not appended to lists', () => {
+    const DOC_KEY = ['crud', 'cars', 'get', 'c4'];
+    queryClient.setQueryData(DOC_KEY, fresh('c4', 'Before'));
+    const written = fresh('c4', 'After');
+
+    cacheStored(written);
+
+    expect(queryClient.getQueryData(DOC_KEY)).toEqual(written);
+    expect(queryClient.getQueryData(LIST_KEY)).toEqual({ items: [stored] });
   });
 });

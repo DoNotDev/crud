@@ -76,7 +76,11 @@ import { createSingleton, getQueryClient, REMOVED_STATUS } from '@donotdev/core'
 import { bulkImpl } from './CrudService.bulk';
 import type { BulkSchemas } from './CrudService.bulk';
 import { bulkAcrossImpl } from './CrudService.bulkAcross';
-import { invalidateCollectionImpl, updateListCaches } from './CrudService.cache';
+import {
+  invalidateCollectionImpl,
+  isCachedRow,
+  updateListCaches,
+} from './CrudService.cache';
 import { attachProviderImpl, initializeImpl } from './CrudService.internal';
 import {
   addImpl,
@@ -276,8 +280,13 @@ export class CrudService implements CrudServiceInternal {
 
   /**
    * Cache a row stored by a write that did not go through this service (an app
-   * RPC, a server function): the document cache and every cached list holding it
-   * take the row as stored, without a refetch.
+   * RPC, a server function), without a refetch. Same call for a create and an update:
+   * - Update: the row is in a cache of the collection (its document cache holds it,
+   *   non-null, or a cached list holds it). The document cache and every cached list
+   *   holding it take the row as stored; lists without it are left as they are.
+   * - Insert: no cache of the collection knows the id. The document cache is set and
+   *   the row is appended to every cached list of the collection, `total` bumped,
+   *   as `add` does.
    *
    * @param collection - The row's collection
    * @param row - The full row as the backend returned it, read-filtered for the requester
@@ -290,7 +299,10 @@ export class CrudService implements CrudServiceInternal {
    * @since 0.3.0
    */
   cacheStored<T extends { id: string }>(collection: string, row: T): void {
-    updateListCaches(this, collection, row.id, row, CRUD_OPERATION.SET);
+    const operation = isCachedRow(this.getQueryClient(), collection, row.id)
+      ? CRUD_OPERATION.SET
+      : CRUD_OPERATION.ADD;
+    updateListCaches(this, collection, row.id, row, operation);
   }
 
   // ===================================================================

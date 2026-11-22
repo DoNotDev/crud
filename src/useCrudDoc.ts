@@ -11,11 +11,12 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import {
   FEATURE_STATUS,
   isClient,
+  isNextJs,
   useQuery,
   useQueryClient,
 } from '@donotdev/core';
@@ -28,6 +29,7 @@ import { useCrud, getCrudServiceInstance } from './useCrud';
 import type { UseCrudOptions } from './useCrud';
 import { useServerPrefetch } from './useServerPrefetch';
 import { applyOptimisticToDoc } from './utils/mergeWithOptimistic';
+import { isRouteRecord } from './utils/routeRecord';
 import { useRowTranslator } from './utils/useRowTranslator';
 
 /**
@@ -54,7 +56,14 @@ export interface UseCrudDocReturn<T> {
   loading: boolean;
   /** True during a background refetch (show a subtle indicator) */
   fetching: boolean;
-  /** True once the read settled and no document exists for `id` */
+  /**
+   * True once the read settled and no document exists for `id`. On Vite (client-rendered),
+   * when this is the record the URL names (the current route declares the entity in its
+   * PageMeta and its `:param` is `id`), the page then carries
+   * `<meta name="robots" content="noindex">` until a document shows up or the component
+   * unmounts; a secondary read on the page never does. On Next, entity pages answer a
+   * missing record with a 404.
+   */
   notFound: boolean;
   /** Read error (access denied, network, adapter) */
   error: Error | null;
@@ -180,6 +189,28 @@ export function useCrudDoc<
     await refetch();
   }, [refetch, hasQuery]);
 
+  // 5c. Vite (client-rendered: every URL answers HTTP 200): while the record the URL names
+  // is not found, the page tells crawlers not to index it (`<meta name="robots"
+  // content="noindex">`). Only that read: the current route declares this entity and its
+  // param is `id` (a missing brand on a valid product page keeps the page indexable).
+  // Next answers a missing entity record with a real 404 (`notFound()`): nothing added there.
+  const notFound = queryData !== undefined && data === null;
+  const noindex =
+    isAvailable &&
+    notFound &&
+    !onServer &&
+    !isNextJs() &&
+    !!id &&
+    isRouteRecord(collection, id);
+  useEffect(() => {
+    if (!noindex) return;
+    const robots = document.createElement('meta');
+    robots.name = 'robots';
+    robots.content = 'noindex';
+    document.head.append(robots);
+    return () => robots.remove();
+  }, [noindex]);
+
   // 6. Not ready. Initializing with an id to read = loading (skeleton); degraded
   // (consent declined, feature absent) = nothing will load, so not loading.
   if (!isAvailable) {
@@ -204,7 +235,7 @@ export function useCrudDoc<
       ? enabled && !!query && queryData === undefined
       : isLoading,
     fetching: onServer ? false : isFetching,
-    notFound: queryData !== undefined && data === null,
+    notFound,
     error: onServer ? null : queryError,
     refresh,
     isAvailable: true,

@@ -125,6 +125,7 @@ export function useCrudCardList<
     entity: options.entity,
     staleTime: options.staleTime,
     noCache: options.noCache,
+    translate: options.translate,
   };
 
   // Use base hook with 'listCard' schema and no pagination

@@ -16,10 +16,12 @@ import { useState } from 'react';
 
 import {
   Button,
-  Calendar,
   FloatingLabel,
+  LazyCalendar,
+  preloadCalendar,
   Sheet,
   Text,
+  useIdlePreloadCalendar,
 } from '@donotdev/components';
 // patterns.css provides .dndev-inline-action-btn
 import { formatDate } from '@donotdev/core';
@@ -58,6 +60,8 @@ export function DateFilter({
   locale = 'en',
 }: DateFilterProps) {
   const [open, setOpen] = useState(false);
+  // Calendar chunk: when the browser is idle (touch visitors get no hover)
+  useIdlePreloadCalendar();
   const [activeRange, setActiveRange] = useState<'start' | 'end' | null>(null);
 
   // Parse current value - always range format
@@ -220,7 +224,8 @@ export function DateFilter({
           </div>
 
           {/* Calendar */}
-          <Calendar
+          <LazyCalendar
+            errorLabel={tCrud('date.calendarLoadError')}
             selected={
               currentDate ? new Date(currentDate + 'T00:00:00') : undefined
             }
@@ -269,6 +274,8 @@ export function DateFilter({
         trigger={
           <Button
             variant="ghost"
+            onPointerEnter={preloadCalendar}
+            onFocus={preloadCalendar}
             onClick={() => {
               setActiveRange('start');
               setOpen(true);
@@ -311,6 +318,8 @@ export function DateFilter({
         trigger={
           <Button
             variant="ghost"
+            onPointerEnter={preloadCalendar}
+            onFocus={preloadCalendar}
             onClick={() => {
               setActiveRange('end');
               setOpen(true);

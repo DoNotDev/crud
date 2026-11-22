@@ -4,6 +4,7 @@
 
 ### Minor Changes
 
+- `cacheStored(collection, row)` on a row no cache of the collection knows is an insert: the document cache is set, the row is appended to every cached list and `total` is bumped, as `add` does. It did nothing for unknown rows (a row from an RPC that created it never showed up). A row already cached (document cache non-null, or in a cached list) is replaced as before.
 - `useCrudDoc(entity, id)`: one document, reactive to the shared cache. Every edit, delete (optimistic or confirmed) or subscription write re-renders it. `EntityDisplayRenderer` (ui, expo) uses it: detail views no longer go stale after an edit.
 - Removed `useCrud().data` (always `null` since 0.1.x). Read documents with `useCrudDoc` or `get()`.
 - Filters: `select` / `radio` / `multiselect` / `reference` filters match exactly (was substring: `toner` matched `toner_pad`), any-of on arrays (OR within a field, AND across fields). `EntityFilters` offers them as multi-selects (state: arrays; a string state still matches). Reference fields (`filterType: 'reference'`, was `'text'`) filter by id with the referenced documents' labels. Option counts/availability are per array item; chips show option / reference labels.
@@ -13,6 +14,9 @@
 
 ### Patch Changes
 
+- `useCrudDoc` on Vite: while the record the URL names is not found, the document head carries `<meta name="robots" content="noindex">` (removed when the record shows up or the component unmounts), so crawlers do not index a client-rendered not-found state served with HTTP 200. The record the URL names: the current route (`matchRoute` from `@donotdev/core`, the AutoMetaTags matcher) declares the entity in its PageMeta (`meta.entity` = the collection read) and its `:param` value is the `id` read; a secondary read on the page (a missing brand on a valid product page) never noindexes it. Next adds nothing (entity pages answer a missing record with a real 404).
+- `DateFilter` loads its calendar on demand (`LazyCalendar`, preloaded when the browser is idle and on trigger pointer-enter / focus): `react-day-picker` no longer ships up front with every list that has a date filter.
+- `useCrudList` / `useCrudCardList` pass `translate` through: `translate: false` is honored (it was ignored, rows were translated anyway).
 - `useCrudFilters`: render no longer writes the store (a page loaded with `f_*` params updated other components during render: React "Cannot update a component while rendering"). The first client render reads the URL, the mount effect seeds the store; server render and hydration show no filters.
 - `EntityFilters`: chip remove and combobox clear buttons are translated (`form.remove`, `filter.clear`; were English "Remove" / "Clear").
 - `EntityFilters`: a multi-select with values shows them (one value's label, `filters.selected` for several; was the placeholder). `filters.selected_other` added (fr, es, it, pt).

@@ -144,6 +144,7 @@ export function useCrudList<
     entity: options.entity,
     staleTime: options.staleTime,
     noCache: options.noCache,
+    translate: options.translate,
   };
 
   const baseResult = useBaseCrudList<T>(

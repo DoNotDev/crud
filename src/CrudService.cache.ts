@@ -68,6 +68,41 @@ export function cachedListRow<T>(
   return found;
 }
 
+/**
+ * Whether a document is in a cache of its collection: its document cache holds it
+ * (non-null; `null` means "does not exist"), or a cached list holds its row
+ * (`{ items }` or plain-array shape, every `['crud', collection, …]` key).
+ *
+ * @returns false when no cache of the collection knows the id
+ */
+export function isCachedRow(
+  queryClient: QueryClient,
+  collection: string,
+  id: string
+): boolean {
+  if (queryClient.getQueryData(['crud', collection, 'get', id]) != null) {
+    return true;
+  }
+  return queryClient
+    .getQueriesData({ queryKey: ['crud', collection] })
+    .some(([, data]) => {
+      const rows = Array.isArray(data)
+        ? data
+        : data != null && typeof data === 'object' && 'items' in data
+          ? (data as { items: unknown }).items
+          : null;
+      return (
+        Array.isArray(rows) &&
+        rows.some(
+          (row) =>
+            row != null &&
+            typeof row === 'object' &&
+            (row as { id?: unknown }).id === id
+        )
+      );
+    });
+}
+
 /** Document with required id field for cache operations */
 interface DocumentWithId {
   id: string;
