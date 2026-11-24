@@ -217,7 +217,7 @@ export function DateFilter({
                     setOpen(false);
                   }}
                 >
-                  {tCrud(`filter.${preset}`, { defaultValue: preset })}
+                  {tCrud(`filter.${preset}`)}
                 </Button>
               );
             })}

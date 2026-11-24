@@ -121,11 +121,9 @@ const ComboboxComponent: ComponentType<ComboboxComponentProps> = ({
         onValueChange={handleValueChange}
         onOpenChange={handleOpenChange}
         placeholder={placeholder || t(placeholderKey, placeholderDefault)}
-        emptyMessage={
-          emptyMessage || t('messages.noResults', 'No results found')
-        }
+        emptyMessage={emptyMessage || t('messages.noResults')}
         creatable={creatable}
-        createLabel={createLabel || t('actions.create', 'Create')}
+        createLabel={createLabel || t('actions.create')}
         options={comboboxOptions}
         required={required}
         variant={hasError ? 'destructive' : undefined}

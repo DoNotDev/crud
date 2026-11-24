@@ -68,7 +68,6 @@ export function ControlledYearField(props: ControlledFieldProps): ReactElement {
             placeholder={placeholder || fieldOptions.placeholder}
             translationNamespace="crud"
             placeholderKey="actions.selectYear"
-            placeholderDefault="Select or type year"
             creatable={true} // Allow typing custom years
           />
         );

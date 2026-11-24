@@ -84,8 +84,8 @@ const FormLayout = <T extends FieldValues>({
   const { t } = useTranslation('crud');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const defaultSubmitText = submitText || t('form.submit', 'Submit');
-  const defaultCancelText = cancelText || t('form.cancel', 'Cancel');
+  const defaultSubmitText = submitText || t('form.submit');
+  const defaultCancelText = cancelText || t('form.cancel');
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     setIsSubmitting(true);
@@ -168,9 +168,7 @@ const FormLayout = <T extends FieldValues>({
               intent="save"
               loading={loading || isSubmitting}
               loadingText={
-                isSubmitting
-                  ? t('form.submitting', 'Submitting...')
-                  : t('form.loading', 'Loading...')
+                isSubmitting ? t('form.submitting') : t('form.loading')
               }
               style={{ minWidth: '120px' }}
             >

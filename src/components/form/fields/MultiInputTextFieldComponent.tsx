@@ -69,10 +69,10 @@ const MultiInputTextFieldComponent: ComponentType<
           onChange={(e) => setInputValue(e.target.value)}
           required={required}
           className="dndev-flex-1"
-          placeholder={t('form.typeAndPressAdd', 'Type and press Add...')}
+          placeholder={t('form.typeAndPressAdd')}
         />
         <Button type="button" onClick={handleAdd} disabled={!inputValue.trim()}>
-          {t('form.add', 'Add')}
+          {t('form.add')}
         </Button>
       </Stack>
       <Stack direction="row" wrap="wrap">
@@ -105,7 +105,7 @@ const MultiInputTextFieldComponent: ComponentType<
               onMouseLeave={(e) => {
                 e.currentTarget.style.color = 'var(--muted-foreground)';
               }}
-              aria-label={`${t('form.remove', 'Remove')} ${item}`}
+              aria-label={`${t('form.remove')} ${item}`}
             >
               ×
             </button>

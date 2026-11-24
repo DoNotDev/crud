@@ -69,10 +69,7 @@ const MapFieldComponent: ComponentType<MapFieldComponentProps> = ({
           type="text"
           required={required}
           className="dndev-w-full"
-          placeholder={t(
-            'form.enterLocationData',
-            'Enter location data (JSON)'
-          )}
+          placeholder={t('form.enterLocationData')}
           value={JSON.stringify(value)}
           onChange={(e) => {
             try {

@@ -487,12 +487,12 @@ const AddressFieldComponent = ({
           value={inputValue}
           onValueChange={handleSelect}
           onSearchChange={handleSearchChange}
-          placeholder={t('address.placeholder', 'Enter address...')}
+          placeholder={t('address.placeholder')}
           options={[]}
           required={required}
           variant={error ? 'destructive' : undefined}
           creatable={true}
-          createLabel={t('actions.use', 'Use this address')}
+          createLabel={t('actions.use')}
         />
         {helperText && (
           <p
@@ -518,18 +518,14 @@ const AddressFieldComponent = ({
         value={inputValue}
         onValueChange={handleSelect}
         onSearchChange={handleSearchChange}
-        placeholder={t('address.placeholder', 'Enter address...')}
-        emptyMessage={
-          loading
-            ? t('messages.loading', 'Loading...')
-            : t('address.noResults', 'No addresses found')
-        }
+        placeholder={t('address.placeholder')}
+        emptyMessage={loading ? t('messages.loading') : t('address.noResults')}
         options={options.map((o) => ({ value: o.value, label: o.label }))}
         required={required}
         variant={error ? 'destructive' : undefined}
         isLoading={loading}
         creatable={true}
-        createLabel={t('actions.use', 'Use this address')}
+        createLabel={t('actions.use')}
         disabled={!mapsLoaded && !apiError}
       />
       {apiError && (
@@ -539,10 +535,7 @@ const AddressFieldComponent = ({
             color: 'var(--muted-foreground)',
           }}
         >
-          {t(
-            'address.apiUnavailable',
-            'Google Places unavailable — type address manually'
-          )}
+          {t('address.apiUnavailable')}
         </p>
       )}
       {helperText && (

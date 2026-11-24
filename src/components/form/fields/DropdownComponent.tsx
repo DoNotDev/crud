@@ -79,7 +79,7 @@ const DropdownComponent: ComponentType<DropdownComponentProps> = ({
         value={displayValue}
         onValueChange={handleChange}
         onOpenChange={(open) => !open && onBlur?.()}
-        placeholder={t('actions.select', 'Select')}
+        placeholder={t('actions.select')}
         required={required}
         options={options.map((option) => ({
           value: String(option.value),
