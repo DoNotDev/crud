@@ -14,7 +14,13 @@
 import { useMemo, useId } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 
-import { Combobox, Stack, cn } from '@donotdev/components';
+import {
+  Combobox,
+  Stack,
+  cn,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
 
 export interface ComboboxComponentProps {
@@ -26,9 +32,9 @@ export interface ComboboxComponentProps {
   value?: string;
   /** Available options */
   options: { value: string; label: string }[];
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Change handler - accepts both event and direct value */
   onChange?: (value: string | ChangeEvent<HTMLSelectElement>) => void;
@@ -109,12 +115,11 @@ const ComboboxComponent: ComponentType<ComboboxComponentProps> = ({
   };
 
   const hasError = !!error;
-  const errorId = `${id}-error`;
-  const helperId = `${id}-helper`;
 
   return (
     <Stack gap="tight">
       <Combobox
+        {...fieldMessageAria({ id: `${id}-message`, error, helperText })}
         label={label}
         info={info}
         value={value || ''}
@@ -129,33 +134,11 @@ const ComboboxComponent: ComponentType<ComboboxComponentProps> = ({
         variant={hasError ? 'destructive' : undefined}
         clearable={!!value}
       />
-      {hasError && (
-        <Stack
-          id={errorId}
-          direction="row"
-          align="center"
-          gap="tight"
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--destructive)',
-          }}
-          role="alert"
-        >
-          <span>⚠</span>
-          {helperText}
-        </Stack>
-      )}
-      {helperText && !hasError && (
-        <p
-          id={helperId}
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--muted-foreground)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

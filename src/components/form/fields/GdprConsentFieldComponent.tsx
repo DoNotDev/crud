@@ -10,10 +10,18 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { ChangeEvent, ComponentType, MouseEvent } from 'react';
 
-import { Checkbox, Label, Sheet, Text } from '@donotdev/components';
+import {
+  Checkbox,
+  Label,
+  Sheet,
+  Text,
+  FieldMessage,
+  fieldMessageAria,
+  Stack,
+} from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
 
 import { InlineFieldRow } from './internal/InlineFieldRow';
@@ -29,6 +37,10 @@ export interface GdprConsentFieldComponentProps {
   privacyPolicyPath?: string;
   /** Path to terms of use page (default: '/legal/terms') */
   termsPath?: string;
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
+  helperText?: string;
 }
 
 /**
@@ -49,7 +61,10 @@ const GdprConsentFieldComponent: ComponentType<
   required,
   privacyPolicyPath = '/legal/privacy',
   termsPath = '/legal/terms',
+  error,
+  helperText,
 }) => {
+  const id = useId();
   const { t } = useTranslation('crud');
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
@@ -93,35 +108,50 @@ const GdprConsentFieldComponent: ComponentType<
 
   return (
     <>
-      <InlineFieldRow>
-        <Checkbox checked={checked} onCheckedChange={handleChange} />
-        <Label
-          required={required}
-          plain
-          onClick={handleLabelClick}
-          style={{ cursor: 'pointer' }}
-        >
-          <Text level="body" style={{ fontSize: 'var(--font-size-input)' }}>
-            {consentText}{' '}
-            <a
-              href={privacyPolicyPath}
-              onClick={(e) => handleLinkClick(e, 'privacy')}
-              style={{ textDecoration: 'underline', cursor: 'pointer' }}
-            >
-              {privacyPolicyText}
-            </a>
-            {' / '}
-            <a
-              href={termsPath}
-              onClick={(e) => handleLinkClick(e, 'terms')}
-              style={{ textDecoration: 'underline', cursor: 'pointer' }}
-            >
-              {termsText}
-            </a>{' '}
-            {andText}
-          </Text>
-        </Label>
-      </InlineFieldRow>
+      <Stack gap="tight">
+        <InlineFieldRow>
+          <Checkbox
+            checked={checked}
+            onCheckedChange={handleChange}
+            {...fieldMessageAria({
+              id: `${id}-message`,
+              error,
+              helperText,
+            })}
+          />
+          <Label
+            required={required}
+            plain
+            onClick={handleLabelClick}
+            style={{ cursor: 'pointer' }}
+          >
+            <Text level="body" style={{ fontSize: 'var(--font-size-input)' }}>
+              {consentText}{' '}
+              <a
+                href={privacyPolicyPath}
+                onClick={(e) => handleLinkClick(e, 'privacy')}
+                style={{ textDecoration: 'underline', cursor: 'pointer' }}
+              >
+                {privacyPolicyText}
+              </a>
+              {' / '}
+              <a
+                href={termsPath}
+                onClick={(e) => handleLinkClick(e, 'terms')}
+                style={{ textDecoration: 'underline', cursor: 'pointer' }}
+              >
+                {termsText}
+              </a>{' '}
+              {andText}
+            </Text>
+          </Label>
+        </InlineFieldRow>
+        <FieldMessage
+          id={`${id}-message`}
+          error={error}
+          helperText={helperText}
+        />
+      </Stack>
       <Sheet
         open={privacyOpen}
         onOpenChange={setPrivacyOpen}

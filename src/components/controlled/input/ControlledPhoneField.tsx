@@ -39,7 +39,6 @@ export function ControlledPhoneField(
           value={typeof field.value === 'string' ? field.value : ''}
           onChange={(e) => field.onChange(fromInputValue(e.target.value))}
           error={fieldState.error?.message}
-          helperText={fieldState.error?.message}
           required={required}
         />
       )}

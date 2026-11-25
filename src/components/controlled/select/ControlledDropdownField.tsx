@@ -31,9 +31,7 @@ export function ControlledDropdownField(
   // dependsOn: watch only the parent field, not the entire form
   const dependsOn =
     'dependsOn' in fieldConfig ? fieldConfig.dependsOn : undefined;
-  const dependsOnField = dependsOn
-    ? dependsOn.field
-    : undefined;
+  const dependsOnField = dependsOn ? dependsOn.field : undefined;
 
   const hasDynamicOptions = typeof validation?.options === 'function';
 
@@ -75,10 +73,12 @@ export function ControlledDropdownField(
 
   // why: @donotdev/core declares no fieldSpecific shape for this field type, and FieldType is erased at registry dispatch
   const fieldSpecific = fieldOptions.fieldSpecific as
-    | { setParentOnChange?: (
+    | {
+        setParentOnChange?: (
           childValue: string,
           formValues: Record<string, unknown>
-        ) => unknown }
+        ) => unknown;
+      }
     | undefined;
 
   return (
@@ -126,8 +126,7 @@ export function ControlledDropdownField(
             onChange={handleChange}
             onBlur={field.onBlur}
             options={translatedOptions}
-            error={!!fieldState.error}
-            helperText={fieldState.error?.message}
+            error={fieldState.error?.message}
             required={required}
           />
         );

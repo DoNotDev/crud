@@ -49,7 +49,6 @@ export function ControlledTextField(props: ControlledFieldProps): ReactElement {
           label={t(label)}
           info={fieldInfo(fieldConfig, t)}
           error={fieldState.error?.message}
-          helperText={fieldState.error?.message}
           type={inputType}
           required={required}
           placeholder={placeholder || options.placeholder}

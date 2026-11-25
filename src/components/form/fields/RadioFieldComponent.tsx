@@ -9,9 +9,16 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { useId } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 
-import { RadioGroup, Label, Stack } from '@donotdev/components';
+import {
+  RadioGroup,
+  Label,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 import type { RadioOption } from '@donotdev/components';
 
 export interface RadioFieldComponentProps {
@@ -23,9 +30,9 @@ export interface RadioFieldComponentProps {
   onChange: (value: string | ChangeEvent<HTMLInputElement>) => void;
   /** Available radio options */
   options: RadioOption[];
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Whether the field is required */
   required?: boolean;
@@ -40,6 +47,7 @@ const RadioFieldComponent: ComponentType<RadioFieldComponentProps> = ({
   helperText,
   required,
 }) => {
+  const id = useId();
   const handleChange = (newValue: string) => {
     // Create a synthetic event with the string value
     const syntheticEvent = {
@@ -60,19 +68,21 @@ const RadioFieldComponent: ComponentType<RadioFieldComponentProps> = ({
       >
         {label}
       </Label>
-      <RadioGroup value={value} onValueChange={handleChange} items={options} />
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <RadioGroup
+        value={value}
+        onValueChange={handleChange}
+        items={options}
+        {...fieldMessageAria({
+          id: `${id}-message`,
+          error,
+          helperText,
+        })}
+      />
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

@@ -27,8 +27,7 @@ export function ControlledDurationField(
   const options = fieldConfig.options || {};
   // why: @donotdev/core declares no fieldSpecific shape for this field type, and FieldType is erased at registry dispatch
   const fieldSpecific = options.fieldSpecific as
-    | { min?: number; max?: number; step?: number }
-    | undefined;
+    { min?: number; max?: number; step?: number } | undefined;
 
   return (
     <Controller
@@ -40,8 +39,7 @@ export function ControlledDurationField(
           label={t(label)}
           value={field.value ?? 0}
           onChange={(value) => field.onChange(value)}
-          error={!!fieldState.error}
-          helperText={fieldState.error?.message}
+          error={fieldState.error?.message}
           required={required}
           disabled={field.disabled}
           min={fieldSpecific?.min ?? 0}

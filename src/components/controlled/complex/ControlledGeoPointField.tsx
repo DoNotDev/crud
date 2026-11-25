@@ -53,8 +53,7 @@ export function ControlledGeoPointField(
             label={t(label)}
             value={field.value || { lat: 0, lng: 0 }}
             onChange={handleChange}
-            error={!!fieldState.error}
-            helperText={fieldState.error?.message}
+            error={fieldState.error?.message}
             required={required}
           />
         );

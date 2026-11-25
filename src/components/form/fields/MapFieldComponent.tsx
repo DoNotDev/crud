@@ -9,9 +9,15 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { useId } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 
-import { Input, Stack } from '@donotdev/components';
+import {
+  Input,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
 
 export interface MapFieldComponentProps {
@@ -25,9 +31,9 @@ export interface MapFieldComponentProps {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: exported signature; narrowing it is a breaking change for importers (deferred to a major, any-audit 2026-11-11)
     value: Record<string, any> | ChangeEvent<HTMLInputElement>
   ) => void;
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Whether the field is required */
   required?: boolean;
@@ -42,6 +48,7 @@ const MapFieldComponent: ComponentType<MapFieldComponentProps> = ({
   required,
 }) => {
   const { t } = useTranslation('crud');
+  const id = useId();
   // Placeholder implementation: Replace with an actual map integration as needed.
   return (
     <Stack gap="tight">
@@ -69,6 +76,11 @@ const MapFieldComponent: ComponentType<MapFieldComponentProps> = ({
           type="text"
           required={required}
           className="dndev-w-full"
+          {...fieldMessageAria({
+            id: `${id}-message`,
+            error,
+            helperText,
+          })}
           placeholder={t('form.enterLocationData')}
           value={JSON.stringify(value)}
           onChange={(e) => {
@@ -89,19 +101,11 @@ const MapFieldComponent: ComponentType<MapFieldComponentProps> = ({
           }}
         />
       </div>
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-            marginTop: 'var(--gap-sm)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

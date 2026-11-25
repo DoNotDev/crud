@@ -30,8 +30,7 @@ export function ControlledRatingField(
 
   // why: @donotdev/core declares no fieldSpecific shape for this field type, and FieldType is erased at registry dispatch
   const fieldSpecific = options.fieldSpecific as
-    | { showValue?: boolean; max?: number }
-    | undefined;
+    { showValue?: boolean; max?: number } | undefined;
 
   return (
     <Controller
@@ -45,8 +44,7 @@ export function ControlledRatingField(
           onChange={(value) => {
             field.onChange(value);
           }}
-          error={!!fieldState.error}
-          helperText={fieldState.error?.message}
+          error={fieldState.error?.message}
           required={required}
           max={fieldSpecific?.max ?? validation?.max ?? 5}
           showValue={fieldSpecific?.showValue}

@@ -11,10 +11,17 @@
  */
 
 import { Clock } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useId } from 'react';
 import type { ComponentType } from 'react';
 
-import { Label, Stack, Button, Slider } from '@donotdev/components';
+import {
+  Label,
+  Stack,
+  Button,
+  Slider,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 
 /** Preset durations in minutes */
 export const DURATION_PRESETS = [15, 30, 45, 60, 90, 120, 150, 180] as const;
@@ -26,9 +33,9 @@ export interface DurationFieldComponentProps {
   value?: number;
   /** Change handler (minutes) */
   onChange: (value: number) => void;
-  /** Whether the field is in error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Whether the field is disabled */
   disabled?: boolean;
@@ -96,6 +103,7 @@ const DurationFieldComponent: ComponentType<DurationFieldComponentProps> = ({
   step = 5,
   t,
 }) => {
+  const id = useId();
   const numericValue =
     typeof value === 'number' && !Number.isNaN(value) ? value : 0;
   const isPreset = (DURATION_PRESETS as readonly number[]).includes(
@@ -112,9 +120,7 @@ const DurationFieldComponent: ComponentType<DurationFieldComponentProps> = ({
     [t]
   );
 
-  const customLabel = t
-    ? t('crud:duration.custom')
-    : 'Custom';
+  const customLabel = t ? t('crud:duration.custom') : 'Custom';
 
   if (readonly) {
     const display =
@@ -157,19 +163,11 @@ const DurationFieldComponent: ComponentType<DurationFieldComponentProps> = ({
             {display}
           </span>
         </Stack>
-        {helperText && (
-          <p
-            style={{
-              fontSize: 'var(--font-size-xs)',
-              color: error
-                ? 'var(--destructive)'
-                : 'var(--muted-foreground)',
-              marginTop: 'var(--gap-sm)',
-            }}
-          >
-            {helperText}
-          </p>
-        )}
+        <FieldMessage
+          id={`${id}-message`}
+          error={error}
+          helperText={helperText}
+        />
       </Stack>
     );
   }
@@ -229,6 +227,7 @@ const DurationFieldComponent: ComponentType<DurationFieldComponentProps> = ({
       {showCustom && (
         <Stack gap="tight" style={{ marginTop: 'var(--gap-sm)' }}>
           <Slider
+            {...fieldMessageAria({ id: `${id}-message`, error, helperText })}
             value={[isPreset ? 30 : numericValue]}
             onValueChange={([v]) =>
               onChange(Math.max(min, Math.min(max, v ?? 0)))
@@ -243,19 +242,11 @@ const DurationFieldComponent: ComponentType<DurationFieldComponentProps> = ({
         </Stack>
       )}
 
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-            marginTop: 'var(--gap-sm)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

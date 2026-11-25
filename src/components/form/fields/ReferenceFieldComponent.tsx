@@ -14,7 +14,12 @@
 import { Plus } from 'lucide-react';
 import { useMemo, useId } from 'react';
 
-import { Combobox, Stack } from '@donotdev/components';
+import {
+  Combobox,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
 
 /** Option format for reference field */
@@ -43,9 +48,9 @@ export interface ReferenceFieldComponentProps {
   options: ReferenceOption[];
   /** Loading state */
   isLoading?: boolean;
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Whether the field is required */
   required?: boolean;
@@ -114,12 +119,11 @@ const ReferenceFieldComponent = ({
   };
 
   const hasError = !!error;
-  const errorId = `${id}-error`;
-  const helperId = `${id}-helper`;
 
   return (
     <Stack gap="tight">
       <Combobox
+        {...fieldMessageAria({ id: `${id}-message`, error, helperText })}
         label={label}
         info={info}
         value={value || ''}
@@ -137,33 +141,11 @@ const ReferenceFieldComponent = ({
         isLoading={isLoading}
         clearable={!!value}
       />
-      {hasError && (
-        <Stack
-          id={errorId}
-          direction="row"
-          align="center"
-          gap="tight"
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--destructive)',
-          }}
-          role="alert"
-        >
-          <span>⚠</span>
-          {helperText}
-        </Stack>
-      )}
-      {helperText && !hasError && (
-        <p
-          id={helperId}
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--muted-foreground)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

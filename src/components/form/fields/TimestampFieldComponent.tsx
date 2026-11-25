@@ -22,9 +22,9 @@ export interface TimestampFieldComponentProps {
   value?: Date | null;
   /** Change handler - accepts both event and direct value */
   onChange: (date: Date | null | ChangeEvent<HTMLInputElement>) => void;
-  /** Error message */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
   error?: string;
-  /** Helper text */
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Mode for underlying date field (defaults to "datetime-local") */
   mode?: 'datetime-local' | 'date';

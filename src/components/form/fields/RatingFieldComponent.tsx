@@ -10,9 +10,16 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { useId } from 'react';
 import type { ComponentType } from 'react';
 
-import { Label, Rating, Stack } from '@donotdev/components';
+import {
+  Label,
+  Rating,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 
 export interface RatingFieldComponentProps {
   /** Label for the field */
@@ -21,9 +28,9 @@ export interface RatingFieldComponentProps {
   value?: number;
   /** Change handler */
   onChange: (value: number) => void;
-  /** Whether the field is in error state */
-  error?: boolean;
-  /** Helper text to display */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Maximum rating value */
   max?: number;
@@ -60,6 +67,8 @@ const RatingFieldComponent: ComponentType<RatingFieldComponentProps> = ({
   readonly,
   showValue = false,
 }) => {
+  const id = useId();
+
   return (
     <Stack gap="tight">
       <Label
@@ -80,21 +89,18 @@ const RatingFieldComponent: ComponentType<RatingFieldComponentProps> = ({
         readonly={readonly}
         showValue={showValue}
         aria-label={label}
+        {...fieldMessageAria({
+          id: `${id}-message`,
+          error,
+          helperText,
+        })}
       />
 
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-            marginTop: 'var(--gap-sm)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

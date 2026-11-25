@@ -173,8 +173,11 @@ export interface UseEntityFormOptions<
   viewerRole?: string;
 
   /**
-   * React Hook Form mode.
-   * @default 'onSubmit'
+   * When fields validate (React Hook Form `mode`). Default `'onTouched'`: a field shows
+   * its first error when the user leaves it, then re-validates on every change, so the
+   * fix clears the error while typing ("reward early, punish late"). A submit validates
+   * every field. `'onBlur'`: on leaving only; `'onChange'`: every keystroke from the start.
+   * @default 'onTouched'
    */
   mode?: 'onBlur' | 'onChange' | 'onSubmit' | 'onTouched' | 'all';
 

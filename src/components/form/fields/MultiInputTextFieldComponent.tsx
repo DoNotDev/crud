@@ -10,10 +10,16 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 
-import { Input, Button, Stack } from '@donotdev/components';
+import {
+  Input,
+  Button,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
 
 export interface MultiInputTextFieldComponentProps {
@@ -25,6 +31,10 @@ export interface MultiInputTextFieldComponentProps {
   value: string[];
   /** Handler for value changes - accepts both event and direct value */
   onChange: (value: string[] | ChangeEvent<HTMLInputElement>) => void;
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
+  helperText?: string;
   /** Optional classname for styling */
   className?: string;
   /** Whether the field is required */
@@ -33,8 +43,18 @@ export interface MultiInputTextFieldComponentProps {
 
 const MultiInputTextFieldComponent: ComponentType<
   MultiInputTextFieldComponentProps
-> = ({ label, info, value = [], onChange, className, required }) => {
+> = ({
+  label,
+  info,
+  value = [],
+  onChange,
+  error,
+  helperText,
+  className,
+  required,
+}) => {
   const { t } = useTranslation('crud');
+  const id = useId();
   const [inputValue, setInputValue] = useState('');
 
   const handleAdd = () => {
@@ -69,6 +89,12 @@ const MultiInputTextFieldComponent: ComponentType<
           onChange={(e) => setInputValue(e.target.value)}
           required={required}
           className="dndev-flex-1"
+          {...fieldMessageAria({
+            id: `${id}-message`,
+            error,
+            helperText,
+          })}
+          data-variant={error ? 'destructive' : undefined}
           placeholder={t('form.typeAndPressAdd')}
         />
         <Button type="button" onClick={handleAdd} disabled={!inputValue.trim()}>
@@ -112,6 +138,11 @@ const MultiInputTextFieldComponent: ComponentType<
           </span>
         ))}
       </Stack>
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

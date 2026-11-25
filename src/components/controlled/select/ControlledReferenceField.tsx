@@ -104,8 +104,7 @@ export function ControlledReferenceField(
           onBlur={field.onBlur}
           options={referenceOptions}
           isLoading={loading}
-          error={!!fieldState.error}
-          helperText={fieldState.error?.message}
+          error={fieldState.error?.message}
           required={required}
           placeholder={placeholder || fieldOptions.placeholder}
         />

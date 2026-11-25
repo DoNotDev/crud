@@ -16,10 +16,10 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 
-import { Stack } from '@donotdev/components';
+import { FieldMessage, Stack } from '@donotdev/components';
 
 import type { RichTextComponentProps } from '../types';
 
@@ -65,6 +65,8 @@ const TiptapEditorInner: ComponentType<
     StarterKit,
     Placeholder: PlaceholderExt,
   } = modules;
+
+  const id = useId();
 
   // useEditor is now called at the top level of this component (not inside useMemo)
   const editor = useEditor({
@@ -128,18 +130,11 @@ const TiptapEditorInner: ComponentType<
       >
         <EditorContent editor={editor} />
       </div>
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
       <style>{`
         .ProseMirror {
           outline: none;

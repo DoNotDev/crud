@@ -28,7 +28,7 @@ export function ControlledMultiInputField(
       name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
-      render={({ field }) => {
+      render={({ field, fieldState }) => {
         const handleChange = (
           value: string[] | React.ChangeEvent<HTMLInputElement>
         ) => {
@@ -53,6 +53,7 @@ export function ControlledMultiInputField(
             info={fieldInfo(fieldConfig, t)}
             value={Array.isArray(field.value) ? field.value : []}
             onChange={handleChange}
+            error={fieldState.error?.message}
             required={required}
             className={options.className}
           />

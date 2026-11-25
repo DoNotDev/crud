@@ -13,7 +13,13 @@
 import { useMemo, useId } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 
-import { Combobox, Tag, Stack } from '@donotdev/components';
+import {
+  Combobox,
+  Tag,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
 
 /** Show all chips up to this count; above it, collapse */
@@ -30,9 +36,9 @@ export interface MultiDropdownComponentProps {
   value?: string[];
   /** Options for selection */
   options: { value: string | number | boolean; label: string }[];
-  /** Whether an error exists */
-  error?: boolean;
-  /** Helper text for the field */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Change handler - accepts both event and direct value */
   onChange: (value: string[] | ChangeEvent<HTMLSelectElement>) => void;
@@ -100,8 +106,6 @@ const MultiDropdownComponent: ComponentType<MultiDropdownComponentProps> = ({
   };
 
   const hasError = !!error;
-  const errorId = `${id}-error`;
-  const helperId = `${id}-helper`;
 
   const chips =
     value.length > 0 ? (
@@ -129,6 +133,7 @@ const MultiDropdownComponent: ComponentType<MultiDropdownComponentProps> = ({
     <Stack gap="tight" className={className}>
       {/* Multi-select combobox with inline chips */}
       <Combobox
+        {...fieldMessageAria({ id: `${id}-message`, error, helperText })}
         label={label}
         info={info}
         value={value}
@@ -143,34 +148,11 @@ const MultiDropdownComponent: ComponentType<MultiDropdownComponentProps> = ({
         chips={chips}
       />
 
-      {hasError && (
-        <Stack
-          id={errorId}
-          direction="row"
-          align="center"
-          gap="tight"
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--destructive)',
-          }}
-          role="alert"
-        >
-          <span>⚠</span>
-          {helperText}
-        </Stack>
-      )}
-
-      {helperText && !hasError && (
-        <p
-          id={helperId}
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--muted-foreground)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

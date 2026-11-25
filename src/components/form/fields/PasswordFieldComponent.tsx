@@ -13,7 +13,13 @@
 import { useId } from 'react';
 import type { ChangeEvent, ComponentProps, ComponentType } from 'react';
 
-import { PasswordInput, Label, cn, Stack } from '@donotdev/components';
+import {
+  PasswordInput,
+  cn,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 
 export interface PasswordFieldComponentProps extends Omit<
   ComponentProps<typeof PasswordInput>,
@@ -29,9 +35,9 @@ export interface PasswordFieldComponentProps extends Omit<
   onChange: (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => void;
-  /** Error state */
-  error?: boolean;
-  /** Helper text to display */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
 }
 
@@ -66,21 +72,18 @@ const PasswordFieldComponent: ComponentType<PasswordFieldComponentProps> = ({
         info={info}
         className="dndev-w-full"
         required={props.required}
+        {...fieldMessageAria({
+          id: `${id}-message`,
+          error,
+          helperText,
+        })}
         {...props}
       />
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-            marginTop: 'var(--gap-sm)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

@@ -49,8 +49,7 @@ export function ControlledPriceField(
             info={fieldInfo(fieldConfig, t)}
             value={value ?? undefined}
             onChange={handleChange}
-            error={!!fieldState.error}
-            helperText={fieldState.error?.message}
+            error={fieldState.error?.message}
             required={required}
             placeholder={placeholder}
             defaultCurrency={fieldSpecific?.defaultCurrency ?? 'EUR'}

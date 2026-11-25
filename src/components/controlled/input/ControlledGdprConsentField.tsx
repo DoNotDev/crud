@@ -31,7 +31,7 @@ export function ControlledGdprConsentField(
       name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
-      render={({ field }) => {
+      render={({ field, fieldState }) => {
         // Handle both boolean (legacy) and object (new) formats
         const currentValue = field.value;
         const isChecked =
@@ -60,6 +60,7 @@ export function ControlledGdprConsentField(
             checked={isChecked}
             onChange={handleChange}
             required={required}
+            error={fieldState.error?.message}
             privacyPolicyPath={privacyPolicyPath}
             termsPath={termsPath}
           />

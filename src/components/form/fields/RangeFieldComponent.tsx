@@ -9,9 +9,17 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { useId } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 
-import { Label, Slider, cn, Stack } from '@donotdev/components';
+import {
+  Label,
+  Slider,
+  cn,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 
 export interface RangeFieldComponentProps {
   /** Label for the field */
@@ -20,9 +28,9 @@ export interface RangeFieldComponentProps {
   value?: number;
   /** Change handler - accepts both event and direct value */
   onChange: (value: number | ChangeEvent<HTMLInputElement>) => void;
-  /** Whether the field is in error state */
-  error?: boolean;
-  /** Helper text to display */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Minimum allowed value */
   min?: number;
@@ -60,6 +68,8 @@ const RangeFieldComponent: ComponentType<RangeFieldComponentProps> = ({
   required,
   showValue = true,
 }) => {
+  const id = useId();
+
   const handleChange = (newValue: number) => {
     // Create a synthetic event with the numeric value
     const syntheticEvent = {
@@ -93,6 +103,7 @@ const RangeFieldComponent: ComponentType<RangeFieldComponentProps> = ({
       </Stack>
 
       <Slider
+        {...fieldMessageAria({ id: `${id}-message`, error, helperText })}
         value={[value ?? min]}
         onValueChange={([newValue]) => handleChange(newValue ?? min)}
         min={min}
@@ -107,19 +118,11 @@ const RangeFieldComponent: ComponentType<RangeFieldComponentProps> = ({
         aria-label={label}
       />
 
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-            marginTop: 'var(--gap-sm)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

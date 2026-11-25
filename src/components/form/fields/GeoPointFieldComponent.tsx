@@ -9,9 +9,17 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { useId } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 
-import { Label, Input, cn, Stack } from '@donotdev/components';
+import {
+  Label,
+  Input,
+  cn,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 
 export interface GeoPoint {
   lat: number;
@@ -25,9 +33,9 @@ export interface GeoPointFieldComponentProps {
   value?: GeoPoint;
   /** Change handler - accepts both event and direct value */
   onChange: (point: GeoPoint | ChangeEvent<HTMLInputElement>) => void;
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Whether the field is disabled */
   disabled?: boolean;
@@ -51,6 +59,8 @@ const GeoPointFieldComponent: ComponentType<GeoPointFieldComponentProps> = ({
   disabled,
   required,
 }) => {
+  const id = useId();
+
   const handleLatChange = (e: ChangeEvent<HTMLInputElement>) => {
     const lat = parseFloat(e.target.value) || 0;
     if (lat >= -90 && lat <= 90) {
@@ -98,6 +108,11 @@ const GeoPointFieldComponent: ComponentType<GeoPointFieldComponentProps> = ({
           step="0.000001"
           disabled={disabled}
           data-variant={error ? 'destructive' : undefined}
+          {...fieldMessageAria({
+            id: `${id}-message`,
+            error,
+            helperText,
+          })}
           className="dndev-w-full"
         />
         <Input
@@ -110,22 +125,19 @@ const GeoPointFieldComponent: ComponentType<GeoPointFieldComponentProps> = ({
           step="0.000001"
           disabled={disabled}
           data-variant={error ? 'destructive' : undefined}
+          {...fieldMessageAria({
+            id: `${id}-message`,
+            error,
+            helperText,
+          })}
           className="dndev-w-full"
         />
       </Stack>
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-            marginTop: 'var(--gap-sm)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

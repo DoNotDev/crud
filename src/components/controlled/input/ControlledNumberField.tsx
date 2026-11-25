@@ -27,8 +27,7 @@ export function ControlledNumberField(
 
   // why: @donotdev/core declares no fieldSpecific shape for this field type, and FieldType is erased at registry dispatch
   const fieldSpecific = options.fieldSpecific as
-    | { mask?: 'currency' | 'mileage' | 'number' }
-    | undefined;
+    { mask?: 'currency' | 'mileage' | 'number' } | undefined;
 
   return (
     <Controller
@@ -61,8 +60,7 @@ export function ControlledNumberField(
             info={fieldInfo(fieldConfig, t)}
             value={field.value ?? undefined}
             onChange={handleChange}
-            error={!!fieldState.error}
-            helperText={fieldState.error?.message}
+            error={fieldState.error?.message}
             required={required}
             min={validation?.min}
             max={validation?.max}

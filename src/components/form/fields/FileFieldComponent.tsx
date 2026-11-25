@@ -24,7 +24,13 @@ import {
   FileArchive,
   FileCode,
 } from 'lucide-react';
-import { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import {
+  useState,
+  useRef,
+  useImperativeHandle,
+  forwardRef,
+  useId,
+} from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 
 import {
@@ -33,6 +39,8 @@ import {
   Text,
   Stack,
   Progress,
+  FieldMessage,
+  fieldMessageAria,
 } from '@donotdev/components';
 import { handleError, useTranslation } from '@donotdev/core';
 
@@ -55,9 +63,9 @@ export interface FileFieldComponentProps {
   value?: FileAsset | FileAsset[] | null;
   /** Change handler */
   onChange: (value: FileAsset | FileAsset[] | null) => void;
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Accept attribute for file input (MIME types or extensions) */
   accept?: string;
@@ -224,6 +232,7 @@ const FileFieldComponent = forwardRef<
       }
     }
 
+    const messageId = `${useId()}-message`;
     const showDropzone = multiple || files.length === 0;
 
     return (
@@ -238,6 +247,12 @@ const FileFieldComponent = forwardRef<
           <div
             role="button"
             tabIndex={0}
+            // role=button takes no aria-invalid (ARIA 1.2): described by the message only
+            aria-describedby={
+              fieldMessageAria({ id: messageId, error, helperText })[
+                'aria-describedby'
+              ]
+            }
             aria-label={
               multiple
                 ? t('file.upload.ariaLabelMultiple')
@@ -378,15 +393,7 @@ const FileFieldComponent = forwardRef<
           </Stack>
         )}
 
-        {helperText && (
-          <Text
-            level="caption"
-            variant={error ? 'destructive' : 'muted'}
-            style={{ marginTop: 'var(--gap-sm)' }}
-          >
-            {helperText}
-          </Text>
-        )}
+        <FieldMessage id={messageId} error={error} helperText={helperText} />
       </Stack>
     );
   }

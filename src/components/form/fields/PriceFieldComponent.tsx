@@ -23,6 +23,8 @@ import {
   CollapsiblePrimitive,
   CollapsibleTrigger,
   CollapsibleContent,
+  FieldMessage,
+  fieldMessageAria,
 } from '@donotdev/components';
 import { useTranslation, getCurrencySymbol } from '@donotdev/core';
 
@@ -42,9 +44,9 @@ export interface PriceFieldComponentProps {
   value?: PriceValue | null;
   /** Change handler */
   onChange: (value: PriceValue) => void;
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Required */
   required?: boolean;
@@ -180,7 +182,11 @@ const PriceFieldComponent: ComponentType<PriceFieldComponentProps> = ({
             min={0}
             step={0.01}
             data-variant={error ? 'destructive' : undefined}
-            aria-invalid={error}
+            {...fieldMessageAria({
+              id: `${amountId}-message`,
+              error,
+              helperText,
+            })}
           />
           <CollapsibleTrigger asChild>
             <button
@@ -258,18 +264,11 @@ const PriceFieldComponent: ComponentType<PriceFieldComponentProps> = ({
           </div>
         </CollapsibleContent>
       </Stack>
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${amountId}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </CollapsiblePrimitive>
   );
 };

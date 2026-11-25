@@ -4,7 +4,8 @@ import { describe, it, expect, vi } from 'vitest';
 import CurrencyFieldComponent from '../CurrencyFieldComponent';
 
 // Mock @donotdev/components
-vi.mock('@donotdev/components', () => ({
+vi.mock('@donotdev/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@donotdev/components')>()),
   Input: ({ value, onChange, onFocus, onBlur, ...props }: any) => (
     <input
       data-testid="currency-input"

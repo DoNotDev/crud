@@ -9,9 +9,17 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { useId } from 'react';
 import type { ComponentProps, ComponentType } from 'react';
 
-import { Avatar, Input, cn, Stack } from '@donotdev/components';
+import {
+  Avatar,
+  Input,
+  cn,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 import type { EntityField } from '@donotdev/core';
 
 export interface AvatarFieldComponentProps extends Omit<
@@ -24,9 +32,9 @@ export interface AvatarFieldComponentProps extends Omit<
   value: string;
   /** Change handler */
   onChange: (value: string) => void;
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Translation function */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- why: t prop signature shared by field components; narrowing it is a breaking change for callers
@@ -50,6 +58,8 @@ export const AvatarFieldComponent: ComponentType<AvatarFieldComponentProps> = ({
   className,
   ...props
 }) => {
+  const id = useId();
+
   const getInitials = (label: string): string => {
     return label
       .split(' ')
@@ -78,21 +88,21 @@ export const AvatarFieldComponent: ComponentType<AvatarFieldComponentProps> = ({
             placeholder={t('common.enterAvatarUrl')}
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            {...fieldMessageAria({
+              id: `${id}-message`,
+              error,
+              helperText,
+            })}
             {...props}
           />
         </div>
       </Stack>
 
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--muted-foreground)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

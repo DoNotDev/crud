@@ -9,9 +9,15 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { useId } from 'react';
 import type { ChangeEvent, ComponentType, ReactNode } from 'react';
 
-import { Checkbox } from '@donotdev/components';
+import {
+  Checkbox,
+  FieldMessage,
+  Stack,
+  fieldMessageAria,
+} from '@donotdev/components';
 
 import { InlineFieldRow } from './internal/InlineFieldRow';
 
@@ -24,6 +30,10 @@ export interface CheckboxFieldComponentProps {
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
   /** Whether the field is required */
   required?: boolean;
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
+  helperText?: string;
 }
 
 /**
@@ -40,7 +50,10 @@ const CheckboxFieldComponent: ComponentType<CheckboxFieldComponentProps> = ({
   checked = false,
   onChange,
   required,
+  error,
+  helperText,
 }) => {
+  const id = useId();
   const handleChange = (checked: boolean) => {
     if (onChange) {
       onChange({
@@ -50,14 +63,26 @@ const CheckboxFieldComponent: ComponentType<CheckboxFieldComponentProps> = ({
   };
 
   return (
-    <InlineFieldRow>
-      <Checkbox
-        checked={checked}
-        onCheckedChange={handleChange}
-        label={label}
-        required={required}
+    <Stack gap="tight">
+      <InlineFieldRow>
+        <Checkbox
+          checked={checked}
+          onCheckedChange={handleChange}
+          label={label}
+          required={required}
+          {...fieldMessageAria({
+            id: `${id}-message`,
+            error,
+            helperText,
+          })}
+        />
+      </InlineFieldRow>
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
       />
-    </InlineFieldRow>
+    </Stack>
   );
 };
 

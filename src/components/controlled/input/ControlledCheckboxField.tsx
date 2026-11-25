@@ -30,12 +30,13 @@ export function ControlledCheckboxField(
       name={name}
       control={control}
       rules={validation ? convertValidationRules(validation) : undefined}
-      render={({ field }) => (
+      render={({ field, fieldState }) => (
         <CheckboxFieldComponent
           label={labelContent}
           checked={Boolean(field.value)}
           onChange={(e) => field.onChange(e.target.checked)}
           required={required}
+          error={fieldState.error?.message}
         />
       )}
     />

@@ -31,13 +31,21 @@ import { Upload, X, Loader2, GripVertical } from 'lucide-react';
 import {
   forwardRef,
   useCallback,
+  useId,
   useImperativeHandle,
   useRef,
   useState,
 } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 
-import { Text, Stack, Progress, handleImageError } from '@donotdev/components';
+import {
+  FieldMessage,
+  Text,
+  Stack,
+  Progress,
+  fieldMessageAria,
+  handleImageError,
+} from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
 import type { Picture } from '@donotdev/core';
 
@@ -61,9 +69,9 @@ export interface ImageFieldComponentProps {
   value?: Picture | Picture[] | null;
   /** Change handler */
   onChange: (value: Picture | Picture[] | null) => void;
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Multiple images mode */
   multiple?: boolean;
@@ -419,6 +427,7 @@ const ImageFieldComponent = forwardRef<
       setSelectedIndex(index);
     };
 
+    const messageId = `${useId()}-message`;
     const showDropzone = multiple || files.length === 0;
 
     // Expose methods via ref
@@ -446,6 +455,12 @@ const ImageFieldComponent = forwardRef<
           <div
             role="button"
             tabIndex={0}
+            // role=button takes no aria-invalid (ARIA 1.2): described by the message only
+            aria-describedby={
+              fieldMessageAria({ id: messageId, error, helperText })[
+                'aria-describedby'
+              ]
+            }
             onClick={() => fileInputRef.current?.click()}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ')
@@ -516,11 +531,7 @@ const ImageFieldComponent = forwardRef<
           </DndContext>
         )}
 
-        {helperText && (
-          <Text variant={error ? 'destructive' : 'muted'} level="small">
-            {helperText}
-          </Text>
-        )}
+        <FieldMessage id={messageId} error={error} helperText={helperText} />
 
         {/* Image Viewer Dialog */}
         <ImageViewerDialog

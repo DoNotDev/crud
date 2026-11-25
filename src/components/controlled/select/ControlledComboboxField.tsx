@@ -41,9 +41,7 @@ export function ControlledComboboxField(
     'dependsOn' in fieldConfig ? fieldConfig.dependsOn : undefined;
 
   const parentValue =
-    dependsOn && formValues
-      ? formValues[dependsOn.field]
-      : undefined;
+    dependsOn && formValues ? formValues[dependsOn.field] : undefined;
 
   // Resolve options - support static arrays and dynamic functions
 
@@ -136,8 +134,7 @@ export function ControlledComboboxField(
             onChange={handleChange}
             onBlur={field.onBlur}
             options={translatedOptions}
-            error={!!fieldState.error}
-            helperText={fieldState.error?.message}
+            error={fieldState.error?.message}
             required={required}
             placeholder={placeholder || fieldOptions.placeholder}
             creatable={fieldSpecific?.creatable ?? false}

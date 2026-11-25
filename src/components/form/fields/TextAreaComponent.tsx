@@ -19,6 +19,8 @@ import {
   Spinner,
   cn,
   Stack,
+  FieldMessage,
+  fieldMessageAria,
 } from '@donotdev/components';
 
 export interface TextAreaComponentProps extends Omit<
@@ -33,9 +35,9 @@ export interface TextAreaComponentProps extends Omit<
   value?: string;
   /** Change handler */
   onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
-  /** Error message */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
   error?: string;
-  /** Helper text to display */
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Number of rows (default: 3) */
   rows?: number;
@@ -132,12 +134,13 @@ const TextAreaComponent: ComponentType<TextAreaComponentProps> = ({
             maxLength={maxLength}
             rows={autoResize ? 1 : rows}
             bare
-            aria-describedby={cn(
-              hasError && `${id}-error`,
-              helperText && !hasError && `${id}-helper`,
-              showCharCount && `${id}-count`
-            )}
-            aria-invalid={hasError}
+            {...fieldMessageAria({
+              id: `${id}-message`,
+              error,
+              helperText,
+              describedBy:
+                showCharCount && maxLength ? `${id}-count` : undefined,
+            })}
             className={cn(
               'dndev-w-full',
               autoResize && 'dndev-overflow-hidden',
@@ -183,37 +186,11 @@ const TextAreaComponent: ComponentType<TextAreaComponentProps> = ({
         </div>
       )}
 
-      {/* Error Message */}
-      {hasError && (
-        <Stack
-          as="p"
-          id={`${id}-error`}
-          direction="row"
-          align="center"
-          gap="tight"
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--destructive)',
-          }}
-          role="alert"
-        >
-          <span>⚠</span>
-          {error}
-        </Stack>
-      )}
-
-      {/* Helper Text */}
-      {helperText && !hasError && (
-        <p
-          id={`${id}-helper`}
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--muted-foreground)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

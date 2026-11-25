@@ -8,13 +8,26 @@ import { describe, it, expect, vi } from 'vitest';
 
 import DateFieldComponent from '../DateFieldComponent';
 
-vi.mock('@donotdev/components', () => ({
-  DateTimePicker: ({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) => (
-    <input data-testid="dt" value={value ?? ''} onChange={(e) => onChange(e.target.value || null)} />
+vi.mock('@donotdev/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@donotdev/components')>()),
+  DateTimePicker: ({
+    value,
+    onChange,
+  }: {
+    value: string | null;
+    onChange: (v: string | null) => void;
+  }) => (
+    <input
+      data-testid="dt"
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value || null)}
+    />
   ),
   DatePicker: () => null,
   Input: () => null,
-  Stack: ({ children }: { children: unknown }) => <div>{children as never}</div>,
+  Stack: ({ children }: { children: unknown }) => (
+    <div>{children as never}</div>
+  ),
   cn: (...c: unknown[]) => c.filter(Boolean).join(' '),
 }));
 
@@ -25,14 +38,34 @@ const local = (d: Date) =>
 describe('DateFieldComponent datetime-local', () => {
   it('shows the stored instant in local time', () => {
     const iso = '2026-11-13T09:30:00.000Z';
-    render(<DateFieldComponent label="Starts" value={iso} onChange={() => {}} mode="datetime-local" />);
-    expect((screen.getByTestId('dt') as HTMLInputElement).value).toBe(local(new Date(iso)));
+    render(
+      <DateFieldComponent
+        label="Starts"
+        value={iso}
+        onChange={() => {}}
+        mode="datetime-local"
+      />
+    );
+    expect((screen.getByTestId('dt') as HTMLInputElement).value).toBe(
+      local(new Date(iso))
+    );
   });
 
   it('saves the local input as an ISO instant', () => {
     const onChange = vi.fn();
-    render(<DateFieldComponent label="Starts" value={null} onChange={onChange} mode="datetime-local" />);
-    fireEvent.change(screen.getByTestId('dt'), { target: { value: '2026-11-13T10:30' } });
-    expect(onChange).toHaveBeenCalledWith(new Date('2026-11-13T10:30').toISOString());
+    render(
+      <DateFieldComponent
+        label="Starts"
+        value={null}
+        onChange={onChange}
+        mode="datetime-local"
+      />
+    );
+    fireEvent.change(screen.getByTestId('dt'), {
+      target: { value: '2026-11-13T10:30' },
+    });
+    expect(onChange).toHaveBeenCalledWith(
+      new Date('2026-11-13T10:30').toISOString()
+    );
   });
 });

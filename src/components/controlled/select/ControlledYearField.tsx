@@ -62,8 +62,7 @@ export function ControlledYearField(props: ControlledFieldProps): ReactElement {
             onChange={handleChange}
             onBlur={field.onBlur}
             options={yearOptions}
-            error={!!fieldState.error}
-            helperText={fieldState.error?.message}
+            error={fieldState.error?.message}
             required={required}
             placeholder={placeholder || fieldOptions.placeholder}
             translationNamespace="crud"

@@ -213,11 +213,16 @@ function stripBlobUrls(data: unknown): unknown {
  * Prefer EntityFormRenderer from @donotdev/ui when no custom layout is needed.
  *
  * Simple, predictable behavior:
- * - Edit mode: defaultValues (DB object) is accepted as-is and becomes `form.record`;
+ * - Edit mode: defaultValues (DB object) is accepted as-is and becomes `form.record`
+ *   and the form's initial values from the first render (server render included);
  *   auto-save to FormStore
  * - Create mode: schema/caller defaults, auto-save to FormStore
  * - Draft restored on mount with dismissible toast (with the `form.record` it was
  *   saved with, so a concurrency token read from it stays the draft's base version)
+ * - Validation `mode` default `'onTouched'`: a field's first error shows when the user
+ *   leaves it, then it re-validates on every change (the fix clears it while typing).
+ *   An invalid submit focuses the first invalid control (DOM order), scrolls it into
+ *   view and toasts the fields to fix.
  *
  * Form state, local draft and payload hold only the fields the form writes
  * (entity descriptor, design 3.4): inputs editable for the viewer and operation,
@@ -279,7 +284,7 @@ export function useEntityForm<
     operation: operationProp,
     defaultValues,
     viewerRole: viewerRoleProp,
-    mode = 'onBlur',
+    mode = 'onTouched',
     t: tProp,
     loading: loadingProp = false,
     successPath,
@@ -482,17 +487,19 @@ export function useEntityForm<
     return projected;
   };
 
-  // Initialize React Hook Form
-  // Create mode: defaultValues = schema defaults with caller overrides
-  // Edit mode: defaultValues are set via reset(initialValues) when record arrives
+  // Initialize React Hook Form with the initial values known at mount (create: schema
+  // + caller defaults, edit: the record), so the server render and the first client
+  // render show the same values (no hydration mismatch, no empty-then-filled flash).
+  // A record that arrives later (loading, async edit) is applied by reset below.
   const formMethods = useForm<State, unknown, Values>({
-    defaultValues:
-      operation === 'create'
-        ? (initialValues as FormDefaults)
-        : undefined,
+    defaultValues: initialValues as FormDefaults,
     mode,
     resolver: dynamicResolver,
     shouldUnregister: false,
+    // The invalid submit focuses the first invalid control itself (scrollToFirstError):
+    // DOM order, skipping hidden / disabled / inert ones, then scrolls it into view.
+    // React Hook Form's own focus follows registration order and needs each field's
+    // ref on a focusable element, which composite fields (address, price, files) lack.
     shouldFocusError: false,
   });
 

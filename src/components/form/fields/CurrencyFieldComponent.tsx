@@ -12,7 +12,13 @@
 import { useState, useEffect, useId } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 
-import { Input, FloatingLabel, Stack } from '@donotdev/components';
+import {
+  Input,
+  FloatingLabel,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 
 export interface CurrencyFieldComponentProps {
   /** Field label */
@@ -27,9 +33,9 @@ export interface CurrencyFieldComponentProps {
   currency?: string;
   /** Locale for formatting (e.g., 'fr-FR', 'en-US') */
   locale?: string;
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Required field */
   required?: boolean;
@@ -167,25 +173,22 @@ const CurrencyFieldComponent: ComponentType<CurrencyFieldComponentProps> = ({
             disabled={disabled}
             placeholder={placeholder || '0'}
             data-variant={error ? 'destructive' : undefined}
+            {...fieldMessageAria({
+              id: `${id}-message`,
+              error,
+              helperText,
+            })}
             style={{
               paddingLeft: `calc(var(--gap-md) + ${currencySymbol.length * 0.6}em + var(--gap-sm))`,
             }}
           />
         </div>
       </FloatingLabel>
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-            marginTop: 'var(--gap-sm)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

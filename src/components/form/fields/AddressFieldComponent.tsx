@@ -9,9 +9,14 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 
-import { Combobox, Stack } from '@donotdev/components';
+import {
+  Combobox,
+  FieldMessage,
+  Stack,
+  fieldMessageAria,
+} from '@donotdev/components';
 import { useTranslation, getPlatformEnvVar } from '@donotdev/core';
 
 /**
@@ -43,9 +48,9 @@ export interface AddressFieldComponentProps {
    * onto the address value.
    */
   extractDistrictCode?: boolean;
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Whether the field is required */
   required?: boolean;
@@ -224,6 +229,7 @@ const AddressFieldComponent = ({
   required,
 }: AddressFieldComponentProps) => {
   const { t } = useTranslation('crud');
+  const id = useId();
 
   const [inputValue, setInputValue] = useState<string>(
     value?.formatted_address || ''
@@ -482,6 +488,7 @@ const AddressFieldComponent = ({
     return (
       <Stack gap="tight">
         <Combobox
+          {...fieldMessageAria({ id: `${id}-message`, error, helperText })}
           label={label}
           info={info}
           value={inputValue}
@@ -494,18 +501,11 @@ const AddressFieldComponent = ({
           creatable={true}
           createLabel={t('actions.use')}
         />
-        {helperText && (
-          <p
-            style={{
-              fontSize: 'var(--font-size-xs)',
-              color: error
-                ? 'var(--destructive)'
-                : 'var(--muted-foreground)',
-            }}
-          >
-            {helperText}
-          </p>
-        )}
+        <FieldMessage
+          id={`${id}-message`}
+          error={error}
+          helperText={helperText}
+        />
       </Stack>
     );
   }
@@ -513,6 +513,7 @@ const AddressFieldComponent = ({
   return (
     <Stack gap="tight">
       <Combobox
+        {...fieldMessageAria({ id: `${id}-message`, error, helperText })}
         label={label}
         info={info}
         value={inputValue}
@@ -538,18 +539,11 @@ const AddressFieldComponent = ({
           {t('address.apiUnavailable')}
         </p>
       )}
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

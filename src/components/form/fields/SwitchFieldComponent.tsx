@@ -10,9 +10,15 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { useId } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 
-import { Switch, Text, Stack } from '@donotdev/components';
+import {
+  Switch,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 
 import { InlineFieldRow } from './internal/InlineFieldRow';
 
@@ -27,7 +33,9 @@ export interface SwitchFieldComponentProps {
   uncheckedLabel?: string;
   /** Label for checked state (e.g., "Automatic") */
   checkedLabel?: string;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
 }
 
@@ -47,8 +55,10 @@ const SwitchFieldComponent: ComponentType<SwitchFieldComponentProps> = ({
   onChange,
   uncheckedLabel,
   checkedLabel,
+  error,
   helperText,
 }) => {
+  const id = useId();
   const handleChange = (checked: boolean) => {
     if (onChange) {
       // Create a synthetic event with the checked value
@@ -70,13 +80,18 @@ const SwitchFieldComponent: ComponentType<SwitchFieldComponentProps> = ({
           variant={checked ? 'primary' : 'muted'}
           uncheckedLabel={uncheckedLabel}
           checkedLabel={checkedLabel}
+          {...fieldMessageAria({
+            id: `${id}-message`,
+            error,
+            helperText,
+          })}
         />
       </InlineFieldRow>
-      {helperText && (
-        <Text as="p" variant="muted" level="small">
-          {helperText}
-        </Text>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

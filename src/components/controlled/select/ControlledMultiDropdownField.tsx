@@ -28,9 +28,7 @@ export function ControlledMultiDropdownField(
   // dependsOn: watch only the parent field, not the entire form
   const dependsOn =
     'dependsOn' in fieldConfig ? fieldConfig.dependsOn : undefined;
-  const dependsOnField = dependsOn
-    ? dependsOn.field
-    : undefined;
+  const dependsOnField = dependsOn ? dependsOn.field : undefined;
 
   const hasDynamicOptions = typeof validation?.options === 'function';
 
@@ -98,8 +96,7 @@ export function ControlledMultiDropdownField(
             onChange={handleChange}
             onBlur={field.onBlur}
             options={translatedOptions}
-            error={!!fieldState.error}
-            helperText={fieldState.error?.message}
+            error={fieldState.error?.message}
             required={required}
           />
         );

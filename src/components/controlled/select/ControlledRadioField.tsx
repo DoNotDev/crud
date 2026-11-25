@@ -27,9 +27,7 @@ export function ControlledRadioField(
   // dependsOn: watch only the parent field, not the entire form
   const dependsOn =
     'dependsOn' in fieldConfig ? fieldConfig.dependsOn : undefined;
-  const dependsOnField = dependsOn
-    ? dependsOn.field
-    : undefined;
+  const dependsOnField = dependsOn ? dependsOn.field : undefined;
 
   const hasDynamicOptions = typeof validation?.options === 'function';
 
@@ -81,8 +79,7 @@ export function ControlledRadioField(
             field.onChange(newValue);
           }}
           options={translatedOptions}
-          error={!!fieldState.error}
-          helperText={fieldState.error?.message}
+          error={fieldState.error?.message}
           required={required}
         />
       )}

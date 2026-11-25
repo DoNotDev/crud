@@ -39,7 +39,6 @@ export function ControlledTextareaField(
           value={field.value ?? ''}
           onChange={(e) => field.onChange(fromInputValue(e.target.value))}
           error={fieldState.error?.message}
-          helperText={fieldState.error?.message}
           required={required}
           placeholder={placeholder || options.placeholder}
           maxLength={validation?.maxLength}

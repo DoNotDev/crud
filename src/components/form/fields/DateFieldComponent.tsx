@@ -15,9 +15,10 @@ import type { ChangeEvent, ComponentType } from 'react';
 import {
   DatePicker,
   DateTimePicker,
+  FieldMessage,
   Input,
-  cn,
   Stack,
+  fieldMessageAria,
 } from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
 
@@ -30,9 +31,9 @@ export interface DateFieldComponentProps {
   value?: string | null;
   /** Change handler emitting an ISO string or null */
   onChange: (date: string | null) => void;
-  /** Error message (string = message to display, falsy = no error) */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
   error?: string;
-  /** Helper text to display */
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /**
    * Input mode: "date", "datetime-local", "month", "time", or "week".
@@ -116,44 +117,18 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
           value={value ?? null}
           onChange={onChange}
           required={required}
-          aria-describedby={cn(
-            hasError && `${id}-error`,
-            helperText && !hasError && `${id}-helper`
-          )}
-          aria-invalid={hasError}
+          {...fieldMessageAria({
+            id: `${id}-message`,
+            error,
+            helperText,
+          })}
           data-variant={hasError ? 'destructive' : undefined}
         />
-
-        {/* Error Message */}
-        {hasError && (
-          <Stack
-            id={`${id}-error`}
-            direction="row"
-            align="center"
-            gap="tight"
-            style={{
-              fontSize: 'var(--font-size-xs)',
-              color: 'var(--destructive)',
-            }}
-            role="alert"
-          >
-            <span>⚠</span>
-            {error}
-          </Stack>
-        )}
-
-        {/* Helper Text */}
-        {helperText && !hasError && (
-          <p
-            id={`${id}-helper`}
-            style={{
-              fontSize: 'var(--font-size-xs)',
-              color: 'var(--muted-foreground)',
-            }}
-          >
-            {helperText}
-          </p>
-        )}
+        <FieldMessage
+          id={`${id}-message`}
+          error={error}
+          helperText={helperText}
+        />
       </Stack>
     );
   }
@@ -170,44 +145,18 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
           value={displayValue || null}
           onChange={handleDateTimeChange}
           required={required}
-          aria-describedby={cn(
-            hasError && `${id}-error`,
-            helperText && !hasError && `${id}-helper`
-          )}
-          aria-invalid={hasError}
+          {...fieldMessageAria({
+            id: `${id}-message`,
+            error,
+            helperText,
+          })}
           data-variant={hasError ? 'destructive' : undefined}
         />
-
-        {/* Error Message */}
-        {hasError && (
-          <Stack
-            id={`${id}-error`}
-            direction="row"
-            align="center"
-            gap="tight"
-            style={{
-              fontSize: 'var(--font-size-xs)',
-              color: 'var(--destructive)',
-            }}
-            role="alert"
-          >
-            <span>⚠</span>
-            {error}
-          </Stack>
-        )}
-
-        {/* Helper Text */}
-        {helperText && !hasError && (
-          <p
-            id={`${id}-helper`}
-            style={{
-              fontSize: 'var(--font-size-xs)',
-              color: 'var(--muted-foreground)',
-            }}
-          >
-            {helperText}
-          </p>
-        )}
+        <FieldMessage
+          id={`${id}-message`}
+          error={error}
+          helperText={helperText}
+        />
       </Stack>
     );
   }
@@ -223,46 +172,20 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
         value={displayValue}
         onChange={handleChange}
         required={required}
-        aria-describedby={cn(
-          hasError && `${id}-error`,
-          helperText && !hasError && `${id}-helper`
-        )}
-        aria-invalid={hasError}
+        {...fieldMessageAria({
+          id: `${id}-message`,
+          error,
+          helperText,
+        })}
         data-variant={hasError ? 'destructive' : undefined}
         className="dndev-w-full"
         {...props}
       />
-
-      {/* Error Message */}
-      {hasError && (
-        <Stack
-          id={`${id}-error`}
-          direction="row"
-          align="center"
-          gap="tight"
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--destructive)',
-          }}
-          role="alert"
-        >
-          <span>⚠</span>
-          {error}
-        </Stack>
-      )}
-
-      {/* Helper Text */}
-      {helperText && !hasError && (
-        <p
-          id={`${id}-helper`}
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--muted-foreground)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

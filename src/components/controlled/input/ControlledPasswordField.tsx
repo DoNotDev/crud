@@ -36,8 +36,7 @@ export function ControlledPasswordField(
           info={fieldInfo(fieldConfig, t)}
           value={field.value ?? ''}
           onChange={(e) => field.onChange(fromInputValue(e.target.value))}
-          error={!!fieldState.error}
-          helperText={fieldState.error?.message}
+          error={fieldState.error?.message}
           required={required}
           placeholder={placeholder || options.placeholder}
           className={options.className}

@@ -22,7 +22,8 @@ import {
   BUTTON_VARIANT,
   DropdownMenu,
   Stack,
-  cn,
+  FieldMessage,
+  fieldMessageAria,
 } from '@donotdev/components';
 import type { DropdownMenuItemData } from '@donotdev/components';
 import { Flag, COUNTRIES } from '@donotdev/core';
@@ -74,9 +75,9 @@ export interface PhoneNumberComponentProps {
   value?: string;
   /** Change handler */
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  /** Error message */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
   error?: string;
-  /** Helper text */
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Required field indicator */
   required?: boolean;
@@ -212,7 +213,9 @@ const PhoneNumberComponent: ComponentType<PhoneNumberComponentProps> = ({
   const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
     // Emptied input or dial code only: empty value (the controlled field stores it as null)
     const syntheticEvent = {
-      target: { value: toPhoneValue(event.target.value, selectedCountry.dialCode) },
+      target: {
+        value: toPhoneValue(event.target.value, selectedCountry.dialCode),
+      },
     } as ChangeEvent<HTMLInputElement>;
     onChange(syntheticEvent);
   };
@@ -300,45 +303,20 @@ const PhoneNumberComponent: ComponentType<PhoneNumberComponentProps> = ({
               borderBottomLeftRadius: 0,
               borderRadius: '0 var(--radius-md) var(--radius-md) 0',
             }}
-            aria-describedby={cn(
-              hasError && `${id}-error`,
-              helperText && !hasError && `${id}-helper`
-            )}
-            aria-invalid={hasError}
+            {...fieldMessageAria({
+              id: `${id}-message`,
+              error,
+              helperText,
+            })}
           />
         </div>
       </FloatingLabel>
 
-      {/* Error Message */}
-      {hasError && (
-        <Stack
-          id={`${id}-error`}
-          direction="row"
-          align="center"
-          gap="tight"
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--destructive)',
-          }}
-          role="alert"
-        >
-          <span>⚠</span>
-          {error}
-        </Stack>
-      )}
-
-      {/* Helper Text */}
-      {helperText && !hasError && (
-        <p
-          id={`${id}-helper`}
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--muted-foreground)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

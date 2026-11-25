@@ -53,8 +53,7 @@ export function ControlledMapField(props: ControlledFieldProps): ReactElement {
             label={t(label)}
             value={field.value || {}}
             onChange={handleChange}
-            error={!!fieldState.error}
-            helperText={fieldState.error?.message}
+            error={fieldState.error?.message}
             required={required}
           />
         );

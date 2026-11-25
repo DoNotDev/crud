@@ -20,7 +20,13 @@ import {
   Loader2,
   Eye,
 } from 'lucide-react';
-import { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import {
+  useState,
+  useRef,
+  useImperativeHandle,
+  forwardRef,
+  useId,
+} from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 
 import {
@@ -29,6 +35,8 @@ import {
   Text,
   Stack,
   Progress,
+  FieldMessage,
+  fieldMessageAria,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -56,9 +64,9 @@ export interface DocumentFieldComponentProps {
   value?: FileAsset | FileAsset[] | null;
   /** Change handler */
   onChange: (value: FileAsset | FileAsset[] | null) => void;
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Multiple files mode */
   multiple?: boolean;
@@ -296,6 +304,7 @@ const DocumentFieldComponent = forwardRef<
       }
     }
 
+    const messageId = `${useId()}-message`;
     const showDropzone = multiple || files.length === 0;
 
     return (
@@ -311,6 +320,12 @@ const DocumentFieldComponent = forwardRef<
             <div
               role="button"
               tabIndex={0}
+              // role=button takes no aria-invalid (ARIA 1.2): described by the message only
+              aria-describedby={
+                fieldMessageAria({ id: messageId, error, helperText })[
+                  'aria-describedby'
+                ]
+              }
               aria-label={t('document.upload.ariaLabel')}
               className="dndev-surface"
               data-variant={error ? 'destructive' : 'default'}
@@ -469,15 +484,7 @@ const DocumentFieldComponent = forwardRef<
             </Stack>
           )}
 
-          {helperText && (
-            <Text
-              level="caption"
-              variant={error ? 'destructive' : 'muted'}
-              style={{ marginTop: 'var(--gap-sm)' }}
-            >
-              {helperText}
-            </Text>
-          )}
+          <FieldMessage id={messageId} error={error} helperText={helperText} />
         </Stack>
 
         {/* PDF Preview Dialog */}

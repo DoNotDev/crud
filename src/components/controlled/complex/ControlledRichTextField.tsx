@@ -33,7 +33,6 @@ export function ControlledRichTextField(
           value={field.value ?? ''}
           onChange={(value) => field.onChange(value)}
           error={fieldState.error?.message}
-          helperText={fieldState.error?.message}
           required={required}
           placeholder={placeholder || options.placeholder}
           className={options.className}

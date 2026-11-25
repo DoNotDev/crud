@@ -61,7 +61,7 @@ export function ControlledSwitchField(
             onChange={(e) => handleChange(e.target.checked)}
             uncheckedLabel={uncheckedLabel ? t(uncheckedLabel) : undefined}
             checkedLabel={checkedLabel ? t(checkedLabel) : undefined}
-            helperText={fieldState.error?.message}
+            error={fieldState.error?.message}
           />
         );
       }}

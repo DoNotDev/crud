@@ -46,8 +46,7 @@ export function ControlledMultiFileField(
             label={t(label)}
             value={arrayValue}
             onChange={(value) => field.onChange(value)}
-            error={!!fieldState.error}
-            helperText={fieldState.error?.message}
+            error={fieldState.error?.message}
             required={required}
             multiple={true}
             maxFiles={options.maxFiles ?? 10}

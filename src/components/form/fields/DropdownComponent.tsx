@@ -9,9 +9,15 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { useId } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 
-import { Select, Stack } from '@donotdev/components';
+import {
+  Select,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
 
 export interface DropdownComponentProps {
@@ -23,9 +29,9 @@ export interface DropdownComponentProps {
   value?: string | number | boolean;
   /** Available options */
   options: { value: string | number | boolean; label: string }[];
-  /** Error state */
-  error?: boolean;
-  /** Helper text */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Change handler - accepts both event and direct value */
   onChange?: (value: string | ChangeEvent<HTMLSelectElement>) => void;
@@ -56,6 +62,7 @@ const DropdownComponent: ComponentType<DropdownComponentProps> = ({
   required,
 }) => {
   const { t } = useTranslation('crud');
+  const id = useId();
 
   // Convert value to string - preserve undefined to maintain form state
   // Only convert to empty string if value is explicitly null or empty
@@ -74,6 +81,7 @@ const DropdownComponent: ComponentType<DropdownComponentProps> = ({
   return (
     <Stack gap="tight">
       <Select
+        {...fieldMessageAria({ id: `${id}-message`, error, helperText })}
         label={label}
         info={info}
         value={displayValue}
@@ -86,19 +94,11 @@ const DropdownComponent: ComponentType<DropdownComponentProps> = ({
           label: option.label,
         }))}
       />
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-            marginTop: 'var(--gap-sm)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

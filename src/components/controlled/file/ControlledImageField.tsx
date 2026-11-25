@@ -47,8 +47,7 @@ export function ControlledImageField(
           label={t(label)}
           value={field.value ?? null}
           onChange={(value) => field.onChange(value)}
-          error={!!fieldState.error}
-          helperText={fieldState.error?.message}
+          error={fieldState.error?.message}
           required={required}
           multiple={false}
           maxFiles={1}

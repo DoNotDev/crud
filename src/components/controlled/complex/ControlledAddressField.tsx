@@ -38,8 +38,7 @@ export function ControlledAddressField(
           info={fieldInfo(fieldConfig, t)}
           value={field.value ?? undefined}
           onChange={(value) => field.onChange(value)}
-          error={!!fieldState.error}
-          helperText={fieldState.error?.message}
+          error={fieldState.error?.message}
           required={required}
           enableGoogleMaps={fieldSpecific?.enableGoogleMaps}
           extractDistrictCode={fieldSpecific?.extractDistrictCode}

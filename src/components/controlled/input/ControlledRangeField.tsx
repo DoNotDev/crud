@@ -40,8 +40,7 @@ export function ControlledRangeField(
               field.onChange(Number(value.target.value) || 0);
             }
           }}
-          error={!!fieldState.error}
-          helperText={fieldState.error?.message}
+          error={fieldState.error?.message}
           required={required}
           min={validation?.min}
           max={validation?.max}

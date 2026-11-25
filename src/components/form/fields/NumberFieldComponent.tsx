@@ -9,10 +9,16 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useId } from 'react';
 import type { ChangeEvent, ComponentType } from 'react';
 
-import { Input, Label, cn, Stack } from '@donotdev/components';
+import {
+  Input,
+  cn,
+  Stack,
+  FieldMessage,
+  fieldMessageAria,
+} from '@donotdev/components';
 import { useTranslation } from '@donotdev/core';
 
 export interface NumberFieldComponentProps {
@@ -24,9 +30,9 @@ export interface NumberFieldComponentProps {
   value?: number;
   /** Change handler */
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  /** Whether the field is in error state */
-  error?: boolean;
-  /** Helper text to display */
+  /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
+  error?: string;
+  /** Helper text under the field while there is no error */
   helperText?: string;
   /** Minimum allowed value */
   min?: number;
@@ -69,6 +75,7 @@ const NumberFieldComponent: ComponentType<NumberFieldComponentProps> = ({
   mask = 'number',
   ...props
 }) => {
+  const id = useId();
   const { i18n } = useTranslation();
   const locale =
     i18n?.language ||
@@ -183,25 +190,22 @@ const NumberFieldComponent: ComponentType<NumberFieldComponentProps> = ({
         required={required}
         className={cn('dndev-w-full', className)}
         data-variant={error ? 'destructive' : undefined}
+        {...fieldMessageAria({
+          id: `${id}-message`,
+          error,
+          helperText,
+        })}
         style={{
           opacity: disabled ? 'var(--opacity-muted)' : undefined,
           cursor: disabled ? 'not-allowed' : undefined,
         }}
         {...props}
       />
-      {helperText && (
-        <p
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            color: error
-              ? 'var(--destructive)'
-              : 'var(--muted-foreground)',
-            marginTop: 'var(--gap-sm)',
-          }}
-        >
-          {helperText}
-        </p>
-      )}
+      <FieldMessage
+        id={`${id}-message`}
+        error={error}
+        helperText={helperText}
+      />
     </Stack>
   );
 };

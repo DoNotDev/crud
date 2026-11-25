@@ -187,7 +187,8 @@ function renderEmpty(compact: boolean): ReactElement {
  */
 function text(type: string): DisplayFormatter {
   const format = FIELD_TEXT_FORMATTERS[type];
-  if (!format) throw new Error(`No core text formatter for field type "${type}"`);
+  if (!format)
+    throw new Error(`No core text formatter for field type "${type}"`);
   return (value, config, t, options) =>
     format(value, config, t, { locale: options?.locale });
 }
@@ -283,9 +284,7 @@ const displayFormatters: Record<string, DisplayFormatter> = {
     }
     const currencyCode = normalized.currency || 'EUR';
     const vatLabel =
-      (normalized.vatIncluded ?? true)
-        ? ` ${t('crud:price.vatIncluded')}`
-        : '';
+      (normalized.vatIncluded ?? true) ? ` ${t('crud:price.vatIncluded')}` : '';
     return (
       <Stack direction="column" gap="tight" align="end">
         <Text
@@ -1372,8 +1371,7 @@ export function registerAllBuiltinFieldTypes(
               // For avatar fields, value is always string
               onChange(newValue);
             }}
-            error={!!error}
-            helperText={error || undefined}
+            error={error || undefined}
             t={t}
             {...config.options}
           />
@@ -1403,8 +1401,7 @@ export function registerAllBuiltinFieldTypes(
               // For badge fields, value is always string
               onChange(newValue);
             }}
-            error={!!error}
-            helperText={error || undefined}
+            error={error || undefined}
             t={t}
             {...config.options}
           />

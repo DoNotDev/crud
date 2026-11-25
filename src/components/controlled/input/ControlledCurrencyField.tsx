@@ -23,8 +23,7 @@ export function ControlledCurrencyField(
 
   // why: @donotdev/core declares no fieldSpecific shape for this field type, and FieldType is erased at registry dispatch
   const fieldSpecific = options.fieldSpecific as
-    | { currency?: string; locale?: string }
-    | undefined;
+    { currency?: string; locale?: string } | undefined;
 
   return (
     <Controller
@@ -68,8 +67,7 @@ export function ControlledCurrencyField(
             onChange={handleChange}
             currency={fieldSpecific?.currency || 'EUR'}
             locale={fieldSpecific?.locale}
-            error={!!fieldState.error}
-            helperText={fieldState.error?.message}
+            error={fieldState.error?.message}
             required={required}
             placeholder={placeholder}
           />
