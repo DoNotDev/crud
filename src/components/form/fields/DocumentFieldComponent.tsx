@@ -336,7 +336,7 @@ const DocumentFieldComponent = forwardRef<
                   : error
                     ? 'var(--destructive)'
                     : 'var(--border)',
-                borderRadius: 'var(--radius-lg)',
+                borderRadius: 'var(--radius-surface)',
                 padding: 'var(--gap-lg)',
                 backgroundColor: dragActive
                   ? 'color-mix(in oklab, var(--primary) 5%, transparent)'

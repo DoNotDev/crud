@@ -673,13 +673,21 @@ export function peekFilters(key: string): FilterState {
  * (`currententrychange`, fired by every history change); browsers without it get
  * back/forward only (`popstate`), and pages re-read on mount (`useCrudFilters`).
  * Client only, installed once on the first URL-synced access.
+ *
+ * The re-read runs in a microtask: `currententrychange` fires synchronously inside
+ * `history.pushState` / `replaceState`, which routers call during React's commit
+ * (Next.js writes history in a `useInsertionEffect`). Updating the store there would
+ * schedule React updates inside that effect ("useInsertionEffect must not schedule
+ * updates"); the microtask runs once the commit is done.
  */
 function installUrlListener(): void {
   if (urlListenerInstalled || !isClient()) return;
   urlListenerInstalled = true;
   const onUrlChange = () => {
-    const { syncFiltersFromUrl } = useCrudStore.getState();
-    urlWatchedKeys.forEach((key) => syncFiltersFromUrl(key));
+    queueMicrotask(() => {
+      const { syncFiltersFromUrl } = useCrudStore.getState();
+      urlWatchedKeys.forEach((key) => syncFiltersFromUrl(key));
+    });
   };
   const navigation = (window as { navigation?: EventTarget }).navigation;
   if (navigation) navigation.addEventListener('currententrychange', onUrlChange);

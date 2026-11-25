@@ -58,7 +58,7 @@ const MapFieldComponent: ComponentType<MapFieldComponentProps> = ({
         style={{
           border: '1px solid',
           borderColor: error ? 'var(--destructive)' : 'var(--input)',
-          borderRadius: 'var(--radius-lg)',
+          borderRadius: 'var(--radius-surface)',
           padding: 'var(--gap-md)',
         }}
       >

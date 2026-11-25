@@ -128,9 +128,11 @@ export const TextFieldDisplay: ComponentType<TextFieldDisplayProps> = ({
           </a>
         );
       case 'month':
+        // YYYY-MM is a calendar month: read as written (UTC), never shifted by a zone
         return new Date(val).toLocaleDateString(getI18nInstance()?.language, {
           year: 'numeric',
           month: 'long',
+          timeZone: 'UTC',
         });
       case 'week':
         // Use the centralized date utility for week calculation

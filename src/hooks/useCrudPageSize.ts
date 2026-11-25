@@ -10,13 +10,15 @@
  * @author AMBROISE PARK Consulting
  */
 
+import { DEFAULT_TABLE_PAGE_SIZE } from '@donotdev/components';
+
 import { useCrudStore } from '../CrudStore';
 
 /** Options for the {@link useCrudPageSize} hook. */
 export interface UseCrudPageSizeOptions {
   /** Entity collection name (e.g., 'cars', 'products') */
   collection: string;
-  /** Default page size when no preference is stored (default: 12) */
+  /** Default page size when no preference is stored (default: `DEFAULT_TABLE_PAGE_SIZE`, the DataTable / Pagination default) */
   defaultPageSize?: number;
 }
 
@@ -28,8 +30,6 @@ export interface UseCrudPageSizeReturn {
   setPageSize: (pageSize: number) => void;
 }
 
-/** Default items per page when no preference is stored */
-const DEFAULT_PAGE_SIZE = 12;
 
 /**
  * Hook for managing per-collection page size preference from CrudStore
@@ -47,7 +47,7 @@ const DEFAULT_PAGE_SIZE = 12;
 export function useCrudPageSize(
   options: UseCrudPageSizeOptions
 ): UseCrudPageSizeReturn {
-  const { collection, defaultPageSize = DEFAULT_PAGE_SIZE } = options;
+  const { collection, defaultPageSize = DEFAULT_TABLE_PAGE_SIZE } = options;
 
   const pageSize = useCrudStore(
     (state) => state.collections[collection]?.ui?.pageSize ?? defaultPageSize

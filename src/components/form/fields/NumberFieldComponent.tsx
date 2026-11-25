@@ -76,10 +76,8 @@ const NumberFieldComponent: ComponentType<NumberFieldComponentProps> = ({
   ...props
 }) => {
   const id = useId();
-  const { i18n } = useTranslation();
-  const locale =
-    i18n?.language ||
-    (typeof navigator !== 'undefined' ? navigator.language : 'en-US');
+  // The UI language, set during the server render and hydration pass too (same text both sides)
+  const { language: locale } = useTranslation();
 
   // Format number based on mask type (locale-aware)
   const formatValue = useCallback(

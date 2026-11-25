@@ -177,7 +177,7 @@ const TiptapEditorInner: ComponentType<
         .ProseMirror code {
           background: var(--muted);
           padding: 0.2em 0.4em;
-          border-radius: var(--radius-sm);
+          border-radius: var(--radius-interactive);
           font-family: monospace;
         }
         .ProseMirror blockquote {

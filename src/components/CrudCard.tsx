@@ -11,7 +11,7 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 
 import { Card, Stack, Text, ActionButton } from '@donotdev/components';
 import { useTranslation, getListCardFieldNames } from '@donotdev/core';
@@ -218,13 +218,24 @@ export function CrudCard({
         </Stack>
       );
     }
+    // Formatted values can be elements (status badge, check icon): separators
+    // between nodes, never a string join ("[object Object]")
     const parts = footerFields.map((name) => {
       const config = entity.fields[name];
       return config
         ? formatValue(item[name], config, t, { compact: true, item: fvItem })
-        : item[name];
+        : String(item[name] ?? '');
     });
-    return <Text level="small">{parts.join(' · ')}</Text>;
+    return (
+      <Text level="small">
+        {parts.map((part, index) => (
+          <Fragment key={footerFields[index]}>
+            {index > 0 && ' · '}
+            {part}
+          </Fragment>
+        ))}
+      </Text>
+    );
   }, [item, entity.fields, footerFields, t]);
 
   // Built-in delete = logical delete (CRUD rule 3, `remove`); `delete` is the hard delete.

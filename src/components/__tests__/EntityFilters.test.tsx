@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { useTranslation } from '@donotdev/core';
+import { defineEntity, useTranslation } from '@donotdev/core';
 
 import { EntityFilters } from '../EntityFilters';
 import { useCrudFilters } from '../../hooks/useCrudFilters';
@@ -66,6 +66,7 @@ const FILTER_TYPES: Record<string, string> = {
   multiselect: 'multiselect',
   reference: 'reference',
   number: 'range',
+  rating: 'rating',
 };
 
 vi.mock('../../fieldTypeRegistry', () => ({
@@ -112,12 +113,13 @@ describe('EntityFilters', () => {
     expect(useTranslation).toHaveBeenCalledWith([mockEntity.namespace, 'crud']);
   });
 
-  it('renders filters for entity fields', () => {
+  it('renders filters for entity fields: text = a "contains" input, select = a combobox', () => {
     render(<EntityFilters entity={mockEntity} viewerRole="user" />);
-
-    // Component should render clear buttons (per-filter + global)
-    const clearButtons = screen.getAllByRole('button', { name: /clear/i });
-    expect(clearButtons.length).toBeGreaterThan(0);
+    expect(screen.getByPlaceholderText('filter.contains')).toBeTruthy();
+    expect(screen.queryByTestId('combobox-Title')).toBeNull();
+    expect(screen.getAllByTestId(/^combobox-/).length).toBeGreaterThan(0);
+    // No active filter: no "Clear all filters" link
+    expect(screen.queryByRole('button', { name: 'filter.clearAll' })).toBeNull();
   });
 
   it('renders with data prop', () => {
@@ -128,15 +130,13 @@ describe('EntityFilters', () => {
 
     render(<EntityFilters entity={mockEntity} viewerRole="user" data={mockData} />);
 
-    const clearButtons = screen.getAllByRole('button', { name: /clear/i });
-    expect(clearButtons.length).toBeGreaterThan(0);
+    expect(screen.getByPlaceholderText('filter.contains')).toBeTruthy();
   });
 
   it('renders with sidebar variant', () => {
     render(<EntityFilters entity={mockEntity} viewerRole="user" variant="sidebar" />);
 
-    const clearButtons = screen.getAllByRole('button', { name: /clear/i });
-    expect(clearButtons.length).toBeGreaterThan(0);
+    expect(screen.getByPlaceholderText('filter.contains')).toBeTruthy();
   });
 
   it('sizes inline columns by the panel width (selects never under 14rem, at most 2 below laptop)', () => {
@@ -156,14 +156,44 @@ describe('EntityFilters', () => {
     ]);
   });
 
-  it('puts the inline clear button beside the filter grid, not in it', () => {
+  it('"Clear all filters" is a link-style button beside the active-filter chips, not in the grid', () => {
+    const setFilters = vi.fn();
+    vi.mocked(useCrudFilters).mockReturnValueOnce({
+      filters: { status: ['active'] },
+      setFilters,
+      showFavoritesOnly: false,
+      setShowFavoritesOnly: vi.fn(),
+    } as any);
     const { container } = render(
       <EntityFilters entity={mockEntity} viewerRole="user" variant="inline" />
     );
     const grid = container.querySelector('[data-cols]')!;
-    const clear = screen.getByRole('button', { name: /clear/i });
+    const clear = screen.getByRole('button', { name: 'filter.clearAll' });
+    expect(clear.getAttribute('variant')).toBe('link');
     expect(grid.contains(clear)).toBe(false);
-    expect(clear.parentElement).toBe(grid.parentElement);
+    expect(clear.parentElement).toBe(screen.getByTestId('filter-chip').parentElement);
+    fireEvent.click(clear);
+    expect(setFilters).toHaveBeenCalledWith({});
+  });
+
+  it('labels the rating filter and keeps ranges in one cell', () => {
+    const ratedEntity = defineEntity({
+      name: 'Rated',
+      collection: 'filter_rated',
+      fields: {
+        rating: { name: 'rating', label: 'Rating', type: 'rating', visibility: 'guest', validation: {} },
+        stock: { name: 'stock', label: 'Stock', type: 'number', visibility: 'guest', validation: {} },
+      },
+    });
+    const { container } = render(
+      <EntityFilters entity={ratedEntity} data={[{ id: '1', rating: 4, stock: 3 }]} />
+    );
+    const grid = container.querySelector('[data-cols]')!;
+    // Visible label (the floating label every filter has), not only aria-label
+    expect(grid.textContent).toContain('Rating');
+    const cells = Array.from(grid.children) as HTMLElement[];
+    expect(cells).toHaveLength(2);
+    for (const cell of cells) expect(cell.style.gridColumn).toBe('span 1');
   });
 
   it('uses 1 col for sidebar variant', () => {
@@ -288,7 +318,8 @@ describe('EntityFilters options and chips', () => {
     expect(attr('Type', 'data-multiple')).toBe(true);
     expect(attr('Skin types', 'data-multiple')).toBe(true);
     expect(attr('Brand', 'data-multiple')).toBe(true);
-    expect(attr('Size', 'data-multiple')).toBe(false);
+    // Free text: a "contains" input, not a dropdown of values
+    expect(screen.queryByTestId('combobox-Size')).toBeNull();
   });
 
   it('multi-select value: the array state; a string state reads as one value', () => {
@@ -308,12 +339,87 @@ describe('EntityFilters options and chips', () => {
     expect(byValue.b2).toMatchObject({ count: 1 });
   });
 
-  it('text filters keep a single value with an "any" option that cannot collide', () => {
-    renderFilters();
-    const options = optionsOf('Size');
-    expect(options[0]!.label).toBe('filter.selectPlaceholder');
-    expect(options[0]!.value).not.toBe('all');
-    expect(options.slice(1).map((o) => o.value)).toEqual(['100 ml', '50 ml']);
+  it('text filters: a "contains" input, applied after typing stops, showing the stored text', () => {
+    vi.useFakeTimers();
+    try {
+      const set = vi.fn();
+      vi.mocked(useCrudFilters).mockReturnValue({
+        filters: {},
+        setFilters: set,
+        showFavoritesOnly: false,
+        setShowFavoritesOnly: vi.fn(),
+      } as any);
+      renderFilters();
+      const input = screen.getByPlaceholderText('filter.contains') as HTMLInputElement;
+      fireEvent.change(input, { target: { value: '50' } });
+      expect(input.value).toBe('50');
+      expect(set).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+      expect(set).toHaveBeenCalledWith({ size: '50' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Clear all cancels a range still being typed (it does not come back after the clear)', () => {
+    vi.useFakeTimers();
+    try {
+      const set = vi.fn();
+      vi.mocked(useCrudFilters).mockReturnValue({
+        filters: { stock: { min: '1', max: '' } },
+        setFilters: set,
+        showFavoritesOnly: false,
+        setShowFavoritesOnly: vi.fn(),
+      } as any);
+      const stockEntity = defineEntity({
+        name: 'Stocked',
+        collection: 'filter_stocked',
+        fields: {
+          stock: { name: 'stock', label: 'Stock', type: 'number', visibility: 'guest', validation: {} },
+        },
+      });
+      render(
+        <EntityFilters
+          entity={stockEntity}
+          data={[{ id: '1', stock: 3 }, { id: '2', stock: 9 }]}
+          variant="inline"
+        />
+      );
+      const min = screen.getByPlaceholderText('filter.min') as HTMLInputElement;
+      fireEvent.change(min, { target: { value: '5' } });
+      fireEvent.click(screen.getByRole('button', { name: 'filter.clearAll' }));
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+      expect(set.mock.calls).toEqual([[{}]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('text filters: show the stored text; emptied, the filter is removed', () => {
+    vi.useFakeTimers();
+    try {
+      const set = vi.fn();
+      vi.mocked(useCrudFilters).mockReturnValue({
+        filters: { size: '100', type: ['toner'] },
+        setFilters: set,
+        showFavoritesOnly: false,
+        setShowFavoritesOnly: vi.fn(),
+      } as any);
+      renderFilters();
+      const input = screen.getByPlaceholderText('filter.contains') as HTMLInputElement;
+      expect(input.value).toBe('100');
+      fireEvent.change(input, { target: { value: ' ' } });
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+      expect(set).toHaveBeenCalledWith({ type: ['toner'] });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('chips show the translated option label, never the raw value', () => {
@@ -355,7 +461,6 @@ describe('EntityFilters options and chips', () => {
       .map((c) => c.getAttribute('data-remove-label'));
     expect(removeLabels).toEqual(['form.remove', 'form.remove']);
     expect(attr('Type', 'data-clear-label')).toBe('filter.clear');
-    expect(attr('Size', 'data-clear-label')).toBe('filter.clear');
   });
 
   it('multi-select summary: filters.selected with the selection count', () => {
@@ -400,11 +505,11 @@ describe('EntityFilters options and chips', () => {
     const { container, rerender } = render(
       <EntityFilters entity={skinEntity} data={rows} fieldsToFilter={['type']} />
     );
-    expect(container.textContent).not.toBe('');
+    expect(container.childElementCount).toBeGreaterThan(0);
     const adminOnly = adminOnlyFieldEntity;
     rerender(
       <EntityFilters entity={adminOnly} data={rows} fieldsToFilter={['secret']} />
     );
-    expect(container.textContent).toBe('');
+    expect(container.childElementCount).toBe(0);
   });
 });

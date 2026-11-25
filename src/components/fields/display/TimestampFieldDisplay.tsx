@@ -12,7 +12,7 @@
 import type { ComponentType } from 'react';
 
 import { Text } from '@donotdev/components';
-import { getI18nInstance } from '@donotdev/core';
+import { formatTimeZoneFor, getI18nInstance } from '@donotdev/core';
 import type { EntityField } from '@donotdev/core';
 
 export interface TimestampFieldDisplayProps {
@@ -48,8 +48,11 @@ export const TimestampFieldDisplay: ComponentType<
   try {
     const date = new Date(value);
     const locale = getI18nInstance()?.language;
-    const formattedDate = date.toLocaleDateString(locale);
-    const formattedTime = date.toLocaleTimeString(locale);
+    // The app's zone (i18n.timeZone): the same text on the server and in the browser;
+    // a calendar date (YYYY-MM-DD) reads as written
+    const timeZone = formatTimeZoneFor(value);
+    const formattedDate = date.toLocaleDateString(locale, { timeZone });
+    const formattedTime = date.toLocaleTimeString(locale, { timeZone });
 
     return (
       <div className={className}>

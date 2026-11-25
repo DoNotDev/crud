@@ -28,6 +28,7 @@ import type {
 } from '@donotdev/core';
 
 import { getDisplayFormatter } from '../fieldTypeRegistry';
+import { ImagePlaceholder } from './DisplayThumbnail';
 import type { DisplayFormatterOptions } from '../fieldTypeRegistry';
 import { translateFieldLabel } from '../forms/utils';
 
@@ -110,8 +111,13 @@ function registryTextFormatter(
  * @param config - Field configuration
  * @param t - Translation function
  * @param options - Formatting options
- * @param options.compact - Use compact formatting (smaller images, plain spans for empty)
- * @param options.asString - Prefer string output when possible (e.g. for price in text placeholders)
+ * @param options.compact - List-cell formatting: price amount only (`fieldColumnTitle` puts
+ *   "VAT incl." in the column title), booleans as a check icon, images as a 40 px thumbnail
+ *   (a neutral tile when empty), plain spans for empty values
+ * @param options.asString - Text only (card titles, SEO, placeholders): translated Yes / No,
+ *   option labels, price with its VAT note
+ * @param options.referenceData - Resolved reference labels (`useReferenceResolver`): a
+ *   reference shows its label instead of its id
  * @returns Formatted value as string or ReactElement
  */
 export function formatValue(
@@ -137,6 +143,10 @@ export function formatValue(
 
   if (!resolvedByEntity && isEmptyFieldValue(value)) {
     if (asString) return '—';
+    // A list cell keeps the image column's rhythm: a neutral tile, not a dash
+    if (compact && (config.type === 'image' || config.type === 'images')) {
+      return <ImagePlaceholder />;
+    }
     return compact ? (
       <span style={{ color: 'var(--muted-foreground)' }}>—</span>
     ) : (

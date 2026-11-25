@@ -19,6 +19,7 @@ import {
   FieldMessage,
   fieldMessageAria,
 } from '@donotdev/components';
+import { useTranslation } from '@donotdev/core';
 
 export interface CurrencyFieldComponentProps {
   /** Field label */
@@ -67,9 +68,9 @@ const CurrencyFieldComponent: ComponentType<CurrencyFieldComponentProps> = ({
 }) => {
   const id = useId();
 
-  // Detect locale from browser if not provided
-  const effectiveLocale =
-    locale || (typeof navigator !== 'undefined' ? navigator.language : 'en-US');
+  // `locale` when given, else the UI language (set during the server render and hydration pass too)
+  const { language } = useTranslation();
+  const effectiveLocale = locale ?? language;
 
   // Format value for display
   const formatValue = (val: number | undefined): string => {

@@ -118,7 +118,7 @@ export const RichTextDisplay: ComponentType<RichTextDisplayProps> = ({
         .prose code {
           background: var(--muted);
           padding: 0.2em 0.4em;
-          border-radius: var(--radius-sm);
+          border-radius: var(--radius-interactive);
           font-family: monospace;
           font-size: 0.9em;
         }

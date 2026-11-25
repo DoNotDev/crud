@@ -58,7 +58,7 @@ export interface ReferenceFieldComponentProps {
   onBlur?: () => void;
   /** Callback to create new item - opens modal, returns new ID */
   onCreate?: () => void;
-  /** Placeholder text */
+  /** Placeholder text (default: `crud:reference.placeholder`, "Select {{label}}") */
   placeholder?: string;
 }
 
@@ -129,12 +129,8 @@ const ReferenceFieldComponent = ({
         value={value || ''}
         onValueChange={handleValueChange}
         onOpenChange={handleOpenChange}
-        placeholder={
-          placeholder ||
-          t('reference.placeholder', { label }) ||
-          `Select ${label}`
-        }
-        emptyMessage={t('reference.noResults') || 'No results found'}
+        placeholder={placeholder ?? t('reference.placeholder', { label })}
+        emptyMessage={t('messages.noResults')}
         options={comboboxOptions}
         required={required}
         variant={hasError ? 'destructive' : undefined}

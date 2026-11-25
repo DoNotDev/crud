@@ -114,7 +114,7 @@ const MultiInputTextFieldComponent: ComponentType<
               padding: 'var(--gap-sm) var(--gap-md)',
               fontSize: 'var(--font-size-sm)',
               fontWeight: 500,
-              borderRadius: 'var(--radius-lg)',
+              borderRadius: 'var(--radius-full)',
             }}
           >
             {item}

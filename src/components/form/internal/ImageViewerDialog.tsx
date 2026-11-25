@@ -266,7 +266,7 @@ export function ImageViewerDialog({
             flex: 1,
             minHeight: 300,
             backgroundColor: 'var(--surface-muted)',
-            borderRadius: 'var(--radius-lg)',
+            borderRadius: 'var(--radius-surface)',
             overflow: 'hidden',
           }}
         >

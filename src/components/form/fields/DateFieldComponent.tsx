@@ -19,17 +19,20 @@ import {
   Input,
   Stack,
   fieldMessageAria,
+  isoToZonedWallTime,
+  toZonedCalendarDate,
+  useComponentLocale,
+  zonedWallTimeToISO,
 } from '@donotdev/components';
-import { useTranslation } from '@donotdev/core';
 
 export interface DateFieldComponentProps {
   /** Field label */
   label: string;
   /** Help text (entity field `hint`): an (i) after the label shows it */
   info?: string;
-  /** Value as an ISO string or null */
+  /** Stored value: an ISO instant (`datetime-local`), or the mode's calendar / wall value (`YYYY-MM-DD`, `YYYY-MM`, `HH:mm`, `YYYY-Www`); null when empty */
   value?: string | null;
-  /** Change handler emitting an ISO string or null */
+  /** Change handler emitting the value in the same format, or null */
   onChange: (date: string | null) => void;
   /** Validation error (translated): shown in place of `helperText` (FieldMessage) */
   error?: string;
@@ -44,14 +47,57 @@ export interface DateFieldComponentProps {
   required?: boolean;
 }
 
-/** Date → local wall time `YYYY-MM-DDTHH:MM` (the DateTimePicker / datetime-local format). */
-function toLocalDateTime(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+/** The ISO 8601 week (`YYYY-Www`) of a calendar date (`YYYY-MM-DD`). */
+function isoWeekOf(calendarDate: string): string {
+  const [year, month, day] = calendarDate.split('-').map(Number);
+  const date = new Date(Date.UTC(year!, month! - 1, day!));
+  // The week's Thursday decides its year (ISO 8601: weeks start on Monday)
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const weekYear = date.getUTCFullYear();
+  const week = Math.ceil(
+    ((date.getTime() - Date.UTC(weekYear, 0, 1)) / 86_400_000 + 1) / 7
+  );
+  return `${weekYear}-W${String(week).padStart(2, '0')}`;
+}
+
+/** Stored formats of the native modes (the value schemas of `fieldSemantics`). */
+const NATIVE_VALUE: Readonly<Record<'month' | 'time' | 'week', RegExp>> = {
+  month: /^\d{4}-\d{2}$/,
+  time: /^\d{2}:\d{2}(?::\d{2})?$/,
+  week: /^\d{4}-W\d{2}$/,
+};
+
+/**
+ * The native input value of a month / time / week field. Its stored value
+ * (`YYYY-MM`, `HH:mm[:ss]`, `YYYY-Www`) as written, never shifted; a calendar date
+ * (`YYYY-MM-DD`) as its month or week; an instant (ISO with time) as its month, time
+ * or week in the app's zone (`timeZone`), as the date and date-time modes. `''` when
+ * it is none of these.
+ */
+function nativeInputValue(
+  value: string,
+  mode: 'month' | 'time' | 'week',
+  timeZone: string
+): string {
+  if (NATIVE_VALUE[mode].test(value)) return value;
+  if (mode === 'time') {
+    // A calendar date has no time of day
+    return /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? ''
+      : isoToZonedWallTime(value, timeZone).slice(11, 16);
+  }
+  const calendarDate = toZonedCalendarDate(value, timeZone);
+  if (calendarDate === '') return '';
+  return mode === 'month' ? calendarDate.slice(0, 7) : isoWeekOf(calendarDate);
 }
 
 /**
- * DateFieldComponent renders a date (or related) input field
+ * DateFieldComponent renders a date (or related) input field. Values, as the app's time
+ * zone rule (`i18n.timeZone`, ComponentLocale `timeZone`) says: a calendar or
+ * wall-clock value (`date` `YYYY-MM-DD`, `month` `YYYY-MM`, `time` `HH:mm`, `week`
+ * `YYYY-Www`) is shown and stored as written; a `datetime-local` value is an instant,
+ * shown and picked as its wall time in the app's zone. A stored instant in a calendar
+ * mode shows as its day, month, time or week in the app's zone.
  *
  * @version 0.1.0
  * @since 0.0.1
@@ -70,51 +116,34 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
 }) => {
   const id = useId();
   const hasError = !!error;
-  const { t } = useTranslation('crud');
+  // The app's time zone (i18n.timeZone): date-times are shown and picked as wall times in it
+  const { timeZone } = useComponentLocale();
 
-  // Handle input change: convert the native value to an ISO string (or null)
+  // Month / time / week (native input): the value is a calendar or wall-clock value
+  // (`YYYY-MM`, `HH:mm`, `YYYY-Www`, the field's stored format), stored as written: no
+  // instant, no zone
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const newValue = event.target.value
-      ? new Date(event.target.value).toISOString()
-      : null;
-    onChange(newValue);
+    onChange(event.target.value || null);
   };
 
-  // DateTimePicker speaks local wall time (YYYY-MM-DDTHH:MM); the stored value is an
-  // ISO instant. Convert at this boundary so the admin sees and edits local time.
-  const handleDateTimeChange = (local: string | null) => {
-    onChange(local ? new Date(local).toISOString() : null);
+  // DateTimePicker speaks wall time (YYYY-MM-DDTHH:MM); the stored value is an ISO
+  // instant. Convert at this boundary in the app's zone (not the machine's): every
+  // viewer sees and edits the same wall time.
+  const handleDateTimeChange = (wall: string | null) => {
+    onChange(wall ? zonedWallTimeToISO(wall, timeZone) : null);
   };
-
-  // Format the incoming ISO string for display in the input
-  let displayValue = '';
-  if (value) {
-    const date = new Date(value);
-    if (mode === 'date') {
-      displayValue = date.toISOString().split('T')[0] || '';
-    } else if (mode === 'datetime-local') {
-      displayValue = toLocalDateTime(date);
-    } else if (mode === 'month') {
-      displayValue = date.toISOString().slice(0, 7);
-    } else if (mode === 'time') {
-      displayValue = date.toISOString().slice(11, 16);
-    } else if (mode === 'week') {
-      // Week input isn't natively supported by all browsers;
-      // fallback to the date format (you may wish to enhance this).
-      displayValue = date.toISOString().split('T')[0] || '';
-    }
-  }
 
   // Date mode: use segmented DatePicker with calendar popover
   if (mode === 'date') {
+    // A calendar date as is; a stored instant as its day in the app's zone ('' = none or invalid)
+    const calendarDate = value ? toZonedCalendarDate(value, timeZone) : '';
     return (
       <Stack gap="tight">
         <DatePicker
           id={id}
-          calendarErrorLabel={t('date.calendarLoadError')}
           label={label}
           info={info}
-          value={value ?? null}
+          value={calendarDate === '' ? null : calendarDate}
           onChange={onChange}
           required={required}
           {...fieldMessageAria({
@@ -139,10 +168,9 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
       <Stack gap="tight">
         <DateTimePicker
           id={id}
-          calendarErrorLabel={t('date.calendarLoadError')}
           label={label}
           info={info}
-          value={displayValue || null}
+          value={value ? isoToZonedWallTime(value, timeZone) || null : null}
           onChange={handleDateTimeChange}
           required={required}
           {...fieldMessageAria({
@@ -169,7 +197,7 @@ const DateFieldComponent: ComponentType<DateFieldComponentProps> = ({
         label={label}
         info={info}
         type={mode}
-        value={displayValue}
+        value={value ? nativeInputValue(value, mode, timeZone) : ''}
         onChange={handleChange}
         required={required}
         {...fieldMessageAria({

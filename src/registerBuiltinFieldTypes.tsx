@@ -18,25 +18,33 @@
 // (@donotdev/core, core/schemas/src/common/fieldSemantics.ts).
 // This registry only handles UI components + filter/display metadata.
 
+import { Check } from 'lucide-react';
 import { lazy } from 'react';
 import type { ChangeEvent, ReactElement } from 'react';
 
 import {
+  Badge,
   Text,
   Stack,
   ImageGallery,
   Rating,
   CopyToClipboard,
+  ResponsiveImg,
+  VisuallyHidden,
 } from '@donotdev/components';
 import {
   FIELD_TEXT_FORMATTERS,
+  effectivePrice,
+  fieldOptionVariant,
   formatCurrency,
   isEmptyFieldValue,
+  priceDiscountPercent,
+  priceVatIncluded,
   sanitizeHref,
   stripHtmlTags,
 } from '@donotdev/core';
 import type { FieldType } from '@donotdev/core';
-import type { EntityField } from '@donotdev/core';
+import type { EntityField, Picture } from '@donotdev/core';
 
 import {
   ControlledCheckboxField,
@@ -73,7 +81,12 @@ import type {
   ComponentRegistration,
   FieldTypeMetadata,
   DisplayFormatter,
+  DisplayFormatterOptions,
 } from './fieldTypeRegistry.types';
+import {
+  ImagePlaceholder,
+  LIST_THUMBNAIL_SIZE,
+} from './components/DisplayThumbnail';
 import { translateLabel } from './forms/utils/translateFieldLabel';
 import { sanitizeHtml } from './utils/sanitizeHtml';
 
@@ -215,6 +228,86 @@ function textOrEmpty(type: string): DisplayFormatter {
   };
 }
 
+// Module-level styles: no style object per render
+const CHECK_STYLE = {
+  width: 'var(--icon-sm)',
+  height: 'var(--icon-sm)',
+  color: 'var(--success)',
+} as const;
+const THUMB_STYLE = {
+  display: 'block',
+  width: LIST_THUMBNAIL_SIZE,
+  height: LIST_THUMBNAIL_SIZE,
+  objectFit: 'cover',
+  borderRadius: 'var(--radius-surface)',
+} as const;
+const FULL_IMAGE_STYLE = {
+  display: 'block',
+  maxWidth: '100%',
+  maxHeight: '320px',
+  objectFit: 'contain',
+  borderRadius: 'var(--radius-surface)',
+} as const;
+
+/**
+ * Boolean display: in compact mode (list cells) a check icon for true and nothing
+ * visible for false (screen readers read "No"); elsewhere, and as text, the translated
+ * Yes / No (`crud:boolean.*`). A switch with its own checked / unchecked labels shows
+ * them as text everywhere.
+ */
+function booleanDisplay(type: 'boolean' | 'checkbox' | 'switch'): DisplayFormatter {
+  const format = FIELD_TEXT_FORMATTERS[type]!;
+  return (value, config, t, options) => {
+    const label = format(value, config, t, { locale: options?.locale });
+    const fieldSpecific = config.options?.fieldSpecific as
+      | { checkedLabel?: string; uncheckedLabel?: string }
+      | undefined;
+    const ownLabels =
+      type === 'switch' &&
+      Boolean(fieldSpecific?.checkedLabel || fieldSpecific?.uncheckedLabel);
+    if (!options?.compact || options.asString || ownLabels) return label;
+    return value ? (
+      <Check role="img" aria-label={label} style={CHECK_STYLE} />
+    ) : (
+      <VisuallyHidden>{label}</VisuallyHidden>
+    );
+  };
+}
+
+/**
+ * Option display: the option label (text), as a Badge when the value has a colour
+ * (its option's `variant`, else a built-in status colour: `fieldOptionVariant`).
+ */
+function optionDisplay(type: 'select'): DisplayFormatter {
+  const format = text(type);
+  return (value, config, t, options) => {
+    const label = format(value, config, t, options);
+    if (options?.asString) return label;
+    const variant = fieldOptionVariant(value, config);
+    return variant ? (
+      <Badge as="span" variant={variant}>
+        {label}
+      </Badge>
+    ) : (
+      label
+    );
+  };
+}
+
+/** The image pair of an image value: a URL string or a `Picture` ({ fullUrl, thumbUrl }). */
+function pictureOf(value: unknown): Picture | null {
+  if (typeof value === 'string') {
+    const url = sanitizeHref(value);
+    return url ? { fullUrl: url, thumbUrl: url } : null;
+  }
+  if (value === null || typeof value !== 'object') return null;
+  const { fullUrl, thumbUrl } = value as Partial<Picture>;
+  const full = typeof fullUrl === 'string' ? sanitizeHref(fullUrl) : '';
+  const thumb = typeof thumbUrl === 'string' ? sanitizeHref(thumbUrl) : '';
+  if (!full && !thumb) return null;
+  return { fullUrl: full || thumb, thumbUrl: thumb || full };
+}
+
 /**
  * Display formatters for each field type
  */
@@ -227,10 +320,10 @@ const displayFormatters: Record<string, DisplayFormatter> = {
   week: textOrEmpty('week'),
   month: textOrEmpty('month'),
 
-  // Boolean types
-  boolean: text('boolean'),
-  checkbox: text('checkbox'),
-  switch: text('switch'),
+  // Boolean types: check icon in compact mode, translated Yes / No elsewhere
+  boolean: booleanDisplay('boolean'),
+  checkbox: booleanDisplay('checkbox'),
+  switch: booleanDisplay('switch'),
 
   // Numeric types
   year: text('year'),
@@ -241,17 +334,17 @@ const displayFormatters: Record<string, DisplayFormatter> = {
     value: any,
     config: EntityField,
     t: (key: string, options?: Record<string, unknown>) => string,
-    options?: { compact?: boolean; asString?: boolean }
+    options?: DisplayFormatterOptions
   ): string | ReactElement => {
     const compact = options?.compact ?? false;
     const asString = options?.asString ?? false;
+    const locale = options?.locale;
     // Backward compat: legacy DB may have price as number
     const normalized =
       value != null && typeof value === 'number'
         ? {
             amount: value,
             currency: 'EUR' as const,
-            vatIncluded: true,
             discountPercent: 0,
           }
         : value;
@@ -262,44 +355,42 @@ const displayFormatters: Record<string, DisplayFormatter> = {
     ) {
       return renderEmpty(compact);
     }
-    const amount = normalized.amount;
-    if (
-      amount === null ||
-      amount === undefined ||
-      amount === '' ||
-      Number.isNaN(Number(amount))
-    ) {
-      return renderEmpty(compact);
-    }
-    const discountPercent = normalized.discountPercent ?? 0;
-    // Text (VAT label, discount clue): @donotdev/core, the same text SEO uses
-    const priceText = text('price')(normalized, config, t, options);
-    if (discountPercent <= 0 || asString) return priceText;
+    const effective = effectivePrice(normalized);
+    if (effective === null) return renderEmpty(compact);
+    // Text (VAT label, discount clue): @donotdev/core, the same text cards and SEO use
+    if (asString) return text('price')(normalized, config, t, options);
+    const currencyCode = normalized.currency || 'EUR';
+    const discountPercent = priceDiscountPercent(normalized);
+    const amountText = formatCurrency(effective, currencyCode, {}, locale);
+    // List cell: the amount only ("VAT incl." is in the column title,
+    // `fieldColumnTitle`), a discount as a small "-15%" badge
     if (compact) {
+      if (discountPercent <= 0) return amountText;
       return (
-        <Text variant="success" weight="bold">
-          {priceText}
-        </Text>
+        <Stack direction="row" gap="tight" align="center" nowrap>
+          <Text as="span">{amountText}</Text>
+          <Badge as="span" variant="muted">
+            {t('crud:price.discountPercent', {
+              percent: Math.round(discountPercent),
+            })}
+          </Badge>
+        </Stack>
       );
     }
-    const currencyCode = normalized.currency || 'EUR';
-    const vatLabel =
-      (normalized.vatIncluded ?? true) ? ` ${t('crud:price.vatIncluded')}` : '';
+    // Detail: the amount with its VAT note, a discount as the struck-through former price
+    if (discountPercent <= 0) return text('price')(normalized, config, t, options);
     return (
-      <Stack direction="column" gap="tight" align="end">
-        <Text
-          variant="muted"
-          style={{
-            textDecoration: 'line-through',
-            fontSize: 'var(--font-size-sm)',
-          }}
-        >
-          {formatCurrency(amount, currencyCode)}
+      <Stack direction="row" gap="tight" align="baseline" wrap="wrap">
+        <Text as="s" level="small" variant="muted">
+          {formatCurrency(Number(normalized.amount), currencyCode, {}, locale)}
         </Text>
-        <Text variant="success" weight="bold">
-          {formatCurrency(amount * (1 - discountPercent / 100), currencyCode)}
-          {vatLabel}
-        </Text>
+        <Text as="span">{amountText}</Text>
+        {/* The value's own VAT basis, else the field's (options.fieldSpecific.vatIncluded) */}
+        {priceVatIncluded(normalized, config) && (
+          <Text as="span" level="small" variant="muted">
+            {t('crud:price.vatIncluded')}
+          </Text>
+        )}
       </Stack>
     );
   },
@@ -334,8 +425,8 @@ const displayFormatters: Record<string, DisplayFormatter> = {
   duration: textOrEmpty('duration'),
   gdprConsent: textOrEmpty('gdprConsent'),
 
-  // Selection types
-  select: text('select'),
+  // Selection types (select: a Badge for values with a colour)
+  select: optionDisplay('select'),
   radio: text('radio'),
   combobox: text('combobox'),
   multiselect: text('multiselect'),
@@ -343,67 +434,46 @@ const displayFormatters: Record<string, DisplayFormatter> = {
   // Image types
   image: (value, config, t, options) => {
     const compact = options?.compact ?? false;
-    if (value === null || value === undefined || value === '') {
-      return renderEmpty(compact);
-    }
-    if (typeof value === 'string') {
-      return (
-        <img
-          src={sanitizeHref(value)}
-          alt={config.label || ''}
-          style={{
-            width: compact ? '40px' : undefined,
-            height: compact ? '40px' : undefined,
-            maxWidth: compact ? undefined : '200px',
-            maxHeight: compact ? undefined : '150px',
-            objectFit: 'cover',
-            borderRadius: 'var(--radius-sm)',
-          }}
-        />
-      );
-    }
-    return renderEmpty(compact);
+    const picture = pictureOf(value);
+    if (!picture) return compact ? <ImagePlaceholder /> : renderEmpty(false);
+    const alt = config.label ? translateLabel(config.label, t) : '';
+    // List cell: the 40 px thumbnail rendition only; detail: the full image pair
+    return compact ? (
+      <ResponsiveImg
+        image={{ fullUrl: picture.thumbUrl }}
+        alt={alt}
+        loading="lazy"
+        style={THUMB_STYLE}
+      />
+    ) : (
+      <ResponsiveImg image={picture} alt={alt} loading="lazy" style={FULL_IMAGE_STYLE} />
+    );
   },
   images: (value, config, t, options) => {
     const compact = options?.compact ?? false;
     if (!Array.isArray(value) || value.length === 0) {
-      return renderEmpty(compact);
+      return compact ? <ImagePlaceholder /> : renderEmpty(false);
     }
-    const firstImg = value[0];
-    const src =
-      typeof firstImg === 'object' && firstImg.thumbUrl
-        ? firstImg.thumbUrl
-        : firstImg;
     if (compact) {
+      const first = pictureOf(value[0]);
       return (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--gap-sm)',
-          }}
-        >
-          <img
-            src={sanitizeHref(src)}
-            alt=""
-            style={{
-              width: '40px',
-              height: '40px',
-              objectFit: 'cover',
-              borderRadius: 'var(--radius-sm)',
-            }}
-          />
-          {value.length > 1 && (
-            <span
-              style={{
-                fontSize: 'var(--font-size-xs)',
-                color: 'var(--muted-foreground)',
-              }}
-            >
-              +{value.length - 1}
-            </span>
+        <Stack direction="row" gap="tight" align="center" nowrap>
+          {first ? (
+            <ResponsiveImg
+              image={{ fullUrl: first.thumbUrl }}
+              alt=""
+              loading="lazy"
+              style={THUMB_STYLE}
+            />
+          ) : (
+            <ImagePlaceholder />
           )}
-        </div>
+          {value.length > 1 && (
+            <Text as="span" level="caption" variant="muted">
+              +{value.length - 1}
+            </Text>
+          )}
+        </Stack>
       );
     }
     // Full mode: use ImageGallery with navigation
@@ -662,7 +732,7 @@ const displayFormatters: Record<string, DisplayFormatter> = {
             width: '20px',
             height: '20px',
             backgroundColor: value,
-            borderRadius: 'var(--radius-sm)',
+            borderRadius: 'var(--radius-interactive)',
             border: '1px solid var(--border)',
           }}
         />

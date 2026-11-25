@@ -35,14 +35,16 @@
 
  */
 
-import { FilterX } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useMemo, useState, useRef, useEffect } from 'react';
 
 import {
   Button,
   Calendar,
   Combobox,
+  FloatingLabel,
   Grid,
+  Input,
   Popover,
   Rating,
   RangeInput,
@@ -86,7 +88,8 @@ const FILTER_COLS_ALL = `repeat(auto-fit, minmax(min(100%, ${FILTER_TRACK_MIN}),
 /**
  * Inline filter columns: sized by the panel's width, so a select never gets
  * narrower than 14rem whatever the viewport and the sidebar take; `auto-fit`
- * collapses empty columns so the filters fill the row. Range filters span two tracks.
+ * collapses empty columns so the filters fill the row. Every filter, ranges
+ * included (min–max side by side), takes one cell: no holes in the grid.
  */
 const INLINE_FILTER_COLS: GridCols = [
   FILTER_COLS_UP_TO_2,
@@ -95,11 +98,12 @@ const INLINE_FILTER_COLS: GridCols = [
   FILTER_COLS_ALL,
 ];
 
-/** Inline clear button: its own width beside the filters, the whole line once wrapped below them. */
-const INLINE_CLEAR_BUTTON_STYLE = { flex: '1 1 auto' } as const;
+/** One grid cell per filter. Module-level: no style object per render. */
+const FILTER_CELL_STYLE = { gridColumn: 'span 1', gridRow: 'span 1' } as const;
 
-/** Value of the single-select "any" option (never a stored option value). */
-const ANY_OPTION_VALUE = '__dndev_filter_any__';
+/** Debounce of typed filters (contains text, min / max) before they apply. */
+const TYPED_FILTER_DELAY_MS = 250;
+
 
 /** Option `{ value, label }` of a select / multiselect field (`validation.options`). */
 type FieldOption = { value: string; label: string };
@@ -123,20 +127,15 @@ function declaredOptionsOf(fieldConfig: EntityField): FieldOption[] {
 }
 
 /**
- * Stored values a row's field contributes to option counts: each item of an array
- * value, the formatted address of an address, else the value itself.
+ * Stored values a row's field contributes to option counts (select, multiselect,
+ * reference): each item of an array value, else the value itself.
  */
-function filterValuesOf(value: unknown, isAddress: boolean): string[] {
+function filterValuesOf(value: unknown): string[] {
   if (value === null || value === undefined) return [];
   if (Array.isArray(value)) {
     return value
       .filter((item) => item !== null && item !== undefined)
       .map(String);
-  }
-  if (isAddress && typeof value === 'object' && 'formatted_address' in value) {
-    const address = (value as { formatted_address?: string })
-      .formatted_address;
-    return address ? [String(address)] : [];
   }
   return [String(value)];
 }
@@ -195,15 +194,17 @@ export interface EntityFiltersProps<
  * - Select/radio/multiselect/reference fields: multi-select Combobox (exact match,
  *   OR within the field; reference options labelled like list cells; a field's
  *   `filter.wildcard` value is never offered and matches every option)
- * - Text fields: Combobox with the unique values (substring match)
+ * - Text / address fields: a "contains" text input (case-insensitive substring),
+ *   applied 250ms after typing stops
 
- * - Number fields: Min/Max inputs + Slider (2 rows)
+ * - Number fields: Min/Max inputs + Slider, in one cell
 
- * - Date fields: Min/Max date pickers + shortcuts (2 rows)
+ * - Date fields: From/To date pickers + shortcuts, in one cell
 
- * - Filters wrap naturally with flex-wrap
+ * - Rating fields: stars under the same floating label as every other filter
 
- * - Clear individual filters (chips with option labels) or all filters
+ * - Clear individual filters (chips with option labels), or all of them with
+ *   the "Clear all filters" link beside the chips
  * - URL sync of the entity collection's state (`urlSync`, CRUD.md "Filters")
 
  */
@@ -228,7 +229,8 @@ export function EntityFilters<
   const { t: tCrud, i18n } = useTranslation('crud');
 
   // Entity + crud namespaces so translateLabel can resolve crud:status.* etc.
-  const { t } = useTranslation([entity.namespace, 'crud']);
+  // `language`: option lists sort in the UI language (same order on server and client)
+  const { t, language } = useTranslation([entity.namespace, 'crud']);
 
   // Get current locale for date formatting
   const locale = i18n?.language || 'en';
@@ -257,15 +259,39 @@ export function EntityFilters<
   const [sliderDrafts, setSliderDrafts] = useState<
     Record<string, [number, number]>
   >({});
-  const rangeTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Text typed in a "contains" filter, until it applies (debounced)
+  const [draftTexts, setDraftTexts] = useState<Record<string, string>>({});
+  // Typed filters ("contains" text, range min / max) apply after a pause: one pending
+  // timer per field, cancelled by a newer keystroke, the field's clear or Clear all
+  const typedTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const applyAfterTyping = (fieldName: string, apply: () => void) => {
+    clearTimeout(typedTimers.current[fieldName]);
+    typedTimers.current[fieldName] = setTimeout(apply, TYPED_FILTER_DELAY_MS);
+  };
+  const cancelTyping = (fieldName: string) => {
+    clearTimeout(typedTimers.current[fieldName]);
+    delete typedTimers.current[fieldName];
+  };
 
   // Cleanup timers on unmount
   useEffect(
-    () => () => {
-      Object.values(rangeTimers.current).forEach(clearTimeout);
-    },
+    () => () => Object.values(typedTimers.current).forEach(clearTimeout),
     []
   );
+
+  // Debounced handler for "contains" typing (per field): the draft shows the
+  // typed text, then leaves once the filter holds it.
+  const handleTextInputChange = (fieldName: string, text: string) => {
+    setDraftTexts((prev) => ({ ...prev, [fieldName]: text }));
+    applyAfterTyping(fieldName, () => {
+      handleFilterChange(fieldName, text.trim() === '' ? undefined : text);
+      setDraftTexts((prev) => {
+        const next = { ...prev };
+        delete next[fieldName];
+        return next;
+      });
+    });
+  };
 
   // Debounced handler for RangeInput typing (250ms per field)
   const handleRangeInputChange = (
@@ -274,11 +300,9 @@ export function EntityFilters<
     max: string
   ) => {
     setDraftRanges((prev) => ({ ...prev, [fieldName]: { min, max } }));
-    if (rangeTimers.current[fieldName])
-      clearTimeout(rangeTimers.current[fieldName]);
-    rangeTimers.current[fieldName] = setTimeout(() => {
+    applyAfterTyping(fieldName, () => {
       handleFilterChange(fieldName, { min, max });
-    }, 250);
+    });
   };
 
   // Determine which fields to show filters for
@@ -528,8 +552,12 @@ export function EntityFilters<
     setFilters(next);
   };
 
-  // Clear all filters
+  // Clear all filters, and what is still being typed or dragged (texts, ranges)
   const handleClearFilters = () => {
+    Object.keys(typedTimers.current).forEach(cancelTyping);
+    setDraftTexts({});
+    setDraftRanges({});
+    setSliderDrafts({});
     setFilters({});
   };
 
@@ -607,11 +635,7 @@ export function EntityFilters<
       const rangeFilter = isRangeFilter
         ? (filterValue)
         : { min: '', max: '' };
-      const rangeGridSpanStyle = {
-        gridColumn: isSidebar ? 'span 1' : 'span 2',
-      };
-
-      // Rating: clickable stars (click = min rating, click same = clear)
+      // Rating: clickable stars (click = min rating, click same = clear), labelled like the others
       if (filterType === 'rating') {
         const max = fieldConfig.validation?.max ?? 5;
         const currentRating =
@@ -620,24 +644,20 @@ export function EntityFilters<
             : 0;
 
         return (
-          <div
-            key={fieldName}
-            style={{
-              gridColumn: 'span 1',
-              gridRow: 'span 1',
-            }}
-          >
-            <Rating
-              value={currentRating}
-              max={max}
-              aria-label={label}
-              onChange={(value) => {
-                handleFilterChange(
-                  fieldName,
-                  value === currentRating ? undefined : String(value)
-                );
-              }}
-            />
+          <div key={fieldName} style={FILTER_CELL_STYLE}>
+            <FloatingLabel label={label}>
+              <Rating
+                value={currentRating}
+                max={max}
+                aria-label={label}
+                onChange={(value) => {
+                  handleFilterChange(
+                    fieldName,
+                    value === currentRating ? undefined : String(value)
+                  );
+                }}
+              />
+            </FloatingLabel>
           </div>
         );
       }
@@ -662,7 +682,7 @@ export function EntityFilters<
           : sliderMax;
 
         return (
-          <Stack key={fieldName} gap="tight" style={rangeGridSpanStyle}>
+          <Stack key={fieldName} gap="tight" style={FILTER_CELL_STYLE}>
             {/* First row: Min/Max inputs */}
 
             <RangeInput
@@ -678,6 +698,7 @@ export function EntityFilters<
                 handleRangeInputChange(fieldName, min, max)
               }
               onClear={() => {
+                cancelTyping(fieldName);
                 setDraftRanges((prev) => {
                   const n = { ...prev };
                   delete n[fieldName];
@@ -730,7 +751,7 @@ export function EntityFilters<
           | { min: number; max: number }
           | undefined;
         return (
-          <div key={fieldName} style={rangeGridSpanStyle}>
+          <div key={fieldName} style={FILTER_CELL_STYLE}>
             <YearFilter
               label={label}
               value={isRangeFilter ? rangeFilter : undefined}
@@ -782,7 +803,7 @@ export function EntityFilters<
         })();
 
         return (
-          <div key={fieldName} style={rangeGridSpanStyle}>
+          <div key={fieldName} style={FILTER_CELL_STYLE}>
             <DateFilter
               label={label}
               fieldType={dateFilterFieldType}
@@ -809,7 +830,26 @@ export function EntityFilters<
         );
       }
 
-      // String/Select/Reference: Combobox (1 row) with FloatingLabel
+      // Text / address (not select / multiselect / reference): "contains" (case-insensitive substring), typed
+      if (!isSelect && !isMultiSelect && !isReference) {
+        return (
+        <div key={fieldName} style={FILTER_CELL_STYLE}>
+          <Input
+            label={label}
+            type="search"
+            icon={Search}
+            value={
+              draftTexts[fieldName] ??
+              (typeof filterValue === 'string' ? filterValue : '')
+            }
+            placeholder={tCrud('filter.contains')}
+            onChange={(e) => handleTextInputChange(fieldName, e.target.value)}
+          />
+        </div>
+      );
+      }
+
+      // Select / multiselect / reference: Combobox with FloatingLabel
 
       // Declared options (select, multiselect); the wildcard is never a choice
       const wildcard = fieldConfig.filter?.wildcard;
@@ -827,14 +867,12 @@ export function EntityFilters<
       const filteredDataExcludingField =
         filteredDataPerField[fieldName] || data;
 
-      const isAddress = filterType === 'address';
-
       const valueCounts = new Map<string, number>();
 
       let wildcardCount = 0;
 
       filteredDataExcludingField.forEach((item) => {
-        const values = new Set(filterValuesOf(item[fieldName], isAddress));
+        const values = new Set(filterValuesOf(item[fieldName]));
         if (wildcard !== undefined && values.has(wildcard)) {
           wildcardCount += 1;
           return;
@@ -859,15 +897,7 @@ export function EntityFilters<
         disabled?: boolean;
 
         count?: number;
-      }> = [
-        {
-          value: ANY_OPTION_VALUE,
-
-          label: tCrud('filter.selectPlaceholder'),
-
-          count: filteredDataExcludingField.length,
-        },
-      ];
+      }> = [];
 
       if (selectEntityOptions.length > 0) {
         const translated = selectEntityOptions.map((opt) => ({
@@ -877,7 +907,7 @@ export function EntityFilters<
         }));
 
         const byLabel = (a: { label: string }, b: { label: string }) =>
-          a.label.localeCompare(b.label);
+          a.label.localeCompare(b.label, language, { sensitivity: 'base' });
 
         // Available options first, then disabled ones, each sorted by label
         translated
@@ -898,33 +928,24 @@ export function EntityFilters<
             label: isReference ? optionLabel(fieldConfig, value) : value,
             count: countOf(value),
           }))
-          .sort((a, b) => a.label.localeCompare(b.label))
+          .sort((a, b) =>
+            a.label.localeCompare(b.label, language, { sensitivity: 'base' })
+          )
           .slice(0, 100) // Limit to 100 options
           .forEach((opt) => options.push(opt));
       }
 
       // Select / radio / multiselect / reference: several values (OR within the
       // field, exact per value); the state is an array. A string state (set by code)
-      // reads as one selected value.
-      if (isSelect || isMultiSelect || isReference) {
-        // No "any" option: an empty selection is "any"
-        const multiOptions = options.filter(
-          (o) => o.value !== ANY_OPTION_VALUE
-        );
-        const selectedValues = Array.isArray(filterValue)
+      // reads as one selected value. No "any" option: an empty selection is "any".
+      const selectedValues = Array.isArray(filterValue)
           ? filterValue
           : typeof filterValue === 'string' && filterValue !== ''
             ? [filterValue]
             : [];
 
         return (
-          <div
-            key={fieldName}
-            style={{
-              gridColumn: isSidebar ? 'span 1' : 'span 1',
-              gridRow: 'span 1',
-            }}
-          >
+          <div key={fieldName} style={FILTER_CELL_STYLE}>
             <Combobox
               label={label}
               value={selectedValues}
@@ -934,7 +955,7 @@ export function EntityFilters<
                 );
                 handleFilterChange(fieldName, arr.length > 0 ? arr : undefined);
               }}
-              options={multiOptions}
+              options={options}
               placeholder={tCrud('filter.placeholder')}
               selectedLabel={tCrud('filters.selected', {
                 count: selectedValues.length,
@@ -945,34 +966,6 @@ export function EntityFilters<
             />
           </div>
         );
-      }
-
-      // Text / address: one value among those in the data (substring match)
-      return (
-        <div
-          key={fieldName}
-          style={{
-            gridColumn: isSidebar ? 'span 1' : 'span 1',
-            gridRow: 'span 1',
-          }}
-        >
-          <Combobox
-            label={label}
-            value={typeof filterValue === 'string' ? filterValue : undefined}
-            onValueChange={(value) => {
-              handleFilterChange(
-                fieldName,
-
-                value === ANY_OPTION_VALUE || !value ? '' : String(value)
-              );
-            }}
-            options={options}
-            placeholder={tCrud('filter.placeholder')}
-            clearable
-            clearLabel={tCrud('filter.clear')}
-          />
-        </div>
-      );
     });
   }, [
     fieldsToShow,
@@ -990,6 +983,10 @@ export function EntityFilters<
     filteredDataPerField,
 
     referenceData,
+
+    draftTexts,
+
+    language,
   ]);
 
   const hasActiveFilters = Object.keys(filters).length > 0;
@@ -1073,56 +1070,21 @@ export function EntityFilters<
 
   const validFilterElements = filterElements.filter(Boolean);
 
-  const clearButton = (
-    <Button
-      variant="outline"
-      icon={<FilterX size={18} />}
-      onClick={handleClearFilters}
-      disabled={!hasActiveFilters}
-      style={isSidebar ? undefined : INLINE_CLEAR_BUTTON_STYLE}
-    >
-      {tCrud('filter.clear')}
-    </Button>
-  );
-
-  // Inline: the clear button sits beside the filters while they all fit on one
-  // row at FILTER_TRACK_MIN (grid basis = their tracks, range = 2), else wraps below
-  // and takes the whole line. The grid's large grow factor keeps the button narrow.
-  const filterTracks = fieldsToShow.reduce((tracks, fieldName) => {
-    const fieldConfig = entity.fields[fieldName];
-    if (!fieldConfig) return tracks;
-    const filterType = getFilterType(fieldConfig.type || 'text');
-    if (!filterType) return tracks;
-    return tracks + (filterType === 'range' ? 2 : 1);
-  }, 0);
-
   const content = (
     <Stack direction="column" gap="tight">
-      {/* Active filter tags */}
+      {/* Active filter tags, then "Clear all filters" as a small link */}
       {filterPills && (
-        <Stack direction="row" gap="tight" style={{ flexWrap: 'wrap' }}>
+        <Stack direction="row" gap="tight" align="center" wrap="wrap">
           {filterPills}
+          <Button variant="link" onClick={handleClearFilters}>
+            {tCrud('filter.clearAll')}
+          </Button>
         </Stack>
       )}
 
-      {isSidebar ? (
-        <Stack direction="column" gap="medium">
-          <Grid cols={cols ?? 1}>{validFilterElements}</Grid>
-          {clearButton}
-        </Stack>
-      ) : (
-        <Stack direction="row" wrap="wrap" align="end" gap="medium">
-          <Grid
-            cols={cols ?? INLINE_FILTER_COLS}
-            style={{
-              flex: `999 1 calc(${filterTracks} * ${FILTER_TRACK_MIN} + ${filterTracks - 1} * var(--gap-md))`,
-            }}
-          >
-            {validFilterElements}
-          </Grid>
-          {clearButton}
-        </Stack>
-      )}
+      <Grid cols={cols ?? (isSidebar ? 1 : INLINE_FILTER_COLS)}>
+        {validFilterElements}
+      </Grid>
     </Stack>
   );
 

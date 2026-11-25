@@ -60,6 +60,12 @@ export interface PriceFieldComponentProps {
   optionsTitle?: string;
   /** Allowed currencies in the select; when set, only these are shown (e.g. ['EUR'] for single-currency) */
   currencies?: string[];
+  /**
+   * VAT toggle when the value states none: the field's declaration
+   * (`options.fieldSpecific.vatIncluded`, `fieldVatIncluded` of `@donotdev/core`).
+   * @default false
+   */
+  defaultVatIncluded?: boolean;
 }
 
 /** Default list when currencies prop is not set */
@@ -85,6 +91,7 @@ const PriceFieldComponent: ComponentType<PriceFieldComponentProps> = ({
   defaultCurrency = 'EUR',
   optionsTitle = 'Price options',
   currencies: currenciesProp,
+  defaultVatIncluded = false,
 }) => {
   const amountId = useId();
   const { t } = useTranslation('crud');
@@ -95,7 +102,7 @@ const PriceFieldComponent: ComponentType<PriceFieldComponentProps> = ({
   const effectiveCurrency = currencyOptions.includes(currency)
     ? currency
     : (currencyOptions[0] ?? defaultCurrency);
-  const vatIncluded = value?.vatIncluded ?? true;
+  const vatIncluded = value?.vatIncluded ?? defaultVatIncluded;
   const discountPercent = value?.discountPercent ?? 0;
   const amountLabel = `${label} (${getCurrencySymbol(effectiveCurrency)})`;
 
@@ -112,7 +119,7 @@ const PriceFieldComponent: ComponentType<PriceFieldComponentProps> = ({
     const vat =
       partial.vatIncluded !== undefined
         ? partial.vatIncluded
-        : (value?.vatIncluded ?? true);
+        : (value?.vatIncluded ?? defaultVatIncluded);
     const discount =
       partial.discountPercent !== undefined
         ? partial.discountPercent

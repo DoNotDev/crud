@@ -166,8 +166,11 @@ export async function ensureAdapter(self: CrudServiceInternal): Promise<void> {
 }
 
 /**
- * Throws if `adapter` is direct (not server-side) and the entity schema has any
- * field with restricted visibility. Call before any adapter read or write, with
+ * Throws if `adapter` is direct (neither `serverSideOnly` nor `dbLevelSecurity`) and
+ * the entity schema has an app field with restricted visibility (`hasRestrictedVisibility`).
+ * The base fields `defineEntity` adds (id, status, createdAt, updatedAt, createdById,
+ * updatedById) do not count at their default visibility: on a direct adapter they are
+ * readable by whoever can read the document. Call before any adapter read or write, with
  * the adapter that performs it (the shared one, or a request-scoped one on the server).
  */
 export function assertCanAccess(
@@ -186,7 +189,9 @@ export function assertCanAccess(
     !adapter.dbLevelSecurity
   ) {
     throw new Error(
-      `[dndev] Direct adapter cannot access "${collection}": entity has restricted field visibility. ` +
+      `[dndev] Direct adapter cannot access "${collection}": entity has restricted field visibility ` +
+        `(a field with a visibility other than 'guest'; the base fields id, status, createdAt, updatedAt, ` +
+        `createdById, updatedById at their default visibility do not count). ` +
         `Use a server-side adapter (FunctionsAdapter for Firebase, or SupabaseCrudAdapter with RLS enabled) ` +
         `to enforce field-level security (serverSideOnly = true | dbLevelSecurity = true).`
     );

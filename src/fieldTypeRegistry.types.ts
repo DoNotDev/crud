@@ -37,7 +37,12 @@ export type FilterType =
  * Display formatter function
  */
 export type DisplayFormatterOptions = {
+  /**
+   * List-cell form: price amount only (the VAT note goes in the column title,
+   * `fieldColumnTitle`), discount badge, boolean check icon, 40 px image thumbnail
+   */
   compact?: boolean;
+  /** Text only (card titles, SEO): option labels, translated Yes / No, price with VAT note */
   asString?: boolean;
   /** Pre-resolved reference data: { collectionName: { id: displayLabel } } */
   referenceData?: Record<string, Record<string, string>>;

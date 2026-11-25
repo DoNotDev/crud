@@ -40,16 +40,14 @@ export const BadgeFieldDisplay: React.ComponentType<BadgeFieldDisplayProps> = ({
   if (value === null || value === undefined) {
     return (
       <Text as="span" variant="muted" className={className}>
-        -
+        —
       </Text>
     );
   }
 
   const displayValue =
     typeof value === 'boolean'
-      ? value
-        ? t('common.yes')
-        : t('common.no')
+      ? t(value ? 'crud:boolean.yes' : 'crud:boolean.no')
       : String(value);
 
   const variant =

@@ -4,6 +4,8 @@
 import type { ReactElement } from 'react';
 import { Controller } from 'react-hook-form';
 
+import { fieldVatIncluded } from '@donotdev/core';
+
 import { PriceFieldComponent } from '../../form/fields';
 import type { PriceValue } from '../../form/fields';
 import { fieldInfo } from '../fieldOptions';
@@ -55,6 +57,7 @@ export function ControlledPriceField(
             defaultCurrency={fieldSpecific?.defaultCurrency ?? 'EUR'}
             optionsTitle={fieldSpecific?.optionsTitle}
             currencies={fieldSpecific?.currencies}
+            defaultVatIncluded={fieldVatIncluded(fieldConfig)}
           />
         );
       }}

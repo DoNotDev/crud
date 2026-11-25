@@ -141,20 +141,22 @@ describe('CrudStore URL sync: scope', () => {
 });
 
 describe('CrudStore URL sync: re-read on URL change', () => {
-  it('back/forward (popstate) updates the filter state', () => {
+  it('back/forward (popstate) updates the filter state', async () => {
     useCrudStore.getState().getFilters(KEY); // first access installs the listener
     go('/catalogue?f_type=serum');
     window.dispatchEvent(new PopStateEvent('popstate'));
+    await Promise.resolve(); // the re-read runs in a microtask
     expect(useCrudStore.getState().collections[KEY]?.ui.filters).toEqual({
       type: ['serum'],
     });
   });
 
-  it('a link without params clears the filter state', () => {
+  it('a link without params clears the filter state', async () => {
     go('/catalogue?f_type=serum');
     expect(useCrudStore.getState().getFilters(KEY)).toEqual({ type: ['serum'] });
     go('/catalogue');
     window.dispatchEvent(new PopStateEvent('popstate'));
+    await Promise.resolve(); // the re-read runs in a microtask
     expect(useCrudStore.getState().collections[KEY]?.ui.filters).toEqual({});
   });
 
@@ -165,17 +167,20 @@ describe('CrudStore URL sync: re-read on URL change', () => {
     useCrudStore.getState().getFilters(KEY);
     go('/catalogue?f_type=toner&f_skinTypes=oily');
     navigation.dispatchEvent(new Event('currententrychange'));
+    expect(useCrudStore.getState().collections[KEY]?.ui.filters).not.toEqual({ type: ['toner'], skinTypes: ['oily'] }); // not during the history write
+    await Promise.resolve(); // the re-read runs in a microtask
     expect(useCrudStore.getState().collections[KEY]?.ui.filters).toEqual({
       type: ['toner'],
       skinTypes: ['oily'],
     });
   });
 
-  it('does not re-read a custom key', () => {
+  it('does not re-read a custom key', async () => {
     useCrudStore.getState().setFilters(PICKER_KEY, { type: 'toner' });
     useCrudStore.getState().getFilters(KEY);
     go('/catalogue?f_type=serum');
     window.dispatchEvent(new PopStateEvent('popstate'));
+    await Promise.resolve(); // the re-read runs in a microtask
     expect(useCrudStore.getState().collections[PICKER_KEY]?.ui.filters).toEqual(
       { type: 'toner' }
     );

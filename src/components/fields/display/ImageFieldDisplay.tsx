@@ -45,7 +45,7 @@ export const ImageFieldDisplay: ComponentType<ImageFieldDisplayProps> = ({
   if (!value) {
     return (
       <Text as="span" variant="muted" className={className}>
-        -
+        —
       </Text>
     );
   }

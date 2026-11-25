@@ -37,12 +37,12 @@ export const CheckboxFieldDisplay: React.ComponentType<
   if (value === null || value === undefined) {
     return (
       <Text as="span" variant="muted" className={className}>
-        -
+        —
       </Text>
     );
   }
 
-  const displayValue = value ? t('common.yes') : t('common.no');
+  const displayValue = t(value ? 'crud:boolean.yes' : 'crud:boolean.no');
   const variant = value ? 'default' : 'secondary';
 
   return (

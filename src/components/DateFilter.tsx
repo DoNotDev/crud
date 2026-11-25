@@ -84,8 +84,8 @@ export function DateFilter({
   const formatDisplayDate = (dateStr: string) => {
     if (!dateStr) return '';
     try {
-      const date = new Date(dateStr + 'T00:00:00');
-      return formatDate(date, locale);
+      // A calendar date (YYYY-MM-DD): formatDate reads it as written, in no zone
+      return formatDate(dateStr, locale);
     } catch {
       return dateStr;
     }
@@ -225,7 +225,6 @@ export function DateFilter({
 
           {/* Calendar */}
           <LazyCalendar
-            errorLabel={tCrud('date.calendarLoadError')}
             selected={
               currentDate ? new Date(currentDate + 'T00:00:00') : undefined
             }

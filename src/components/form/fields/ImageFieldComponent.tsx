@@ -210,7 +210,7 @@ function SortableImageItem({
                 left: 4,
                 padding: 2,
                 background: 'rgba(0,0,0,0.5)',
-                borderRadius: 'var(--radius-sm)',
+                borderRadius: 'var(--radius-interactive)',
                 display: 'flex',
                 zIndex: 2,
                 pointerEvents: 'none',
@@ -250,7 +250,7 @@ function SortableImageItem({
               padding: 4,
               background: 'rgba(0,0,0,0.5)',
               border: 'none',
-              borderRadius: 'var(--radius-sm)',
+              borderRadius: 'var(--radius-interactive)',
               cursor: 'pointer',
               display: 'flex',
               zIndex: 2,
@@ -470,7 +470,7 @@ const ImageFieldComponent = forwardRef<
             onDrop={handleDrop}
             style={{
               border: `var(--border-width) dashed ${error ? 'var(--destructive)' : 'var(--border)'}`,
-              borderRadius: 'var(--radius-lg)',
+              borderRadius: 'var(--radius-surface)',
               padding: 'var(--gap-lg)',
               backgroundColor: 'var(--surface)',
               cursor: 'pointer',

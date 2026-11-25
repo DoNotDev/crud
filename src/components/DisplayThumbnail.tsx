@@ -62,7 +62,8 @@ export function DisplayThumbnail({
       style={{
         width: '100%',
         aspectRatio,
-        borderRadius: 'var(--radius-md)',
+        // A surface, as its placeholder and the ImageGallery thumbnails
+        borderRadius: 'var(--radius-surface)',
         overflow: 'hidden',
         backgroundColor: 'var(--muted)',
         position: 'relative',
@@ -82,6 +83,37 @@ export function DisplayThumbnail({
       />
     </div>
   );
+}
+
+/**
+ * Side of the square image thumbnail in compact displays (list cells): the image
+ * field's compact display (`registerBuiltinFieldTypes`) and {@link ImagePlaceholder}.
+ * One value, so a cell with and one without an image keep the same size.
+ *
+ * @since 0.3.8
+ */
+export const LIST_THUMBNAIL_SIZE = '40px';
+
+// Module-level: no style object per render
+const PLACEHOLDER_STYLE = {
+  display: 'block',
+  width: LIST_THUMBNAIL_SIZE,
+  height: LIST_THUMBNAIL_SIZE,
+  flexShrink: 0,
+  borderRadius: 'var(--radius-surface)',
+  backgroundColor: 'var(--muted)',
+} as const;
+
+/**
+ * Neutral 40 px tile standing for a missing image in compact displays (list cells),
+ * so an image column keeps its rhythm instead of showing a dash. Decorative
+ * (`aria-hidden`): the empty value has nothing to announce.
+ *
+ * @version 0.1.0
+ * @since 0.3.8
+ */
+export function ImagePlaceholder(): React.ReactElement {
+  return <span aria-hidden="true" data-image-placeholder="" style={PLACEHOLDER_STYLE} />;
 }
 
 export default DisplayThumbnail;
