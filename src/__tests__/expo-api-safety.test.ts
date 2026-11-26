@@ -57,6 +57,8 @@ vi.mock('@donotdev/core', () => ({
   // Built-in display formatters wrap the core text formatters at module load
   FIELD_TEXT_FORMATTERS: new Proxy({}, { get: () => () => '' }),
   handleError: vi.fn(),
+  // FormStore follows the sign-out at module load
+  onQueryCacheIdentityChange: () => () => {},
   isClient: () => false,
   isDev: () => false,
   useFeatureConsent: () => true,

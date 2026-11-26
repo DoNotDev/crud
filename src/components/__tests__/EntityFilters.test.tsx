@@ -156,7 +156,7 @@ describe('EntityFilters', () => {
     ]);
   });
 
-  it('"Clear all filters" is a link-style button beside the active-filter chips, not in the grid', () => {
+  it('"Clear all filters" is a link-style button before the active-filter chips, not in the grid', () => {
     const setFilters = vi.fn();
     vi.mocked(useCrudFilters).mockReturnValueOnce({
       filters: { status: ['active'] },
@@ -172,6 +172,7 @@ describe('EntityFilters', () => {
     expect(clear.getAttribute('variant')).toBe('link');
     expect(grid.contains(clear)).toBe(false);
     expect(clear.parentElement).toBe(screen.getByTestId('filter-chip').parentElement);
+    expect(clear.parentElement!.firstElementChild).toBe(clear);
     fireEvent.click(clear);
     expect(setFilters).toHaveBeenCalledWith({});
   });
@@ -483,6 +484,99 @@ describe('EntityFilters options and chips', () => {
     } finally {
       vi.mocked(useTranslation).mockImplementation(original);
     }
+  });
+
+  describe('matching count', () => {
+    function withCountT(run: () => void) {
+      const original = vi.mocked(useTranslation).getMockImplementation()!;
+      vi.mocked(useTranslation).mockReturnValue({
+        t: Object.assign(
+          (key: string, opts?: { count?: number }) =>
+            opts?.count === undefined ? key : `${key}:${opts.count}`,
+          { t: (key: string) => key }
+        ),
+        i18n: { language: 'en' },
+      } as any);
+      try {
+        run();
+      } finally {
+        vi.mocked(useTranslation).mockImplementation(original);
+      }
+    }
+
+    it('shows filters.count with every item when no filter is active', () => {
+      withCountT(() => {
+        renderFilters();
+        expect(screen.getByText('filters.count:3')).toBeTruthy();
+      });
+    });
+
+    it('counts the items matching the active filters, and follows filter changes', () => {
+      withCountT(() => {
+        setFilters({ type: 'toner' });
+        const { rerender } = renderFilters();
+        expect(screen.getByText('filters.count:2')).toBeTruthy();
+        setFilters({ type: 'toner_pad' });
+        rerender(
+          <EntityFilters
+            entity={skinEntity}
+            data={rows}
+            fieldsToFilter={['type', 'skinTypes', 'brandId', 'size']}
+          />
+        );
+        expect(screen.getByText('filters.count:1')).toBeTruthy();
+      });
+    });
+
+    it('is rendered after the grid', () => {
+      withCountT(() => {
+        const { container } = renderFilters();
+        const grid = container.querySelector('[data-cols]')!;
+        const count = screen.getByText('filters.count:3');
+        expect(
+          grid.compareDocumentPosition(count) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+      });
+    });
+
+    it('inline, sits in a zero-height row outside the filters stack (it adds no space)', () => {
+      withCountT(() => {
+        const { container } = renderFilters();
+        const row = screen.getByText('filters.count:3').parentElement!;
+        expect(row.style.blockSize).toMatch(/^0(px)?$/);
+        expect(row.contains(container.querySelector('[data-cols]'))).toBe(false);
+        expect(row.parentElement).toBe(container);
+      });
+    });
+
+    it('sidebar, stays in the flow inside the panel', () => {
+      withCountT(() => {
+        render(
+          <EntityFilters
+            entity={skinEntity}
+            data={rows}
+            fieldsToFilter={['type']}
+            variant="sidebar"
+          />
+        );
+        const count = screen.getByText('filters.count:3');
+        expect(count.parentElement!.style.blockSize).toBe('');
+      });
+    });
+
+    it('is hidden with hideCount', () => {
+      withCountT(() => {
+        render(
+          <EntityFilters
+            entity={skinEntity}
+            data={rows}
+            fieldsToFilter={['type']}
+            hideCount
+          />
+        );
+        expect(screen.queryByText(/^filters\.count/)).toBeNull();
+      });
+    });
   });
 
   it('passes urlSync and the entity to useCrudFilters', () => {

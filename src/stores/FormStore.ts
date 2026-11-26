@@ -15,7 +15,7 @@
  * @author AMBROISE PARK Consulting
  */
 
-import { createDoNotDevStore, generateUUID } from '@donotdev/core';
+import { createDoNotDevStore, generateUUID, onQueryCacheIdentityChange } from '@donotdev/core';
 import type { AnyEntity, BulkAcrossBatch } from '@donotdev/core';
 
 /**
@@ -112,6 +112,8 @@ export interface FormStoreState {
   forms: Record<string, FormState>;
   /** Draft data keyed by draftKey (persisted) */
   drafts: Record<string, DraftData>;
+  /** Bumped by clearAllDrafts: open forms drop their pending autosave (transient) */
+  draftsEpoch: number;
   /** Edit forms open on a record, in opening order: the last one wins (transient) */
   openRecords: OpenRecordForm[];
   /** Joined child rows' edits keyed by `childRowsKey()` (transient; persisted through the form's draft) */
@@ -177,6 +179,11 @@ export interface FormStoreActions {
   hasDraft: (key: string) => boolean;
   /** Remove drafts older than maxAgeMs (default: 7 days) */
   clearStaleDrafts: (maxAgeMs?: number) => void;
+  /**
+   * Remove every draft and bump `draftsEpoch`, so open forms drop their pending
+   * autosave instead of writing it back. Called on sign-out.
+   */
+  clearAllDrafts: () => void;
 
   // Open records + joined child rows (transient)
   /**
@@ -264,6 +271,7 @@ export const useFormStore = createDoNotDevStore<
     return {
       forms: {},
       drafts: {},
+      draftsEpoch: 0,
       openRecords: [],
       childEdits: {},
       childWriters: {},
@@ -531,6 +539,10 @@ export const useFormStore = createDoNotDevStore<
         });
       },
 
+      clearAllDrafts: () => {
+        set((state) => ({ drafts: {}, draftsEpoch: state.draftsEpoch + 1 }));
+      },
+
       // ===================================================================
       // Open records + joined child rows (transient)
       // ===================================================================
@@ -678,6 +690,13 @@ export const useFormStore = createDoNotDevStore<
       state?.clearStaleDrafts();
     },
   },
+});
+
+// Sign-out ends the signed-out user's drafts (owner 2026-11-26): the next person on this
+// browser never gets them back. Sign-in keeps them: they are the guest's own edits.
+// Browser only (the identity never changes on the server); no auth provider: never fires.
+onQueryCacheIdentityChange((userId) => {
+  if (userId === null) useFormStore.getState().clearAllDrafts();
 });
 
 // ===================================================================

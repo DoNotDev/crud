@@ -71,6 +71,7 @@ import { useCrudFilters } from '../hooks/useCrudFilters';
 import { useReferenceResolver } from '../hooks/useReferenceResolver';
 import type { FilterState } from '../types';
 import { useCrudCardList } from '../useCrudCardList';
+import { applyFilters } from '../utils/clientListProcessing';
 import { matchesFilter } from '../utils/matchesFilter';
 
 // Re-export for backward compatibility
@@ -100,6 +101,20 @@ const INLINE_FILTER_COLS: GridCols = [
 
 /** One grid cell per filter. Module-level: no style object per render. */
 const FILTER_CELL_STYLE = { gridColumn: 'span 1', gridRow: 'span 1' } as const;
+
+/**
+ * ON PURPOSE (owner order 2026-11-26), do not "fix": no extra row, no extra gap, no
+ * in-flow height. The layout is [filters] gap [results], with the count inside that gap.
+ * Inline count: a zero-height row after the filters, so the count takes no space of its
+ * own and its line sits in the gap the page puts between the filters and the results
+ * (`--gap-lg` between Sections: 32px at 390px, a small text line ~18px). Offset half a
+ * `--gap-sm` below the filters, out of the flow. Module-level: no style object per render.
+ */
+const COUNT_IN_GAP_STYLE = {
+  blockSize: 0,
+  position: 'relative',
+  insetBlockStart: 'calc(var(--gap-sm) / 2)',
+} as const;
 
 /** Debounce of typed filters (contains text, min / max) before they apply. */
 const TYPED_FILTER_DELAY_MS = 250;
@@ -181,6 +196,14 @@ export interface EntityFiltersProps<
    * @since 0.3.0
    */
   urlSync?: boolean;
+  /**
+   * Hide the count of items matching the active filters (`filters.count`, pluralised),
+   * shown under the filters by default. Inline, it takes no height: it sits in the gap
+   * the page leaves between the filters and the results. In the sidebar, it ends the panel. The count applies the filter state to the
+   * `data` prop (or the auto-fetched items) with `applyFilters`.
+   * @default false
+   */
+  hideCount?: boolean;
 }
 
 /**
@@ -204,7 +227,8 @@ export interface EntityFiltersProps<
  * - Rating fields: stars under the same floating label as every other filter
 
  * - Clear individual filters (chips with option labels), or all of them with
- *   the "Clear all filters" link beside the chips
+ *   the "Clear all filters" link before the chips
+ * - The number of items matching the active filters under the filters (`hideCount` turns it off)
  * - URL sync of the entity collection's state (`urlSync`, CRUD.md "Filters")
 
  */
@@ -223,6 +247,7 @@ export function EntityFilters<
   viewerRole = 'guest',
   filterKey,
   urlSync,
+  hideCount = false,
 }: EntityFiltersProps<T>) {
   const isSidebar = variant === 'sidebar';
 
@@ -1063,6 +1088,12 @@ export function EntityFilters<
     return pills.length > 0 ? pills : null;
   }, [filters, entity.fields, t, tCrud, hasActiveFilters, referenceData]);
 
+  // Items matching the active filters: the same matching as the lists (`applyFilters`)
+  const matchingCount = useMemo(
+    () => applyFilters(data, filters, entity).length,
+    [data, filters, entity]
+  );
+
   // After every hook (rules of hooks): nothing to filter → nothing rendered
   if (!filterElements || filterElements.length === 0) return null;
 
@@ -1070,21 +1101,29 @@ export function EntityFilters<
 
   const validFilterElements = filterElements.filter(Boolean);
 
+  const countText = hideCount ? null : (
+    <Text level="small" variant="muted">
+      {tCrud('filters.count', { count: matchingCount })}
+    </Text>
+  );
+
   const content = (
     <Stack direction="column" gap="tight">
-      {/* Active filter tags, then "Clear all filters" as a small link */}
+      {/* "Clear all filters" as a small link, then the active filter tags */}
       {filterPills && (
         <Stack direction="row" gap="tight" align="center" wrap="wrap">
-          {filterPills}
           <Button variant="link" onClick={handleClearFilters}>
             {tCrud('filter.clearAll')}
           </Button>
+          {filterPills}
         </Stack>
       )}
 
       <Grid cols={cols ?? (isSidebar ? 1 : INLINE_FILTER_COLS)}>
         {validFilterElements}
       </Grid>
+
+      {isSidebar && countText}
     </Stack>
   );
 
@@ -1092,5 +1131,14 @@ export function EntityFilters<
     return <ScrollArea style={{ maxHeight: '100%' }}>{content}</ScrollArea>;
   }
 
-  return content;
+  // Inline: the count adds no height, it sits in the gap below the filters. On purpose
+  // (owner order, see COUNT_IN_GAP_STYLE): not a layout bug, do not move it into the flow.
+  return countText ? (
+    <>
+      {content}
+      <div style={COUNT_IN_GAP_STYLE}>{countText}</div>
+    </>
+  ) : (
+    content
+  );
 }

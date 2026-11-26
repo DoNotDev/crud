@@ -221,6 +221,8 @@ function stripBlobUrls(data: unknown): unknown {
  *   saved with, so a concurrency token read from it stays the draft's base version)
  * - Validation `mode` default `'onTouched'`: a field's first error shows when the user
  *   leaves it, then it re-validates on every change (the fix clears it while typing).
+ *   A field whose `conditions` make it required (or optional) is re-validated at that
+ *   change only once touched, edited, in error, or after a submit: never flagged before.
  *   An invalid submit focuses the first invalid control (DOM order), scrolls it into
  *   view and toasts the fields to fix.
  *
@@ -504,7 +506,10 @@ export function useEntityForm<
   });
 
   // Watch without rendering or validating the entire form on every keystroke.
-  // Only a visibility/requiredness transition revalidates the affected control.
+  // Only a visibility/requiredness transition revalidates the affected control, and only
+  // once the user has met it (touched, edited, already in error) or sent the form: a field
+  // that becomes required is not flagged before then (the `onTouched` rule). Hiding a field
+  // always clears its error.
   useEffect(() => {
     let previous = getFormConditionStates(entity, formMethods.getValues());
     let mounted = true;
@@ -539,7 +544,8 @@ export function useEntityForm<
         // Condition state names come directly from this entity's field map.
         const name = state.name as Path<State>;
         if (!state.visible) formMethods.clearErrors(name);
-        pending.add(name);
+        const field = formMethods.getFieldState(name);
+        if (field.isTouched || field.isDirty || field.error !== undefined || formMethods.formState.isSubmitted) pending.add(name);
       }
       if (pending.size > 0) void revalidate();
     });
@@ -863,6 +869,8 @@ export function useEntityForm<
   // the entire form tree on every keystroke. The callback is a side-effect only.
   // Non-null while a debounced draft write is pending.
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** FormStore `draftsEpoch` when the pending autosave was scheduled. */
+  const saveEpochRef = useRef(0);
   const cancelDraftSave = () => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = null;
@@ -896,10 +904,14 @@ export function useEntityForm<
 
     // Debounce by 3 seconds
     cancelDraftSave();
+    // Sign-out clears every draft (FormStore.clearAllDrafts bumps the epoch): an autosave
+    // scheduled before it is dropped, never written back for the next person.
+    const epoch = useFormStore.getState().draftsEpoch;
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
-      writeDraftRef.current();
+      if (useFormStore.getState().draftsEpoch === epoch) writeDraftRef.current();
     }, 3000);
+    saveEpochRef.current = epoch;
   };
 
   useEffect(() => {
@@ -911,7 +923,8 @@ export function useEntityForm<
       subscription.unsubscribe();
       if (saveTimeoutRef.current) {
         cancelDraftSave();
-        flush();
+        // Same rule as the timer: a sign-out since it was scheduled drops it.
+        if (useFormStore.getState().draftsEpoch === saveEpochRef.current) flush();
       }
     };
   }, [formMethods, draftKey, entity.name, documentId]);

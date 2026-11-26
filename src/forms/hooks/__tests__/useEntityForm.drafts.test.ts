@@ -207,6 +207,19 @@ describe('entity form local drafts and submitted editor baselines', () => {
     expect(draft()).toMatchObject({ title: 'Typed then left' });
   });
 
+  it('drops the pending autosave when every draft is cleared (sign-out): no write-back on timer or unmount', () => {
+    vi.useFakeTimers();
+    const { result, unmount } = mount();
+    act(() => result.current.setValue('title', 'Typed before sign-out', { shouldDirty: true }));
+    useFormStore.getState().saveDraft('other-form-draft', { title: 'Other' }, entity.name);
+    act(() => useFormStore.getState().clearAllDrafts());
+    expect(useFormStore.getState().drafts).toEqual({});
+    act(() => { vi.advanceTimersByTime(3000); });
+    expect(draft()).toBeUndefined();
+    unmount();
+    expect(draft()).toBeUndefined();
+  });
+
   it('does not write a draft on unmount when nothing is pending', () => {
     const { unmount } = mount();
     unmount();

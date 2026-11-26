@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
+import { syncQueryCacheIdentity } from '@donotdev/core';
+
 import { useFormStore } from '../FormStore';
 import type { FormStoreActions, FormStoreState } from '../FormStore';
 
@@ -120,5 +122,23 @@ describe('real FormStore domain lifecycle', () => {
     const saved = JSON.parse(localStorage.getItem('dndev-form-drafts')!);
     expect(saved.state).toEqual({ drafts: useFormStore.getState().drafts });
     expect(store.loadDraft('draft')?.data).toEqual({ title: 'Draft title' });
+  });
+});
+
+describe('drafts follow the sign-out', () => {
+  it('clears every draft and bumps the epoch on sign-out, keeps them on sign-in', () => {
+    const store = useFormStore.getState();
+    syncQueryCacheIdentity('u1'); // first identity: adopted, no change event
+    store.saveDraft('a', { title: 'A' }, 'Entity');
+    store.saveDraft('b', { title: 'B' }, 'Entity');
+    const epoch = useFormStore.getState().draftsEpoch;
+    syncQueryCacheIdentity(null); // sign-out
+    expect(useFormStore.getState().drafts).toEqual({});
+    expect(useFormStore.getState().draftsEpoch).toBe(epoch + 1);
+    expect(JSON.parse(localStorage.getItem('dndev-form-drafts')!).state).toEqual({ drafts: {} });
+    store.saveDraft('guest', { title: 'Guest' }, 'Entity');
+    syncQueryCacheIdentity('u2'); // sign-in
+    expect(store.loadDraft('guest')?.data).toEqual({ title: 'Guest' });
+    expect(useFormStore.getState().draftsEpoch).toBe(epoch + 1);
   });
 });

@@ -128,7 +128,10 @@ describe('condition-aware entity forms', () => {
 
   it('conditional required overrides static required in both directions', async () => {
     const { result } = mount();
-    await act(async () => { await result.current.trigger('optionalOverride'); });
+    await act(async () => {
+      result.current.setValue('optionalOverride', null, { shouldTouch: true });
+      await result.current.trigger('optionalOverride');
+    });
     expect(result.current.getFieldState('optionalOverride').error).toBeUndefined();
     await act(async () => { result.current.setValue('billingCountry', 'DE'); });
     await waitFor(() => expect(result.current.getFieldState('optionalOverride').error).toBeDefined());
@@ -147,7 +150,9 @@ describe('condition-aware entity forms', () => {
     let started = false;
     let calls = 0;
     await act(async () => {
-      result.current.setValue('siret', 'bad');
+      result.current.setValue('companyId', 'x', { shouldTouch: true });
+      result.current.setValue('optionalOverride', null, { shouldTouch: true });
+      result.current.setValue('siret', 'bad', { shouldTouch: true });
       result.current.setValue('billingCountry', 'DE');
     });
     await waitFor(() => expect(result.current.getFieldState('companyId').error).toBeDefined());
@@ -172,11 +177,33 @@ describe('condition-aware entity forms', () => {
     expect(result.current.getFieldState('optionalOverride').error).toBeDefined();
   });
 
+  it('does not flag a field that becomes required before it is touched or the form is sent', async () => {
+    const { result } = mount();
+    const validation = vi.fn(() => Promise.resolve());
+    validationGate.hold = validation;
+    await act(async () => { result.current.setValue('billingCountry', 'DE'); });
+    expect(validation).not.toHaveBeenCalled();
+    expect(result.current.getFieldState('companyId').error).toBeUndefined();
+    expect(result.current.getFieldState('optionalOverride').error).toBeUndefined();
+    validationGate.hold = undefined;
+    const submit = vi.fn();
+    await act(async () => {
+      result.current.setValue('companyId', null);
+      await result.current.handleSubmit(submit)();
+    });
+    expect(submit).not.toHaveBeenCalled();
+    expect(result.current.getFieldState('optionalOverride').error).toBeDefined();
+    // Sent once: a later requiredness change is checked at once.
+    await act(async () => { result.current.setValue('billingCountry', 'FR'); });
+    await waitFor(() => expect(result.current.getFieldState('optionalOverride').error).toBeUndefined());
+  });
+
   it('stops queued revalidations after unmount', async () => {
     const { result, unmount } = mount();
     let release: () => void = () => { throw new Error('Validation has not started'); };
     let started = false;
     const hold = vi.fn(() => new Promise<void>((resolve) => { started = true; release = resolve; }));
+    await act(async () => { result.current.setValue('companyId', 'x', { shouldTouch: true }); });
     validationGate.hold = hold;
     await act(async () => { result.current.setValue('billingCountry', 'DE'); });
     await waitFor(() => expect(started).toBe(true));
