@@ -74,7 +74,7 @@ export const RichTextDisplay: ComponentType<RichTextDisplayProps> = ({
           fontSize: 'var(--font-size-base)',
           lineHeight: '1.6',
         }}
-        className="prose prose-sm max-w-none"
+        className="prose"
       />
       <style>{`
         /* Match Tiptap ProseMirror styling */

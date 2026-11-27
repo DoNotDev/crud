@@ -14,6 +14,13 @@ import type { ComponentType } from 'react';
 import { Avatar, Text } from '@donotdev/components';
 import type { EntityField } from '@donotdev/core';
 
+/** Box per `size`: sm / md the 48px touch target, lg 64px (inline: wins over the Avatar's 32px default) */
+const SIZE_STYLES = {
+  sm: { width: 'var(--touch-target)', height: 'var(--touch-target)' },
+  md: { width: 'var(--touch-target)', height: 'var(--touch-target)' },
+  lg: { width: '4rem', height: '4rem' },
+} as const;
+
 export interface ImageFieldDisplayProps {
   /** Field configuration */
   config: EntityField<'image'>;
@@ -24,7 +31,7 @@ export interface ImageFieldDisplayProps {
   t: (key: string, options?: Record<string, any>) => string;
   /** Additional CSS classes */
   className?: string;
-  /** Image size */
+  /** Size: `sm` / `md` 48px (touch target), `lg` 64px. @default 'md' */
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -50,11 +57,6 @@ export const ImageFieldDisplay: ComponentType<ImageFieldDisplayProps> = ({
     );
   }
 
-  const sizeClasses = {
-    sm: 'size-touch',
-    md: 'size-touch',
-    lg: 'h-16 w-16',
-  };
 
   const getInitials = (label: string): string => {
     return label
@@ -70,7 +72,8 @@ export const ImageFieldDisplay: ComponentType<ImageFieldDisplayProps> = ({
       src={value}
       alt={config.label || 'Image'}
       fallback={getInitials(config.label || 'IMG')}
-      className={`${sizeClasses[size]} ${className || ''}`}
+      className={className}
+      style={SIZE_STYLES[size]}
     />
   );
 };

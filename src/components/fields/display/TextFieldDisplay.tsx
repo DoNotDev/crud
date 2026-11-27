@@ -211,7 +211,7 @@ export const TextFieldDisplay: ComponentType<TextFieldDisplayProps> = ({
       )}
       <Stack direction="row" align="center" gap="tight">
         <div
-          className={cn('dndev-flex-1', truncate && 'truncate', className)}
+          className={cn('dndev-flex-1', className)}
           title={truncate && value.length > maxLength ? value : undefined}
         >
           <Text as="span">{truncatedValue}</Text>
